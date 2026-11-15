@@ -126,6 +126,7 @@ export function errorText(err) {
     tiebreak: 'Voer eerst supabase/004_extra.sql uit in Supabase om schiftingsvragen op te slaan.',
     geen_schifting: 'Deze schiftingsvraag is niet voor jou.',
     start_music: 'Voer eerst supabase/005_muziek_start_einde.sql uit in Supabase.',
+    answer_photo_path: 'Voer eerst supabase/006_antwoordfoto.sql uit in Supabase om een foto bij het antwoord op te slaan.',
     'Invalid login credentials': 'E-mailadres of wachtwoord klopt niet.',
     'Failed to fetch': 'Geen verbinding. Controleer het internet en probeer opnieuw.',
   };
@@ -552,7 +553,7 @@ function musicDebug() {
 // ---------- Versie (altijd de nieuwste versie laden) ----------
 
 // Bij elke nieuwe versie ophogen, samen met version.txt en de ?v=… in index.html en de imports.
-export const APP_VERSION = '19';
+export const APP_VERSION = '20';
 
 /**
  * GitHub Pages en Safari bewaren bestanden een tijd in de cache. Is er een nieuwere

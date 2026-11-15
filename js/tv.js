@@ -3,11 +3,11 @@ import {
   sb, h, mount, toast, load, save, LETTERS, syncClock, secondsLeft,
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
-} from './common.js?v=19';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=19';
+} from './common.js?v=20';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=20';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking,
-} from './scoring.js?v=19';
+} from './scoring.js?v=20';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -219,9 +219,15 @@ async function goTo(status, index) {
   if (!q) return;
   state.busy = true;
   try {
+    // In de antwoordenronde: de foto bij het antwoord, als die er is.
+    let path = q.photo_path;
+    if (status === 'answers') {
+      const { data: k } = await sb.from('question_answers').select('answer_photo_path').eq('question_id', q.id).maybeSingle();
+      if (k?.answer_photo_path) path = k.answer_photo_path;
+    }
     let photoUrl = null;
-    if (q.photo_path) {
-      const { data } = await sb.storage.from('fotos').createSignedUrl(q.photo_path, SIGNED_URL_SECONDS);
+    if (path) {
+      const { data } = await sb.storage.from('fotos').createSignedUrl(path, SIGNED_URL_SECONDS);
       photoUrl = data?.signedUrl || null;
     }
     await setState(status, q.id, photoUrl);
@@ -869,7 +875,7 @@ async function renderReveal() {
   }
 
   const n = state.players.length;
-  const view = h('div', { class: `question reveal reveal-${q.kind} ${photo && q.kind === 'meerkeuze' ? 'has-photo' : ''}` },
+  const view = h('div', { class: `question reveal reveal-${q.kind} ${photo ? 'has-photo' : ''}` },
     h('header', { class: 'q-head' },
       h('div', { class: 'q-meta' },
         q.category && h('span', { class: 'label' }, q.category),
@@ -880,7 +886,7 @@ async function renderReveal() {
       ),
     ),
     h('div', { class: 'q-body' },
-      photo && q.kind === 'meerkeuze' && h('div', { class: 'photo' }, h('img', { src: photo, alt: '' })),
+      photo && h('div', { class: 'photo' }, h('img', { src: photo, alt: '' })),
       h('div', { class: 'q-main' },
         h('h2', { class: 'q-text q-text-small' }, q.text),
         q.media_url && spotifyPlayer(q.media_url),
@@ -892,7 +898,7 @@ async function renderReveal() {
       h('button', { class: 'btn btn-gold btn-lg', onclick: () => { if (isLast) playMusic(state.music?.end); next(); } }, isLast ? 'Einde antwoordenronde ▶' : 'Volgende antwoord ▶'),
     ),
   );
-  mount(stage('screen-plain', bgLayer(i, Boolean(photo && q.kind === 'meerkeuze')), view));
+  mount(stage('screen-plain', bgLayer(i, Boolean(photo)), view));
 }
 
 function revealChoice(q, correct) {
@@ -1131,12 +1137,13 @@ async function showPreviewInner() {
   const q = preview.list[preview.index];
   if (!q) return;
   history.replaceState(null, '', `#tv?voorbeeld=${q.id}`);
+  const answers = preview.mode === 'antwoord' && !q.tiebreak;
+  const path = (answers && preview.keys.get(q.id)?.answer_photo_path) || q.photo_path;
   let photoUrl = null;
-  if (q.photo_path) {
-    const { data } = await sb.storage.from('fotos').createSignedUrl(q.photo_path, 60 * 60);
+  if (path) {
+    const { data } = await sb.storage.from('fotos').createSignedUrl(path, 60 * 60);
     photoUrl = data?.signedUrl || null;
   }
-  const answers = preview.mode === 'antwoord' && !q.tiebreak;
   state.game = {
     id: 'voorbeeld',
     status: q.tiebreak ? 'schifting' : answers ? 'answers' : 'question',
