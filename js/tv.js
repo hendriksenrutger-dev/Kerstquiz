@@ -3,11 +3,11 @@ import {
   sb, h, mount, toast, load, save, LETTERS, syncClock, secondsLeft,
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
-} from './common.js?v=20';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=20';
+} from './common.js?v=21';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=21';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking,
-} from './scoring.js?v=20';
+} from './scoring.js?v=21';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -99,25 +99,21 @@ function renderHome(savedGame) {
   stopLive();
   bgMusic(null);
   const n = state.questions.length;
-  const trees = state.questions.filter((q) => q.rate_tree).length;
   const running = savedGame && savedGame.status !== 'tree' ? savedGame : null;
   const content = h('div', { class: 'stack home' },
     h('h1', { class: 'title' }, 'Kerstquiz'),
-    h('p', { class: 'lead' },
-      n === 0
-        ? 'Er staan nog geen vragen klaar. Voeg ze toe via "Beheer".'
-        : `${n} ${n === 1 ? 'vraag' : 'vragen'} klaar${trees ? `, waarvan ${trees} ${trees === 1 ? 'boom' : 'bomen'} met cijfer` : ''}.`),
+    n === 0 && h('p', { class: 'lead' }, 'Er staan nog geen vragen klaar. Voeg ze toe via Beheer.'),
     h('div', { class: 'home-buttons' },
-      h('button', { class: 'btn btn-gold btn-lg', onclick: newGame, disabled: n === 0 }, '▶ Start nieuwe quiz'),
+      h('button', { class: 'btn btn-gold btn-lg', onclick: newGame, disabled: n === 0 }, '▶ Start quiz'),
       running && h('button', { class: 'btn btn-ghost btn-lg', onclick: () => { if (running.status === 'lobby') playMusic(state.music?.start); openGame(running); } },
-        `Verder met spel ${running.code}`),
+        `Verder met ${running.code}`),
+      h('a', { class: 'btn btn-ghost btn-lg', href: '#beheer' }, '✎ Beheer'),
     ),
-    h('div', { class: 'row' },
+    h('div', { class: 'row home-links' },
       fullscreenButton(),
-      h('a', { class: 'link', href: '#beheer' }, 'Beheer'),
       h('button', { class: 'link', onclick: logout }, 'Uitloggen'),
+      h('span', { class: 'version' }, `versie ${APP_VERSION}`),
     ),
-    h('p', { class: 'version' }, `versie ${APP_VERSION}`),
   );
   mount(stage('screen-free', heroLayout(content)));
 }
