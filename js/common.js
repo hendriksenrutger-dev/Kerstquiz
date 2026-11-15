@@ -127,6 +127,7 @@ export function errorText(err) {
     geen_schifting: 'Deze schiftingsvraag is niet voor jou.',
     start_music: 'Voer eerst supabase/005_muziek_start_einde.sql uit in Supabase.',
     answer_photo_path: 'Voer eerst supabase/006_antwoordfoto.sql uit in Supabase om een foto bij het antwoord op te slaan.',
+    'mime type image/gif is not supported': 'GIF wordt nog niet toegestaan: voer eerst supabase/007_gif.sql uit in Supabase.',
     'Invalid login credentials': 'E-mailadres of wachtwoord klopt niet.',
     'Failed to fetch': 'Geen verbinding. Controleer het internet en probeer opnieuw.',
   };
@@ -553,7 +554,7 @@ function musicDebug() {
 // ---------- Versie (altijd de nieuwste versie laden) ----------
 
 // Bij elke nieuwe versie ophogen, samen met version.txt en de ?v=… in index.html en de imports.
-export const APP_VERSION = '22';
+export const APP_VERSION = '23';
 
 /**
  * GitHub Pages en Safari bewaren bestanden een tijd in de cache. Is er een nieuwere

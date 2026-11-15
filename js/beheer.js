@@ -2,9 +2,9 @@
 // spelinstellingen en een spel starten. Licht thema; werkt op iPad en iPhone.
 import {
   sb, h, mount, toast, LETTERS, errorText, loginForm, parseSpotify, cleanSpotifyLink, spotifyPlayer,
-} from './common.js?v=22';
-import { parseNumber, formatNumber } from './scoring.js?v=22';
-import { addTestPlayers } from './proef.js?v=22';
+} from './common.js?v=23';
+import { parseNumber, formatNumber } from './scoring.js?v=23';
+import { addTestPlayers } from './proef.js?v=23';
 
 const TREE_CATEGORY = 'Van wie is deze kerstboom?';
 // Drie soorten muziekvragen (zie renderMusicForm)
@@ -27,6 +27,7 @@ const KINDS = [
 const KIND_LABEL = Object.fromEntries(KINDS.map((k) => [k.value, k.label]));
 const PHOTO_MAX = 1600;
 const PHOTO_QUALITY = 0.8;
+const GIF_MAX_BYTES = 10 * 1024 * 1024;
 
 const state = {
   questions: [],
@@ -137,8 +138,9 @@ async function resizePhoto(file) {
 }
 
 async function uploadPhoto(blob) {
-  const path = `vragen/${crypto.randomUUID()}.jpg`;
-  const { error } = await sb.storage.from('fotos').upload(path, blob, { contentType: 'image/jpeg', upsert: false });
+  const gif = blob.type === 'image/gif';
+  const path = `vragen/${crypto.randomUUID()}.${gif ? 'gif' : 'jpg'}`;
+  const { error } = await sb.storage.from('fotos').upload(path, blob, { contentType: gif ? 'image/gif' : 'image/jpeg', upsert: false });
   if (error) throw error;
   return path;
 }
@@ -170,12 +172,19 @@ function photoPicker(currentUrl, { big = false } = {}) {
   input.addEventListener('change', async () => {
     const file = input.files?.[0];
     if (!file) return;
-    status.textContent = 'Foto verkleinen…';
     try {
-      blob = await resizePhoto(file);
+      if (file.type === 'image/gif') {
+        // Bewegende GIF: niet verkleinen of omzetten, anders blijft alleen het eerste beeld over.
+        if (file.size > GIF_MAX_BYTES) throw new Error(`Deze GIF is te groot (${Math.round(file.size / 1048576)} MB). Maximaal 10 MB.`);
+        blob = file;
+        status.textContent = `Bewegende GIF (${Math.round(blob.size / 1024)} kB)`;
+      } else {
+        status.textContent = 'Foto verkleinen…';
+        blob = await resizePhoto(file);
+        status.textContent = `Klaar (${Math.round(blob.size / 1024)} kB)`;
+      }
       removed = false;
       show(URL.createObjectURL(blob));
-      status.textContent = `Klaar (${Math.round(blob.size / 1024)} kB)`;
     } catch (e) {
       status.textContent = e.message;
     }
