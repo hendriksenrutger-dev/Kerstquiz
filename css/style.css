@@ -786,3 +786,22 @@ body.beheer {
 .version { color: var(--muted); font-size: 13px; opacity: .7; }
 .bg-music { flex-wrap: wrap; }
 .bg-music-debug { flex-basis: 100%; color: var(--muted); font: 500 11px/1.3 ui-monospace, monospace; padding: 2px 4px 0; }
+
+/* Sfeerbeelden achter de vragen: foto met donkergroene laag (links sterk, rechts lichter) */
+.q-bg { position: absolute; inset: 0; z-index: 0; background-size: cover; background-position: right center; }
+.q-bg::after {
+  content: ''; position: absolute; inset: 0;
+  background:
+    linear-gradient(90deg, rgba(15, 42, 29, .92) 0%, rgba(15, 42, 29, .84) 40%, rgba(15, 42, 29, .55) 72%, rgba(15, 42, 29, .38) 100%),
+    linear-gradient(0deg, rgba(15, 42, 29, .6) 0%, rgba(15, 42, 29, 0) 25%);
+}
+.q-bg-soft::after { background: rgba(15, 42, 29, .86); }
+.stage > .question { position: relative; z-index: 1; }
+
+/* Leesbaarheid boven de foto */
+.stage .timer { background: rgba(15, 42, 29, .85); }
+.stage .q-foot .btn-ghost { background: rgba(15, 42, 29, .85); }
+.stage .label { background: #2D3D23; }
+.stage .answered, .stage .q-count { text-shadow: 0 1px 6px rgba(15, 42, 29, .9); }
+.stage .option { background: rgba(23, 57, 42, .88); }
+.stage .q-hint { background: rgba(23, 57, 42, .85); }
