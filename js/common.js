@@ -555,7 +555,7 @@ function musicDebug() {
 // ---------- Versie (altijd de nieuwste versie laden) ----------
 
 // Bij elke nieuwe versie ophogen, samen met version.txt en de ?v=… in index.html en de imports.
-export const APP_VERSION = '24';
+export const APP_VERSION = '25';
 
 /**
  * GitHub Pages en Safari bewaren bestanden een tijd in de cache. Is er een nieuwere
@@ -598,4 +598,61 @@ export function brandTitle(extraClass = '') {
 /** Fijne gouden sierlijn met een sterretje. */
 export function ornament() {
   return h('div', { class: 'ornament', 'aria-hidden': 'true' }, h('span'), '✦', h('span'));
+}
+
+// ---------- Speler die de tv zelf start en stopt (muziek bij vraag en antwoord) ----------
+
+/**
+ * Spotify-speler via de iFrame API die vanuit de app te bedienen is.
+ * play() moet binnen een tik worden aangeroepen (anders houdt de browser het tegen).
+ * Speelt één keer (geen herhalen).
+ */
+export function deckPlayer(link, { height = 152 } = {}) {
+  const s = parseSpotify(link);
+  if (!s) return null;
+  const holder = h('div', { class: 'spotify-holder' });
+  const el = h('div', { class: 'deck-player', 'data-link': link }, holder);
+  let ctrl = null;
+  let wanted = false;
+  let playing = false;
+  const listeners = [];
+
+  const start = () => {
+    if (!ctrl) return;
+    if (typeof ctrl.seek === 'function') ctrl.seek(0);
+    if (typeof ctrl.play === 'function') ctrl.play(); else ctrl.togglePlay();
+  };
+  const init = () => {
+    if (!holder.isConnected) { requestAnimationFrame(init); return; }
+    loadSpotifyApi().then((api) => {
+      api.createController(holder, { uri: `spotify:${s.type}:${s.id}`, width: '100%', height }, (c) => {
+        ctrl = c;
+        c.addListener('playback_update', (e) => {
+          playing = !e.data.isPaused;
+          listeners.forEach((f) => f(playing));
+        });
+        if (wanted) start();
+      });
+    }).catch(() => {
+      holder.replaceWith(spotifyPlayer(link)); // zonder API: gewone speler, zelf op ▶ tikken
+    });
+  };
+  init();
+
+  const api = {
+    el,
+    play() { wanted = true; start(); },
+    pause() {
+      wanted = false;
+      if (ctrl && playing) { if (typeof ctrl.pause === 'function') ctrl.pause(); else ctrl.togglePlay(); }
+    },
+    toggle() {
+      if (playing) { api.pause(); return; }
+      wanted = true;
+      if (!ctrl) return;
+      if (typeof ctrl.resume === 'function') ctrl.resume(); else ctrl.togglePlay();
+    },
+    onChange(f) { listeners.push(f); f(playing); },
+  };
+  return api;
 }
