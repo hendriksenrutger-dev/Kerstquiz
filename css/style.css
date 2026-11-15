@@ -782,3 +782,5 @@ body.beheer {
 .p-rating-big { border-top: 0; padding-top: 0; }
 .p-rating-big .p-rating-title { font-size: 22px; font-family: var(--serif); }
 .p-rating-big .p-rate { min-height: 60px; font-size: 22px; }
+
+.version { color: var(--muted); font-size: 13px; opacity: .7; }

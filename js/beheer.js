@@ -2,9 +2,9 @@
 // spelinstellingen en een spel starten. Licht thema; werkt op iPad en iPhone.
 import {
   sb, h, mount, toast, LETTERS, errorText, loginForm, parseSpotify, cleanSpotifyLink, spotifyPlayer,
-} from './common.js';
-import { parseNumber, formatNumber } from './scoring.js';
-import { addTestPlayers } from './proef.js';
+} from './common.js?v=13';
+import { parseNumber, formatNumber } from './scoring.js?v=13';
+import { addTestPlayers } from './proef.js?v=13';
 
 const TREE_CATEGORY = 'Van wie is deze kerstboom?';
 // Drie soorten muziekvragen (zie renderMusicForm)

@@ -495,3 +495,26 @@ export function loopingSpotifyPlayer(link) {
     },
   };
 }
+
+// ---------- Versie (altijd de nieuwste versie laden) ----------
+
+// Bij elke nieuwe versie ophogen, samen met version.txt en de ?v=… in index.html en de imports.
+export const APP_VERSION = '13';
+
+/**
+ * GitHub Pages en Safari bewaren bestanden een tijd in de cache. Is er een nieuwere
+ * versie online (version.txt), laad de pagina dan opnieuw met ?v=… in de url, zodat
+ * de browser alle nieuwe bestanden ophaalt.
+ */
+export async function checkVersion() {
+  try {
+    const res = await fetch(`version.txt?t=${Date.now()}`, { cache: 'no-store' });
+    if (!res.ok) return;
+    const online = (await res.text()).trim();
+    if (!online || online === APP_VERSION) return;
+    const params = new URLSearchParams(location.search);
+    if (params.get('v') === online) return; // al geprobeerd: niet blijven herladen
+    params.set('v', online);
+    location.replace(`${location.pathname}?${params}${location.hash}`);
+  } catch { /* offline: dan maar de huidige versie */ }
+}
