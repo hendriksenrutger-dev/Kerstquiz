@@ -1,0 +1,340 @@
+/* Kerstquiz – ontwerp volgens SPEC hoofdstuk 9 */
+
+:root {
+  --bg: #0F2A1D;
+  --surface: #17392A;
+  --border: #2B5A43;
+  --text: #F5F1E6;
+  --muted: #B8CBBE;
+  --gold: #E3B04B;
+  --opt-a: #E3B04B;
+  --opt-b: #F09C8F;
+  --opt-c: #F5F1E6;
+  --opt-d: #9ED4B0;
+  --good: #8FE0A8;
+  --bad: #F09C8F;
+
+  --beheer-bg: #F6F3EA;
+  --beheer-surface: #FFFFFF;
+  --beheer-text: #0F2A1D;
+
+  --serif: 'Playfair Display', Georgia, 'Times New Roman', serif;
+  --sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --radius: 14px;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body { margin: 0; height: 100%; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 17px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+}
+
+h1, h2, h3, .serif { font-family: var(--serif); font-weight: 700; margin: 0; }
+p { margin: 0; }
+.title { font-family: var(--serif); font-weight: 700; color: var(--text); line-height: 1.05; }
+.lead { font-size: 1.15em; color: var(--text); }
+.muted { color: var(--muted); }
+.gold { color: var(--gold); }
+.big { font-size: 1.5em; font-weight: 700; }
+.small-caps { text-transform: uppercase; letter-spacing: .12em; font-size: .8em; font-weight: 600; }
+.center { text-align: center; align-items: center; justify-content: center; }
+.stack { display: flex; flex-direction: column; gap: 16px; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
+.hint { color: var(--muted); font-size: .9em; }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* ---------- knoppen en formulieren ---------- */
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .4em;
+  min-height: 48px; padding: 0 22px;
+  border-radius: 999px; border: 2px solid transparent;
+  font: 600 1em var(--sans); text-decoration: none; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .08s ease, opacity .15s ease;
+}
+.btn:active:not(:disabled) { transform: scale(.97); }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn-gold { background: var(--gold); color: var(--bg); }
+.btn-ghost { background: transparent; color: var(--text); border-color: var(--border); }
+.btn-green { background: var(--bg); color: var(--text); }
+.btn-block { width: 100%; }
+.btn-lg { min-height: 60px; padding: 0 30px; font-size: 1.15em; }
+.btn:focus-visible, .link:focus-visible, input:focus-visible, .p-option:focus-visible {
+  outline: 3px solid var(--gold); outline-offset: 3px;
+}
+
+.link {
+  background: none; border: 0; padding: 8px 0; min-height: 44px;
+  color: var(--muted); font: inherit; font-size: .9em; text-decoration: underline; cursor: pointer;
+}
+
+label { display: flex; flex-direction: column; gap: 6px; font-weight: 600; font-size: .95em; }
+input {
+  width: 100%; min-height: 52px; padding: 0 16px;
+  background: var(--bg); color: var(--text);
+  border: 2px solid var(--border); border-radius: 12px;
+  font: 500 17px var(--sans); /* 16px+ voorkomt inzoomen op iPhone */
+}
+input::placeholder { color: var(--muted); opacity: .6; }
+input:focus { border-color: var(--gold); outline: none; }
+.code-input { font-family: var(--serif); font-size: 28px; letter-spacing: .3em; text-align: center; color: var(--gold); }
+.form-error { color: var(--bad); font-weight: 600; min-height: 1.4em; }
+.form-error:empty { min-height: 0; }
+
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 24px;
+}
+
+.label {
+  display: inline-block; align-self: flex-start;
+  padding: .3em .8em; border-radius: 999px;
+  background: rgba(227, 176, 75, .14); border: 1px solid var(--gold); color: var(--gold);
+  font-weight: 600; font-size: .85em; letter-spacing: .02em;
+}
+
+.toast {
+  position: fixed; left: 50%; bottom: max(24px, env(safe-area-inset-bottom));
+  transform: translateX(-50%); z-index: 50;
+  max-width: calc(100% - 32px); padding: 12px 20px;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--gold); border-radius: 12px; font-weight: 600;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .35);
+}
+
+/* ---------- letters en meerkeuzekleuren ---------- */
+
+.letter {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 10px; color: var(--bg); font-weight: 700; font-family: var(--sans);
+}
+.opt-a .letter { background: var(--opt-a); }
+.opt-b .letter { background: var(--opt-b); }
+.opt-c .letter { background: var(--opt-c); }
+.opt-d .letter { background: var(--opt-d); }
+.opt-a { --opt: var(--opt-a); }
+.opt-b { --opt: var(--opt-b); }
+.opt-c { --opt: var(--opt-c); }
+.opt-d { --opt: var(--opt-d); }
+
+/* =====================================================================
+   TV (#tv) – 16:9-podium, zwarte randen bij andere verhoudingen
+   ===================================================================== */
+
+body.tv { background: #000; overflow: hidden; }
+
+.tv-frame {
+  width: 100vw; height: 100vh; height: 100dvh;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.stage {
+  position: relative; overflow: hidden;
+  width: min(100vw, calc(100dvh * 16 / 9));
+  aspect-ratio: 16 / 9;
+  max-height: 100dvh;
+  background: var(--bg);
+  container-type: size;
+  font-size: max(20px, 1.5cqw);
+}
+@supports not (height: 100dvh) {
+  .tv-frame { height: 100vh; }
+  .stage { width: min(100vw, calc(100vh * 16 / 9)); max-height: 100vh; }
+}
+
+/* Welkom / wachtruimte: sfeerfoto met donkergroene overlay links */
+.hero-bg {
+  position: absolute; inset: 0;
+  background:
+    linear-gradient(90deg,
+      rgba(15, 42, 29, .97) 0%,
+      rgba(15, 42, 29, .93) 40%,
+      rgba(15, 42, 29, .55) 62%,
+      rgba(15, 42, 29, 0) 85%),
+    url('../assets/hero.jpg') 75% center / cover no-repeat;
+}
+.hero-content {
+  position: relative; z-index: 1; height: 100%;
+  width: 58%; padding: 4cqh 4cqw;
+  display: flex; flex-direction: column; justify-content: center; gap: 3cqh;
+}
+.screen-hero .title { font-size: max(48px, 6cqw); }
+.screen-hero .lead { font-size: max(22px, 1.9cqw); }
+
+.login-card { width: min(100%, 460px); gap: 16px; display: flex; flex-direction: column; font-size: 17px; }
+.login-card h2 { font-size: 26px; }
+
+.lobby { display: flex; flex-direction: column; gap: 3cqh; height: 100%; justify-content: center; }
+.lobby .title { font-size: max(44px, 5cqw); }
+.join { display: flex; align-items: center; gap: 3cqw; }
+.qr {
+  flex: none; width: max(150px, 20cqh); aspect-ratio: 1;
+  border: 4px solid var(--gold); border-radius: 12px; overflow: hidden; background: var(--text);
+}
+.qr svg { display: block; width: 100%; height: 100%; }
+.join-text { display: flex; flex-direction: column; gap: .4em; min-width: 0; }
+.room-code {
+  font-family: var(--serif); font-weight: 700; color: var(--gold);
+  font-size: max(64px, 7.5cqw); line-height: 1; letter-spacing: .12em;
+}
+.join-url { font-size: max(16px, 1.15cqw); overflow-wrap: anywhere; }
+
+.players-block { display: flex; flex-direction: column; gap: 1.2cqh; min-height: 0; }
+.players-count { font-weight: 700; font-size: max(22px, 1.7cqw); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; max-height: 21cqh; overflow: hidden; }
+.chip {
+  padding: .25em .75em; border-radius: 999px;
+  background: var(--surface); border: 1px solid var(--border);
+  font-size: max(16px, 1.15cqw); font-weight: 500;
+  animation: pop .25s ease-out;
+}
+.chip-more { color: var(--gold); border-color: var(--gold); }
+@keyframes pop { from { transform: scale(.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+.corner { position: absolute; top: 1.5cqh; right: 1.5cqw; z-index: 2; }
+.corner .link { color: var(--text); opacity: .6; }
+
+/* Vraagscherm */
+.question {
+  display: grid; grid-template-rows: auto 1fr auto;
+  height: 100%; padding: 3cqh 3cqw; gap: 2.5cqh;
+}
+.q-head { display: flex; justify-content: space-between; align-items: center; gap: 2cqw; }
+.q-meta { display: flex; align-items: center; gap: 1.5cqw; min-width: 0; }
+.q-meta .label { font-size: max(20px, 1.5cqw); }
+.q-count { font-size: max(20px, 1.5cqw); font-weight: 600; white-space: nowrap; }
+.q-status { display: flex; align-items: center; gap: 2cqw; }
+.answered { font-size: max(20px, 1.5cqw); color: var(--muted); font-weight: 600; white-space: nowrap; }
+.timer {
+  min-width: max(80px, 6.5cqw); height: max(80px, 6.5cqw); padding: 0 .4em;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 999px; border: 4px solid var(--gold);
+  font-weight: 700; font-size: max(32px, 2.6cqw); font-variant-numeric: tabular-nums;
+}
+.timer-low { border-color: var(--bad); color: var(--bad); }
+.timer-done { font-size: max(18px, 1.3cqw); border-color: var(--border); color: var(--muted); border-radius: 999px; padding: 0 1em; }
+
+.q-body { min-height: 0; display: flex; gap: 3cqw; }
+.q-main { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 4cqh; }
+.q-text { font-family: var(--serif); font-weight: 700; font-size: max(44px, 3.6cqw); line-height: 1.15; }
+
+.options { display: grid; grid-template-columns: 1fr 1fr; gap: 2cqh 2cqw; }
+.option {
+  display: flex; align-items: center; gap: 1.2cqw;
+  padding: 1.6cqh 1.4cqw; min-height: 11cqh;
+  background: var(--surface); border: 2px solid var(--border); border-left: 8px solid var(--opt);
+  border-radius: var(--radius);
+  font-size: max(30px, 2.3cqw); font-weight: 600; line-height: 1.15;
+}
+.option .letter { width: 1.6em; height: 1.6em; font-size: 1em; }
+.option-text { min-width: 0; overflow-wrap: anywhere; }
+
+/* Met foto: foto vult het grootste deel, vraag en opties ernaast */
+.question.has-photo .q-body { gap: 2.5cqw; }
+.photo {
+  flex: 0 0 60%; min-height: 0; display: flex; align-items: center; justify-content: center;
+}
+.photo img {
+  max-width: 100%; max-height: 100%; object-fit: contain;
+  border: 4px solid var(--gold); border-radius: var(--radius);
+}
+.question.has-photo .q-text { font-size: max(44px, 2.8cqw); }
+.question.has-photo .options { grid-template-columns: 1fr; gap: 1.4cqh; }
+.question.has-photo .option { min-height: 0; padding: 1.1cqh 1.2cqw; font-size: max(30px, 1.9cqw); }
+
+.q-foot { display: flex; justify-content: space-between; align-items: center; }
+
+/* =====================================================================
+   Telefoon (#speler)
+   ===================================================================== */
+
+body.phone { min-height: 100%; }
+
+.phone-page {
+  min-height: 100vh; min-height: 100dvh;
+  max-width: 560px; margin: 0 auto;
+  display: flex; flex-direction: column;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.phone-page.center { justify-content: center; padding: 24px 16px; }
+
+.phone-hero {
+  position: relative; height: 180px; flex: none;
+  display: flex; align-items: flex-end; padding: 16px;
+  background:
+    linear-gradient(90deg, rgba(15, 42, 29, .95) 0%, rgba(15, 42, 29, .7) 50%, rgba(15, 42, 29, .1) 100%),
+    linear-gradient(0deg, var(--bg) 0%, rgba(15, 42, 29, 0) 45%),
+    url('../assets/hero.jpg') 70% center / cover no-repeat;
+}
+.phone-hero .title { font-size: 44px; }
+
+.phone-body { flex: 1; padding: 20px 16px 28px; }
+.phone-body.center { display: flex; }
+
+.p-top {
+  position: sticky; top: 0; z-index: 5;
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px;
+  padding: max(12px, env(safe-area-inset-top)) 16px 12px;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  font-weight: 600; font-size: 15px;
+}
+.p-timer {
+  min-width: 64px; padding: 4px 12px; text-align: center;
+  border: 2px solid var(--gold); border-radius: 999px; color: var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+.p-name { text-align: right; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.p-question { font-family: var(--serif); font-size: 24px; line-height: 1.25; }
+.p-photo {
+  display: block; width: 100%; max-height: 26vh; object-fit: contain;
+  border: 3px solid var(--gold); border-radius: 12px; background: var(--surface);
+}
+
+.p-options { display: flex; flex-direction: column; gap: 12px; }
+.p-option {
+  display: flex; align-items: center; gap: 14px; width: 100%;
+  min-height: 64px; padding: 10px 14px; text-align: left;
+  background: var(--surface); color: var(--text);
+  border: 2px solid var(--border); border-left: 8px solid var(--opt); border-radius: var(--radius);
+  font: 600 18px/1.25 var(--sans); cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .08s ease, background-color .15s ease;
+}
+.p-option:active { transform: scale(.98); }
+.p-option .letter { width: 40px; height: 40px; font-size: 20px; }
+.p-option .option-text { flex: 1; }
+.p-option .check { visibility: hidden; font-size: 22px; color: var(--bg); }
+.p-option.selected { background: var(--opt); color: var(--bg); border-color: var(--opt); }
+.p-option.selected .letter { background: var(--bg); color: var(--opt); }
+.p-option.selected .check { visibility: visible; }
+
+.done-icon {
+  width: 96px; height: 96px; border-radius: 999px;
+  display: flex; align-items: center; justify-content: center;
+  border: 3px solid var(--gold); color: var(--gold); font-size: 44px;
+}
+.done-icon.ok { border-color: var(--good); color: var(--good); }
+
+/* =====================================================================
+   Beheer (#beheer) – licht thema
+   ===================================================================== */
+
+body.beheer { background: var(--beheer-bg); color: var(--beheer-text); }
+.beheer-page { min-height: 100dvh; padding: 24px 16px; display: flex; max-width: 560px; margin: 0 auto; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
