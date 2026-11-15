@@ -4,11 +4,11 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer,
-} from './common.js?v=27';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=27';
+} from './common.js?v=28';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=28';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking,
-} from './scoring.js?v=27';
+} from './scoring.js?v=28';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -377,64 +377,30 @@ function renderLobby() {
 
 // ---------------------------------------------------------------- uitleg na de start
 
-/** Pictogram per soort vraag. */
-function kindIcon(q) {
-  if (q.media_url) return '♪';
-  if (q.rate_tree) return '🎄';
-  if (q.kind === 'open') return '✎';
-  if (q.kind === 'schatting') return '≈';
-  return 'ABCD';
-}
-
-/** Rubrieken in de volgorde waarin ze voor het eerst langskomen, met aantallen. */
-function rubricOverview() {
-  const groups = new Map();
-  for (const q of state.questions) {
-    const name = q.category || { meerkeuze: 'Meerkeuze', open: 'Open vraag', schatting: 'Schatting' }[q.kind];
-    const g = groups.get(name) || { name, count: 0, icon: kindIcon(q) };
-    g.count++;
-    groups.set(name, g);
-  }
-  return [...groups.values()];
-}
-
 function renderRules() {
   const qs = state.questions;
   const has = (fn) => qs.some(fn);
-  const rules = [
-    ['📱', 'Antwoord op je telefoon; wijzigen kan tot de tijd om is.'],
-    ['⭐', 'Elk goed antwoord is 1 punt.'],
-    has((q) => q.kind === 'open') && ['✎', 'Open vragen: kleine tikfouten zijn niet erg.'],
-    has((q) => q.kind === 'schatting') && ['≈', 'Schatting: de drie die het dichtst zitten krijgen een punt.'],
-    has((q) => q.media_url) && ['♪', 'Muziek: luister goed! Soms is de speler afgedekt, zodat je het antwoord niet ziet.'],
-    has((q) => q.rate_tree) && ['🎄', 'Kerstbomen: geef ook een cijfer (1–10). Telt niet mee, maar kiest de mooiste boom.'],
-    qs.length > INTERIM_EVERY
-      ? ['📊', `Om de ${INTERIM_EVERY} vragen een tussenstand, zonder namen. De antwoorden en de eindstand komen aan het eind.`]
-      : ['🤫', 'Geen tussenstand: de antwoorden en de eindstand komen aan het eind.'],
-    state.tiebreaks.length > 0 && ['⚖️', 'Gelijke stand in de top 3? Dan beslist een schiftingsvraag.'],
+  const tiles = [
+    ['📱', 'Antwoord op je telefoon', 'Wijzigen mag tot de tijd om is'],
+    ['⭐', '1 punt per goed antwoord', has((q) => q.kind === 'open') ? 'Een tikfout is niet erg' : 'Hoe meer goed, hoe beter'],
+    has((q) => q.kind === 'schatting') && ['🎯', 'Schatten', 'De 3 dichtstbij krijgen een punt'],
+    has((q) => q.rate_tree) && ['🎄', 'Kerstbomen', 'Geef elke boom een cijfer'],
+    ['🏆', 'Uitslag aan het eind', state.tiebreaks.length ? 'Gelijk? Dan een schiftingsvraag' : 'Eerst alle vragen, dan de antwoorden'],
   ].filter(Boolean);
 
   const view = h('div', { class: 'rules' },
-    h('header', { class: 'sb-head' },
-      h('h1', { class: 'title' }, 'Zo werkt het'),
-      h('span', { class: 'muted' }, `${qs.length} ${qs.length === 1 ? 'vraag' : 'vragen'} · ${state.players.length} spelers`),
+    h('div', { class: 'rules-top' },
+      h('h1', { class: 'rules-title' }, 'Zo werkt het'),
+      ornament(),
     ),
-    h('div', { class: 'rules-body' },
-      h('section', { class: 'rules-col' },
-        h('h2', { class: 'rules-h' }, 'Spelregels'),
-        h('ul', { class: 'rules-list' }, rules.map(([icon, text]) => h('li', {}, h('span', { class: 'rules-icon', 'aria-hidden': 'true' }, icon), h('span', {}, text)))),
-      ),
-      h('section', { class: 'rules-col' },
-        h('h2', { class: 'rules-h' }, 'Dit komt er'),
-        h('ul', { class: 'rubrics' }, rubricOverview().map((g) => h('li', { class: 'rubric' },
-          h('span', { class: 'rubric-icon', 'aria-hidden': 'true' }, g.icon),
-          h('span', { class: 'rubric-name' }, g.name),
-          h('span', { class: 'rubric-count' }, `${g.count}×`),
-        ))),
-      ),
-    ),
+    h('ul', { class: 'rules-tiles' }, tiles.map(([icon, title, sub]) => h('li', { class: 'rules-tile' },
+      h('span', { class: 'rules-tile-icon', 'aria-hidden': 'true' }, icon),
+      h('strong', {}, title),
+      h('span', { class: 'muted' }, sub),
+    ))),
     h('footer', { class: 'q-foot' },
       h('button', { class: 'btn btn-ghost', onclick: previous }, '◀ Vorige'),
+      h('span', { class: 'muted rules-count' }, `${qs.length} vragen · ${playersCountText().toLowerCase()}`),
       h('button', { class: 'btn btn-gold btn-lg', onclick: next }, 'Eerste vraag ▶'),
     ),
   );
@@ -878,6 +844,7 @@ async function renderReveal() {
   }
 
   const n = state.players.length;
+  const mediaLink = r.key?.answer_media_url || q.media_url;
   const view = h('div', { class: `question reveal reveal-${q.kind} ${photo ? 'has-photo' : ''}` },
     h('header', { class: 'q-head' },
       h('div', { class: 'q-meta' },
@@ -893,11 +860,11 @@ async function renderReveal() {
       h('div', { class: 'q-main' },
         h('h2', { class: 'q-text q-text-small' }, q.text),
         body,
-        (r.key?.answer_media_url || q.media_url) && mediaSlot(r.key?.answer_media_url || q.media_url, 'tonen'),
       ),
     ),
     h('footer', { class: 'q-foot' },
       h('button', { class: 'btn btn-ghost', onclick: previous }, '◀ Vorige'),
+      mediaLink && mediaSlot(mediaLink, 'tonen', 'media-foot'),
       h('button', { class: 'btn btn-gold btn-lg', onclick: () => { if (isLast) playMusic(state.music?.end); next(); } }, isLast ? 'Einde antwoordenronde ▶' : 'Volgende antwoord ▶'),
     ),
   );
@@ -1279,9 +1246,9 @@ function stopMedia() {
 }
 
 /** Vak voor de speler op het scherm. Afgedekt: eigen ▶/⏸-knop, speler onzichtbaar. */
-function mediaSlot(link, mode) {
+function mediaSlot(link, mode, extraClass = '') {
   const covered = mode === 'verbergen';
-  const slot = h('div', { class: `media-slot ${covered ? 'media-covered' : ''}`, 'data-link': link, 'data-covered': String(covered) });
+  const slot = h('div', { class: `media-slot ${covered ? 'media-covered' : ''} ${extraClass}`, 'data-link': link, 'data-covered': String(covered) });
   if (covered) {
     const p = deckFor(link);
     const btn = h('button', { type: 'button', class: 'music-play', 'aria-label': 'Afspelen', onclick: () => p?.toggle() }, '▶');
