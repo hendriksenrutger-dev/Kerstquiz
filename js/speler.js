@@ -2,8 +2,9 @@
 import {
   sb, h, mount, toast, load, save, LETTERS, syncClock, secondsLeft,
   fetchQuestions, fetchGame, errorText, liveSync, spotifyPlayer, hiddenSpotifyPlayer, brandTitle,
-} from './common.js?v=28';
-import { parseNumber, formatNumber } from './scoring.js?v=28';
+} from './common.js?v=29';
+import { parseNumber, formatNumber } from './scoring.js?v=29';
+import { scheduleScare } from './schrik.js?v=29';
 
 const PLAYER_KEY = 'kerstquiz_speler';
 
@@ -155,6 +156,9 @@ async function render() {
     if (win) return renderWinner(win.place);
   }
   if (asking && q) {
+    const startedAt = g.question_started_at;
+    scheduleScare(g, q, () => state.game.current_question_id === q.id && state.game.question_started_at === startedAt
+      && ['question', 'schifting'].includes(state.game.status), q.scare_path ? g.scare_url : null);
     if (state.mineFor !== q.id) {
       state.mineFor = q.id;
       state.mine = {};
