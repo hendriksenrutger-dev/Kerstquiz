@@ -152,8 +152,8 @@ async function render() {
       // eerder gegeven antwoord terughalen (na herladen of bij "vorige vraag")
       sb.rpc('get_my_answer', { p_player_id: state.player.id, p_question_id: q.id }).then(({ data }) => {
         const row = data?.[0];
-        if (state.mineFor !== q.id || !row || hasAnswer()) return;
-        state.mine = { choice: row.choice, text: row.text_answer, number: row.number_answer };
+        if (state.mineFor !== q.id || !row || hasAnswer() || state.mine.rating != null) return;
+        state.mine = { choice: row.choice, text: row.text_answer, number: row.number_answer, rating: row.rating };
         if (state.timeUp) { state.screen = ''; render(); } else showMine(q);
       });
     }
@@ -210,6 +210,7 @@ function renderQuestion(q) {
       h('h2', { class: 'p-question' }, q.text),
       photo && h('img', { class: 'p-photo', src: photo, alt: '' }),
       answerArea,
+      q.rate_tree && ratingArea(q),
     ),
   ));
   showMine(q);
@@ -231,6 +232,19 @@ function choiceArea(q) {
     h('div', { class: 'p-options' }, buttons),
     h('p', { class: 'hint center' }, 'Je kunt je keuze wijzigen tot de tijd om is.'),
   ];
+}
+
+/** Cijfer 1–10 voor de boom (telt niet voor de score). */
+function ratingArea(q) {
+  return h('section', { class: 'p-rating', 'aria-label': 'Cijfer voor deze boom' },
+    h('p', { class: 'p-rating-title' }, 'Welk cijfer geef je deze boom?'),
+    h('div', { class: 'p-rating-grid' }, Array.from({ length: 10 }, (_, k) => h('button', {
+      type: 'button', class: 'p-rate', 'data-rating': k + 1, 'aria-pressed': 'false',
+      'aria-label': `Cijfer ${k + 1}`,
+      onclick: () => submit(q, { rating: k + 1 }),
+    }, String(k + 1)))),
+    h('p', { class: 'hint center' }, 'telt niet voor je score'),
+  );
 }
 
 /** Open vraag: tekstveld en "Verstuur". */
@@ -280,6 +294,11 @@ const hasAnswer = () => state.mine.choice != null || Boolean(state.mine.text) ||
 
 /** Toon het eigen (verstuurde) antwoord in het huidige scherm. */
 function showMine(q) {
+  document.querySelectorAll('.p-rate').forEach((b) => {
+    const on = Number(b.dataset.rating) === state.mine.rating;
+    b.classList.toggle('selected', on);
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
   if (q.kind === 'meerkeuze') {
     document.querySelectorAll('.p-option').forEach((b) => {
       const on = Number(b.dataset.choice) === state.mine.choice;
@@ -323,6 +342,7 @@ async function submit(q, value) {
     p_choice: value.choice ?? null,
     p_text: value.text ?? null,
     p_number: value.number ?? null,
+    p_rating: value.rating ?? null,
   });
   if (!error) return;
   state.mine = previous;
@@ -345,6 +365,7 @@ function renderDone() {
       h('div', { class: `done-icon ${answered ? 'ok' : ''}`, 'aria-hidden': 'true' }, answered ? '✓' : '⏱'),
       h('p', { class: 'big' }, answered ? 'Antwoord ontvangen' : 'De tijd is om'),
       answered && h('p', { class: 'muted' }, `Jouw antwoord: ${mineText(q)}`),
+      q?.rate_tree && state.mine.rating != null && h('p', { class: 'muted' }, `Jouw cijfer voor de boom: ${state.mine.rating}`),
       h('p', { class: 'lead' }, 'Kijk naar het grote scherm'),
     ),
   ));
