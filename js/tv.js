@@ -3,11 +3,11 @@ import {
   sb, h, mount, toast, load, save, LETTERS, syncClock, secondsLeft,
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
-} from './common.js?v=18';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=18';
+} from './common.js?v=19';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=19';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking,
-} from './scoring.js?v=18';
+} from './scoring.js?v=19';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -34,9 +34,28 @@ export async function startTv(params) {
   requestedGameId = params?.get('spel') || null;
   previewId = params?.get('voorbeeld') || null;
   keepScreenOn();
-  const { data } = await sb.auth.getSession();
-  if (!data.session) return renderLogin();
-  await afterLogin();
+  // Meteen iets laten zien, en een uitweg als het laden blijft hangen.
+  loadingScreen(previewId ? 'Voorbeeld laden…' : 'Laden…');
+  const watchdog = setTimeout(() => slowLoading(), 8000);
+  try {
+    const { data } = await sb.auth.getSession();
+    if (!data.session) { clearTimeout(watchdog); return renderLogin(); }
+    await afterLogin();
+  } finally {
+    clearTimeout(watchdog);
+  }
+}
+
+/** Het laden duurt te lang: uitleg en knoppen in plaats van een zwart scherm. */
+function slowLoading() {
+  mount(stage('screen-free', heroLayout(h('div', { class: 'stack' },
+    h('h1', { class: 'title' }, 'Kerstquiz'),
+    h('p', { class: 'lead' }, 'Het laden duurt langer dan normaal. Controleer de internetverbinding.'),
+    h('div', { class: 'home-buttons' },
+      h('button', { class: 'btn btn-gold btn-lg', onclick: () => location.reload() }, '↻ Opnieuw proberen'),
+      previewId && h('a', { class: 'btn btn-ghost btn-lg', href: '#beheer' }, '← Terug naar beheer'),
+    ),
+  ))));
 }
 
 // ---------------------------------------------------------------- inloggen
@@ -1099,6 +1118,16 @@ async function startPreview(id) {
 }
 
 async function showPreview() {
+  try {
+    await showPreviewInner();
+  } catch (e) {
+    console.error(e);
+    toast(`Dit voorbeeld kon niet worden getoond: ${errorText(e)}`);
+    previewChrome(preview.list[preview.index] || {});
+  }
+}
+
+async function showPreviewInner() {
   const q = preview.list[preview.index];
   if (!q) return;
   history.replaceState(null, '', `#tv?voorbeeld=${q.id}`);

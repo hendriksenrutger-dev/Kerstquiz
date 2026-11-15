@@ -3,7 +3,13 @@
 const cfg = window.KERSTQUIZ_CONFIG || {};
 export const sb = window.supabase && cfg.supabaseUrl
   ? window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey, {
-    auth: { persistSession: true, autoRefreshToken: true },
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      // Geen gedeeld slot tussen tabbladen: dat kon blijven hangen (zwart scherm),
+      // bijvoorbeeld met beheer in een ander tabblad of de telefoon in het voorbeeld.
+      lock: async (_name, _timeout, fn) => fn(),
+    },
   })
   : null;
 
@@ -546,7 +552,7 @@ function musicDebug() {
 // ---------- Versie (altijd de nieuwste versie laden) ----------
 
 // Bij elke nieuwe versie ophogen, samen met version.txt en de ?v=… in index.html en de imports.
-export const APP_VERSION = '18';
+export const APP_VERSION = '19';
 
 /**
  * GitHub Pages en Safari bewaren bestanden een tijd in de cache. Is er een nieuwere
