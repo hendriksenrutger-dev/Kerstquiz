@@ -321,7 +321,6 @@ function renderLobby() {
       h('div', { class: 'join-text' },
         h('div', { class: 'muted small-caps' }, 'Kamercode'),
         h('div', { class: 'room-code', 'aria-label': `Kamercode ${g.code.split('').join(' ')}` }, g.code),
-        h('div', { class: 'muted join-url' }, url.replace(/^https?:\/\//, '')),
       ),
     ),
     h('div', { class: 'players-block' },
