@@ -117,6 +117,8 @@ export function errorText(err) {
     keuze_ongeldig: 'Deze keuze kan niet.',
     geen_toegang: 'Je bent niet ingelogd als beheerder.',
     media_url: 'Voer eerst supabase/003_muziek.sql uit in Supabase om Spotify-links op te slaan.',
+    tiebreak: 'Voer eerst supabase/004_extra.sql uit in Supabase om schiftingsvragen op te slaan.',
+    geen_schifting: 'Deze schiftingsvraag is niet voor jou.',
     'Invalid login credentials': 'E-mailadres of wachtwoord klopt niet.',
     'Failed to fetch': 'Geen verbinding. Controleer het internet en probeer opnieuw.',
   };

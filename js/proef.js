@@ -64,9 +64,10 @@ function randomAnswer(q, k) {
  * Laat de testspelers de huidige vraag beantwoorden, verspreid over de tijd.
  * De tv is ingelogd als beheerder en schrijft de antwoorden direct weg.
  * @param isStillOpen () => boolean – staat deze vraag nog open?
+ * @param onlyIds     alleen deze spelers (bijv. de deelnemers aan de schiftingsvraag)
  */
-export async function answerAsTestPlayers(game, question, isStillOpen) {
-  const ids = testPlayers(game.id);
+export async function answerAsTestPlayers(game, question, isStillOpen, onlyIds = null) {
+  const ids = testPlayers(game.id).filter((id) => !onlyIds || onlyIds.includes(id));
   const id = `${game.id}|${question.id}|${game.question_started_at}`;
   if (!ids.length || scheduledFor === id) return;
   clearTimers();
