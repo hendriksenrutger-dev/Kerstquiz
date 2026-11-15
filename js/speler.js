@@ -1,9 +1,9 @@
 // Spelersscherm (#speler): telefoon, zonder login.
 import {
   sb, h, mount, toast, load, save, LETTERS, syncClock, secondsLeft,
-  fetchQuestions, fetchGame, errorText, liveSync, spotifyPlayer, hiddenSpotifyPlayer,
-} from './common.js?v=21';
-import { parseNumber, formatNumber } from './scoring.js?v=21';
+  fetchQuestions, fetchGame, errorText, liveSync, spotifyPlayer, hiddenSpotifyPlayer, brandTitle,
+} from './common.js?v=22';
+import { parseNumber, formatNumber } from './scoring.js?v=22';
 
 const PLAYER_KEY = 'kerstquiz_speler';
 
@@ -85,7 +85,7 @@ function renderJoin(code, message) {
   );
 
   mount(h('div', { class: 'phone-page' },
-    h('div', { class: 'phone-hero' }, h('h1', { class: 'title' }, 'Kerstquiz')),
+    h('div', { class: 'phone-hero' }, brandTitle('brand-phone')),
     h('div', { class: 'phone-body' }, form),
   ));
   (code ? name : room).focus();
@@ -196,7 +196,7 @@ function topBar(q) {
 
 function renderWaiting() {
   mount(h('div', { class: 'phone-page' },
-    h('div', { class: 'phone-hero' }, h('h1', { class: 'title' }, 'Kerstquiz')),
+    h('div', { class: 'phone-hero' }, brandTitle('brand-phone')),
     h('div', { class: 'phone-body center stack' },
       h('p', { class: 'big' }, `Hoi ${state.player.name}!`),
       h('p', { class: 'lead' }, 'Je doet mee. Wacht tot de quiz begint.'),
