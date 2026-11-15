@@ -308,16 +308,26 @@ body.tv { background: #000; overflow: hidden; }
 }
 .mark-good { background: var(--good); }
 .mark-bad { background: var(--bad); }
-.option.is-correct { border-color: var(--good); border-width: 4px; border-left-width: 8px; background: rgba(143, 224, 168, .16); }
+.option.is-correct { border-color: var(--good); border-width: 4px; border-left-width: 8px; background: rgba(23, 70, 45, .95); transform: scale(1.03); box-shadow: 0 10px 30px rgba(0, 0, 0, .35); }
 .option.is-correct .mark { margin-left: auto; }
-.option.is-wrong { opacity: .35; }
+.option.is-wrong { opacity: .3; }
 
-.reveal-open { display: flex; flex-direction: column; gap: 2cqh; min-height: 0; flex: 1; }
+.open-answer { display: flex; flex-direction: column; gap: 2cqh; min-height: 0; flex: 1; }
 .correct-line, .correct-value {
   display: flex; align-items: center; gap: .4em; flex-wrap: wrap;
   font-weight: 700; color: var(--good);
 }
 .correct-line { font-size: max(30px, 2.3cqw); }
+.answer-card {
+  display: flex; align-items: center; gap: .45em; align-self: flex-start; max-width: 100%;
+  padding: .45em .8em; border-radius: var(--radius);
+  background: rgba(15, 42, 29, .88); border: 3px solid var(--good);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .35);
+  font: 700 max(40px, 3.8cqw)/1.15 var(--serif); color: var(--text);
+}
+.answer-card .mark { font-size: .7em; }
+.answer-card-text { overflow-wrap: anywhere; }
+.groups-toggle { align-self: flex-start; font-size: max(16px, 1.1cqw); color: var(--muted); }
 .groups {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(max(280px, 26cqw), 1fr));
   gap: 1.2cqh 1.2cqw; overflow-y: auto; min-height: 0; padding-right: 4px; align-content: start;
@@ -342,7 +352,8 @@ body.tv { background: #000; overflow: hidden; }
 .small { font-size: max(16px, 1.1cqw); }
 
 .reveal-estimate { display: flex; flex-direction: column; gap: 2cqh; }
-.correct-value { font-family: var(--serif); font-size: max(48px, 4.2cqw); }
+.correct-value { font-family: var(--serif); font-size: max(48px, 4.2cqw); align-self: flex-start; padding: .2em .6em; border-radius: var(--radius); background: rgba(15, 42, 29, .88); border: 3px solid var(--good); color: var(--text); box-shadow: 0 10px 30px rgba(0, 0, 0, .35); }
+.correct-value .mark { font-size: .6em; }
 .number-line { width: 100%; height: auto; overflow: visible; }
 .nl-axis { stroke: var(--border); stroke-width: 4; stroke-linecap: round; }
 .nl-dot { fill: var(--muted); opacity: .75; }
