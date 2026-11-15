@@ -3,11 +3,11 @@ import {
   sb, h, mount, toast, load, save, LETTERS, syncClock, secondsLeft,
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
-} from './common.js?v=14';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=14';
+} from './common.js?v=15';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=15';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking,
-} from './scoring.js?v=14';
+} from './scoring.js?v=15';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -484,7 +484,7 @@ function renderQuestion() {
     ),
   );
 
-  mount(stage('screen-plain', view));
+  mount(stage('screen-plain', bgLayer(i, Boolean(photo)), view));
   updateTimer();
 
   const startedAt = state.game.question_started_at;
@@ -869,7 +869,7 @@ async function renderReveal() {
       h('button', { class: 'btn btn-gold btn-lg', onclick: () => { if (isLast) playMusic(state.music?.end); next(); } }, isLast ? 'Einde antwoordenronde ▶' : 'Volgende antwoord ▶'),
     ),
   );
-  mount(stage('screen-plain', view));
+  mount(stage('screen-plain', bgLayer(i, Boolean(photo && q.kind === 'meerkeuze')), view));
 }
 
 function revealChoice(q, correct) {
@@ -1072,6 +1072,21 @@ function playMusic(link) {
 function preloadMusic() {
   musicPlayer(state.music?.start);
   musicPlayer(state.music?.end);
+}
+
+// ---------------------------------------------------------------- achtergronden
+
+/** Sfeerbeelden achter de vragen (assets/achtergronden), om en om. */
+const BACKGROUNDS = ['kerstbal', 'slee', 'lantaarns', 'ski'];
+
+/** Achtergrond voor vraag `i`; bij een vraag met foto extra gedempt. */
+function bgLayer(i, withPhoto) {
+  const name = BACKGROUNDS[((i % BACKGROUNDS.length) + BACKGROUNDS.length) % BACKGROUNDS.length];
+  return h('div', {
+    class: `q-bg ${withPhoto ? 'q-bg-soft' : ''}`,
+    'aria-hidden': 'true',
+    style: { backgroundImage: `url('assets/achtergronden/${name}.jpg')` },
+  });
 }
 
 function cornerMenu() {
