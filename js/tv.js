@@ -1,7 +1,7 @@
 // Tv-scherm (#tv): draait op de iPad, ingelogd als beheerder.
 import {
   sb, h, mount, toast, load, save, LETTERS, syncClock, secondsLeft,
-  fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl,
+  fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
 } from './common.js';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
@@ -17,8 +17,11 @@ const state = {
   busy: false,
 };
 
-export async function startTv() {
+let requestedGameId = null;
+
+export async function startTv(params) {
   document.body.className = 'tv';
+  requestedGameId = params?.get('spel') || null;
   const { data } = await sb.auth.getSession();
   if (!data.session) return renderLogin();
   await afterLogin();
@@ -27,30 +30,7 @@ export async function startTv() {
 // ---------------------------------------------------------------- inloggen
 
 function renderLogin(message) {
-  const email = h('input', { type: 'email', autocomplete: 'username', required: true, placeholder: 'naam@voorbeeld.nl' });
-  const pw = h('input', { type: 'password', autocomplete: 'current-password', required: true });
-  const err = h('p', { class: 'form-error', role: 'alert' }, message || '');
-  const btn = h('button', { class: 'btn btn-gold', type: 'submit' }, 'Inloggen');
-
-  const form = h('form', {
-    class: 'card login-card',
-    onsubmit: async (e) => {
-      e.preventDefault();
-      btn.disabled = true; err.textContent = '';
-      const { error } = await sb.auth.signInWithPassword({ email: email.value.trim(), password: pw.value });
-      btn.disabled = false;
-      if (error) { err.textContent = errorText(error); return; }
-      await afterLogin();
-    },
-  },
-    h('h2', { class: 'serif' }, 'Inloggen quizmaster'),
-    h('label', {}, 'E-mailadres', email),
-    h('label', {}, 'Wachtwoord', pw),
-    err,
-    btn,
-  );
-
-  mount(stage('screen-hero', heroLayout(h('h1', { class: 'title' }, 'Kerstquiz'), form)));
+  mount(stage('screen-hero', heroLayout(h('h1', { class: 'title' }, 'Kerstquiz'), loginForm(afterLogin, message))));
 }
 
 async function afterLogin() {
@@ -60,6 +40,13 @@ async function afterLogin() {
     state.questions = await fetchQuestions();
   } catch (e) {
     return renderLogin(errorText(e));
+  }
+  // Vanuit beheer ("Start quiz op dit scherm") komt een spel-id mee.
+  if (requestedGameId) {
+    const requested = await fetchGame(requestedGameId).catch(() => null);
+    requestedGameId = null;
+    history.replaceState(null, '', '#tv');
+    if (requested) return openGame(requested);
   }
   const savedId = load(TV_GAME_KEY);
   const saved = savedId ? await fetchGame(savedId).catch(() => null) : null;
@@ -303,7 +290,9 @@ function renderQuestion() {
       photo && h('div', { class: 'photo' }, h('img', { src: photo, alt: '' })),
       h('div', { class: 'q-main' },
         h('h2', { class: 'q-text' }, q.text),
-        h('div', { class: 'options' }, options),
+        q.kind === 'meerkeuze'
+          ? h('div', { class: 'options' }, options)
+          : h('p', { class: 'lead muted' }, 'Deze vraagsoort werkt in het spel vanaf de volgende versie.'),
       ),
     ),
     h('footer', { class: 'q-foot' },

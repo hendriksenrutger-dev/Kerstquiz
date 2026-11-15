@@ -51,7 +51,7 @@ function renderJoin(code, message) {
   });
   const room = h('input', {
     type: 'text', maxlength: '4', autocomplete: 'off', autocapitalize: 'characters',
-    spellcheck: false, required: true, placeholder: 'ABCD', value: code || '', class: 'code-input',
+    spellcheck: false, required: true, value: code || '', class: 'code-input',
     oninput: (e) => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); },
   });
   const err = h('p', { class: 'form-error', role: 'alert' }, message || '');
@@ -77,7 +77,7 @@ function renderJoin(code, message) {
     },
   },
     h('label', {}, 'Naam', name, h('span', { class: 'hint' }, 'Maximaal 14 tekens')),
-    h('label', {}, 'Kamercode', room),
+    h('label', {}, 'Kamercode', room, h('span', { class: 'hint' }, 'De code van 4 tekens op het grote scherm')),
     err,
     btn,
   );
@@ -215,8 +215,10 @@ function renderQuestion(q) {
       q.category && h('span', { class: 'label' }, q.category),
       h('h2', { class: 'p-question' }, q.text),
       photo && h('img', { class: 'p-photo', src: photo, alt: '' }),
-      h('div', { class: 'p-options' }, buttons),
-      h('p', { class: 'hint center' }, 'Je kunt je keuze wijzigen tot de tijd om is.'),
+      q.kind === 'meerkeuze'
+        ? [h('div', { class: 'p-options' }, buttons),
+          h('p', { class: 'hint center' }, 'Je kunt je keuze wijzigen tot de tijd om is.')]
+        : h('p', { class: 'muted center' }, 'Kijk naar het grote scherm.'),
     ),
   ));
   markChoice();

@@ -207,3 +207,31 @@ export function qrSvg(text) {
 export function joinUrl(code) {
   return `${location.origin}${location.pathname}#speler?code=${encodeURIComponent(code)}`;
 }
+
+// ---------- Inloggen (tv en beheer) ----------
+
+/** Inlogformulier met e-mail en wachtwoord. `onSuccess` wordt aangeroepen na inloggen. */
+export function loginForm(onSuccess, message) {
+  const email = h('input', { type: 'email', autocomplete: 'username', required: true, placeholder: 'naam@voorbeeld.nl' });
+  const pw = h('input', { type: 'password', autocomplete: 'current-password', required: true });
+  const err = h('p', { class: 'form-error', role: 'alert' }, message || '');
+  const btn = h('button', { class: 'btn btn-gold', type: 'submit' }, 'Inloggen');
+
+  return h('form', {
+    class: 'card login-card',
+    onsubmit: async (e) => {
+      e.preventDefault();
+      btn.disabled = true; err.textContent = '';
+      const { error } = await sb.auth.signInWithPassword({ email: email.value.trim(), password: pw.value });
+      btn.disabled = false;
+      if (error) { err.textContent = errorText(error); return; }
+      await onSuccess();
+    },
+  },
+    h('h2', { class: 'serif' }, 'Inloggen quizmaster'),
+    h('label', {}, 'E-mailadres', email),
+    h('label', {}, 'Wachtwoord', pw),
+    err,
+    btn,
+  );
+}
