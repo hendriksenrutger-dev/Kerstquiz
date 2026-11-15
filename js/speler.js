@@ -2,9 +2,9 @@
 import {
   sb, h, mount, toast, load, save, LETTERS, syncClock, secondsLeft,
   fetchQuestions, fetchGame, errorText, liveSync, spotifyPlayer, hiddenSpotifyPlayer, brandTitle,
-} from './common.js?v=29';
-import { parseNumber, formatNumber } from './scoring.js?v=29';
-import { scheduleScare } from './schrik.js?v=29';
+} from './common.js?v=30';
+import { parseNumber, formatNumber } from './scoring.js?v=30';
+import { scheduleScare } from './schrik.js?v=30';
 
 const PLAYER_KEY = 'kerstquiz_speler';
 
@@ -211,6 +211,15 @@ function renderWaiting() {
 }
 
 function renderQuestion(q) {
+  if (q.scare_only) {
+    // Schrikvraag: alleen de tekst, alsof er een vraag komt
+    return mount(h('div', { class: 'phone-page' },
+      h('div', { class: 'phone-body center stack scare-phone' },
+        h('p', { class: 'scare-phone-text' }, q.text),
+        h('p', { class: 'muted' }, 'Kijk naar het grote scherm'),
+      ),
+    ));
+  }
   const photo = state.game.photo_url;
   let answerArea;
   if (q.kind === 'meerkeuze') answerArea = choiceArea(q);

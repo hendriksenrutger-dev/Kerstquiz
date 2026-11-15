@@ -4,12 +4,12 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer,
-} from './common.js?v=29';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=29';
-import { scheduleScare } from './schrik.js?v=29';
+} from './common.js?v=30';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=30';
+import { scheduleScare } from './schrik.js?v=30';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking,
-} from './scoring.js?v=29';
+} from './scoring.js?v=30';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -282,8 +282,8 @@ async function next() {
   }
   if (g.status === 'tussenstand') return goTo('question', i + 1);
   if (g.status === 'answers') {
-    if (!g.current_question_id) return goTo('answers', 0);
-    return i < last ? goTo('answers', i + 1) : setState('final');
+    const n = answerIndex(g.current_question_id ? i + 1 : 0, 1);
+    return n != null ? goTo('answers', n) : setState('final');
   }
   if (g.status === 'final') {
     if (state.finalInfo?.pending.length && nextTiebreak()) return startSchifting();
@@ -293,6 +293,12 @@ async function next() {
 }
 
 const hasTrees = () => state.questions.some((q) => q.rate_tree);
+
+/** Eerstvolgende vraag met een antwoord vanaf `from` (richting `step`); schrikvragen overslaan. */
+function answerIndex(from, step) {
+  for (let k = from; k >= 0 && k < state.questions.length; k += step) if (!state.questions[k].scare_only) return k;
+  return null;
+}
 
 async function previous() {
   const g = state.game;
@@ -306,10 +312,14 @@ async function previous() {
     }
     return setState('final');
   }
-  if (g.status === 'final') return goTo('answers', last);
+  if (g.status === 'final') {
+    const n = answerIndex(last, -1);
+    return n != null ? goTo('answers', n) : setState('answers');
+  }
   if (g.status === 'answers') {
     if (!g.current_question_id) return goTo('question', last);
-    return i > 0 ? goTo('answers', i - 1) : setState('answers');
+    const n = answerIndex(i - 1, -1);
+    return n != null ? goTo('answers', n) : setState('answers');
   }
   if (g.status === 'tussenstand') return goTo('question', i);
   if (i > 0 && i % INTERIM_EVERY === 0) return setState('tussenstand', state.questions[i - 1].id);
@@ -459,6 +469,7 @@ function renderQuestion() {
       h('button', { class: 'btn btn-gold btn-lg', onclick: () => setState('lobby') }, 'Terug naar de wachtruimte'),
     )));
   }
+  if (q.scare_only) return renderScareQuestion(q, i);
   const photo = state.game.photo_url;
   const isLast = i === state.questions.length - 1;
 
@@ -503,15 +514,44 @@ function renderQuestion() {
   updateTimer();
 
   const startedAt = state.game.question_started_at;
-  if (q.scare_after) {
-    const still = () => state.game.status === 'question'
-      && state.game.current_question_id === q.id && state.game.question_started_at === startedAt;
-    if (q.scare_path) scareUrlFor(q).then((url) => scheduleScare(state.game, q, still, url));
-    else scheduleScare(state.game, q, still);
-  } else scheduleScare(state.game, q);
+  armScare(q);
   answerAsTestPlayers(state.game, q, () => state.game.status === 'question'
     && state.game.current_question_id === q.id && state.game.question_started_at === startedAt
     && secondsLeft(state.game, q) > 0);
+}
+
+/** Schrik voor deze vraag klaarzetten (of een oude annuleren). */
+function armScare(q) {
+  const startedAt = state.game.question_started_at;
+  if (!q.scare_after) return scheduleScare(state.game, q);
+  const still = () => state.game.status === 'question'
+    && state.game.current_question_id === q.id && state.game.question_started_at === startedAt;
+  if (q.scare_path) scareUrlFor(q).then((url) => scheduleScare(state.game, q, still, url));
+  else scheduleScare(state.game, q, still);
+}
+
+/** Schrikvraag: alleen de tekst ("Kijk goed…"), alsof er een vraag komt. */
+function renderScareQuestion(q, i) {
+  const photo = state.game.photo_url;
+  const view = h('div', { class: `question scare-q ${photo ? 'has-photo' : ''}` },
+    h('header', { class: 'q-head' },
+      h('div', { class: 'q-meta' },
+        q.category && h('span', { class: 'label' }, q.category),
+        h('span', { class: 'muted q-count' }, `Vraag ${i + 1} van ${state.questions.length}`),
+      ),
+    ),
+    h('div', { class: 'q-body' },
+      photo && h('div', { class: 'photo' }, h('img', { src: photo, alt: '' })),
+      h('div', { class: 'q-main scare-main' }, h('h2', { class: 'q-text scare-text' }, q.text)),
+    ),
+    h('footer', { class: 'q-foot' },
+      h('button', { class: 'btn btn-ghost', onclick: previous }, '◀ Vorige'),
+      h('button', { class: 'btn btn-gold btn-lg', id: 'next-btn', onclick: next },
+        i === state.questions.length - 1 ? 'Einde vragenronde ▶' : 'Volgende vraag ▶'),
+    ),
+  );
+  mount(stage('screen-plain', bgLayer(i, Boolean(photo)), view));
+  armScare(q);
 }
 
 function renderAnswersIntro() {
@@ -847,7 +887,7 @@ async function renderReveal() {
   if (!q) return renderAnswersIntro();
   const r = state.reveal;
   const photo = state.game.photo_url;
-  const isLast = i === state.questions.length - 1;
+  const isLast = answerIndex(i + 1, 1) == null;
 
   let body;
   let winners;
@@ -1048,7 +1088,9 @@ function updateTimer() {
   const total = g.status === 'schifting' ? (g.tiebreak_names || []).length : state.players.length;
   const everyone = total > 0 && state.answered >= total;
   const btn = document.getElementById('next-btn');
-  if (btn) btn.disabled = state.busy || !(left <= 0 || everyone);
+  // Schrikvraag: verder mag zodra de schrik geweest is
+  const scareDone = q?.scare_only && secondsLeft(g, q) <= q.time_limit - q.scare_after - 1;
+  if (btn) btn.disabled = state.busy || !(left <= 0 || everyone || scareDone);
 }
 
 // ---------------------------------------------------------------- opmaak
