@@ -158,8 +158,8 @@ Voorstel; de precieze opzet mag Claude Code bepalen, binnen deze eisen:
   | Randen | `#2B5A43` |
   | Tekst | crèmewit `#F5F1E6` |
   | Gedempte tekst | `#B8CBBE` |
-  | Accent (knoppen, kamercode, rand om foto's) | goud `#E3B04B` |
-  | Meerkeuze A | `#E3B04B` |
+  | Accent (knoppen, kamercode, rand om foto's) | goud `#CDA349` (knoppen met verloop `#F0D58C` → `#CDA349` → `#9C7226`) |
+  | Meerkeuze A | `#CDA349` |
   | Meerkeuze B | `#F09C8F` |
   | Meerkeuze C | `#F5F1E6` |
   | Meerkeuze D | `#9ED4B0` |
@@ -220,3 +220,12 @@ Gebouwd na de oorspronkelijke vijf PR's (SQL: `supabase/004_extra.sql`).
 - De tv toont de namen van de top 3 groot in beeld.
 - Zonder schiftingsvraag horen bij de top 3 alle spelers met een van de **drie hoogste scores**, hoeveel spelers dat ook zijn. Met de schiftingsvraag (12.2) zijn het precies drie spelers.
 - Hiervoor moet de tv aan de telefoons doorgeven wie er gewonnen heeft (een nieuwe kolom in `games` en een nieuw SQL-bestand in `supabase/`).
+
+## 13. Wensen voor later
+
+Nog niet gebouwd. Eerst overleggen voordat dit wordt opgepakt.
+
+### 13.1 Open vragen: opvulwoorden negeren
+- Bij het automatisch beoordelen van open vragen kleine opvulwoorden negeren, zoals "het", "is", "de", "een", "er", "in". Woorden die de betekenis veranderen ("geen", "niet", "wel") blijven staan.
+- Voorbeeld: "Geen kerstliedje" telt dan als goed bij "Het is geen kerstliedje"; reden "zonder bijzinnetje".
+- Helpt niet bij antwoorden in eigen woorden; maak vragen waarvan het antwoord een uitleg is daarom meerkeuze.
