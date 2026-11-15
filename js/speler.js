@@ -130,7 +130,7 @@ function currentQuestion() {
 async function render() {
   const g = state.game;
   let q = null;
-  if (g.status === 'question') {
+  if (g.status === 'question' && g.current_question_id) {
     q = currentQuestion();
     if (!q) {
       // nieuwe of gewijzigde vraag: lijst opnieuw ophalen
@@ -145,6 +145,7 @@ async function render() {
   state.timeUp = timeUp;
 
   if (g.status === 'lobby') return renderWaiting();
+  if (g.status === 'question' && !g.current_question_id) return renderStarting();
   if (g.status === 'question' && q) {
     if (state.mineFor !== q.id) {
       state.mineFor = q.id;
@@ -164,7 +165,7 @@ async function render() {
 
 function tick() {
   const g = state.game;
-  if (!g || g.status !== 'question') return;
+  if (!g || g.status !== 'question' || !g.current_question_id) return;
   const q = currentQuestion();
   const left = secondsLeft(g, q);
   const t = document.getElementById('p-timer');
@@ -368,6 +369,22 @@ function renderDone() {
       answered && h('p', { class: 'muted' }, `Jouw antwoord: ${mineText(q)}`),
       q?.rate_tree && state.mine.rating != null && h('p', { class: 'muted' }, `Jouw cijfer voor de boom: ${state.mine.rating}`),
       h('p', { class: 'lead' }, 'Kijk naar het grote scherm'),
+    ),
+  ));
+}
+
+/** Na "Start de quiz": korte uitleg terwijl de tv de spelregels toont. */
+function renderStarting() {
+  mount(h('div', { class: 'phone-page' },
+    h('header', { class: 'p-top' }, h('span', {}), h('span', {}), h('span', { class: 'p-name' }, state.player.name)),
+    h('div', { class: 'phone-body stack' },
+      h('p', { class: 'big center' }, 'De quiz begint zo!'),
+      h('ul', { class: 'p-rules' },
+        h('li', {}, 'Antwoord hier op je telefoon; je kunt het wijzigen tot de tijd om is.'),
+        h('li', {}, 'Elk goed antwoord is 1 punt.'),
+        h('li', {}, 'Tussendoor is er geen stand.'),
+      ),
+      h('p', { class: 'lead center' }, 'Kijk naar het grote scherm'),
     ),
   ));
 }

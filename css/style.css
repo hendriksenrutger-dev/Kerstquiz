@@ -651,3 +651,24 @@ body.beheer {
 .spotify-compact { border-radius: 10px; }
 .spotify-preview:empty { display: none; }
 .b-music { padding: 2px 10px; border-radius: 999px; font-size: .8em; font-weight: 600; background: #E6F4EA; color: #1E7A43; }
+
+/* Uitleg na de start (tv) */
+.rules { display: grid; grid-template-rows: auto 1fr auto; height: 100%; padding: 3cqh 4cqw; gap: 2.5cqh; }
+.rules-body { display: grid; grid-template-columns: 1.25fr 1fr; gap: 4cqw; min-height: 0; overflow: hidden; }
+.rules-col { display: flex; flex-direction: column; gap: 1.6cqh; min-height: 0; }
+.rules-h { font-family: var(--serif); color: var(--gold); font-size: max(28px, 2.2cqw); }
+.rules-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1.1cqh; }
+.rules-list li { display: flex; gap: 1cqw; align-items: flex-start; font-size: max(20px, 1.55cqw); line-height: 1.25; }
+.rules-icon { flex: none; width: 1.6em; text-align: center; }
+.rubrics { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1cqh; overflow: hidden; }
+.rubric {
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 1cqw;
+  padding: 1cqh 1.2cqw; border-radius: var(--radius); background: var(--surface); border: 2px solid var(--border);
+  font-size: max(20px, 1.5cqw); font-weight: 600;
+}
+.rubric-icon { min-width: 2.4em; text-align: center; color: var(--gold); font-weight: 700; font-size: .85em; }
+.rubric-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rubric-count { color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* Uitleg na de start (telefoon) */
+.p-rules { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 8px; font-size: 17px; }

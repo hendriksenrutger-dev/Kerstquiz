@@ -239,7 +239,7 @@ function render() {
   if (!g) return;
   if (g.status === 'lobby') return renderLobby();
   if (g.status !== 'answers') state.reveal = null; // bij terugkomen opnieuw laden
-  if (g.status === 'question') return renderQuestion();
+  if (g.status === 'question') return g.current_question_id ? renderQuestion() : renderRules();
   if (g.status === 'answers') return g.current_question_id ? renderReveal() : renderAnswersIntro();
   if (g.status === 'tree') return renderTree();
   return renderScoreboard();
@@ -270,7 +270,7 @@ function renderLobby() {
     h('div', { class: 'row' },
       h('button', {
         class: 'btn btn-gold btn-lg', disabled: noQuestions,
-        onclick: () => goToQuestion(0),
+        onclick: () => setState('question'), // eerst het uitlegscherm
       }, 'Start de quiz'),
       noQuestions && h('span', { class: 'muted' }, 'Er staan nog geen vragen klaar.'),
     ),
@@ -278,6 +278,69 @@ function renderLobby() {
 
   mount(stage('screen-hero', heroLayout(content), cornerMenu()));
   fitChips();
+}
+
+// ---------------------------------------------------------------- uitleg na de start
+
+/** Pictogram per soort vraag. */
+function kindIcon(q) {
+  if (q.media_url) return '♪';
+  if (q.rate_tree) return '🎄';
+  if (q.kind === 'open') return '✎';
+  if (q.kind === 'schatting') return '≈';
+  return 'ABCD';
+}
+
+/** Rubrieken in de volgorde waarin ze voor het eerst langskomen, met aantallen. */
+function rubricOverview() {
+  const groups = new Map();
+  for (const q of state.questions) {
+    const name = q.category || { meerkeuze: 'Meerkeuze', open: 'Open vraag', schatting: 'Schatting' }[q.kind];
+    const g = groups.get(name) || { name, count: 0, icon: kindIcon(q) };
+    g.count++;
+    groups.set(name, g);
+  }
+  return [...groups.values()];
+}
+
+function renderRules() {
+  const qs = state.questions;
+  const has = (fn) => qs.some(fn);
+  const rules = [
+    ['📱', 'Antwoord op je telefoon; wijzigen kan tot de tijd om is.'],
+    ['⭐', 'Elk goed antwoord is 1 punt.'],
+    has((q) => q.kind === 'open') && ['✎', 'Open vragen: kleine tikfouten zijn niet erg.'],
+    has((q) => q.kind === 'schatting') && ['≈', 'Schatting: de drie die het dichtst zitten krijgen een punt.'],
+    has((q) => q.media_url) && ['♪', 'Muziek: tik op ▶ om te luisteren, ook op je telefoon.'],
+    has((q) => q.rate_tree) && ['🎄', 'Kerstbomen: geef ook een cijfer (1–10). Telt niet mee, maar kiest de mooiste boom.'],
+    ['🤫', 'Geen tussenstand: de antwoorden en de eindstand komen aan het eind.'],
+  ].filter(Boolean);
+
+  const view = h('div', { class: 'rules' },
+    h('header', { class: 'sb-head' },
+      h('h1', { class: 'title' }, 'Zo werkt het'),
+      h('span', { class: 'muted' }, `${qs.length} ${qs.length === 1 ? 'vraag' : 'vragen'} · ${state.players.length} spelers`),
+    ),
+    h('div', { class: 'rules-body' },
+      h('section', { class: 'rules-col' },
+        h('h2', { class: 'rules-h' }, 'Spelregels'),
+        h('ul', { class: 'rules-list' }, rules.map(([icon, text]) => h('li', {}, h('span', { class: 'rules-icon', 'aria-hidden': 'true' }, icon), h('span', {}, text)))),
+      ),
+      h('section', { class: 'rules-col' },
+        h('h2', { class: 'rules-h' }, 'Dit komt er'),
+        h('ul', { class: 'rubrics' }, rubricOverview().map((g) => h('li', { class: 'rubric' },
+          h('span', { class: 'rubric-icon', 'aria-hidden': 'true' }, g.icon),
+          h('span', { class: 'rubric-name' }, g.name),
+          h('span', { class: 'rubric-count' }, `${g.count}×`),
+        ))),
+      ),
+    ),
+    h('footer', { class: 'q-foot' },
+      h('button', { class: 'btn btn-ghost', onclick: previous }, '◀ Vorige'),
+      h('button', { class: 'btn btn-gold btn-lg', onclick: next }, 'Eerste vraag ▶'),
+    ),
+  );
+  mount(stage('screen-plain', view));
 }
 
 function playersCountText() {

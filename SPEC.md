@@ -49,18 +49,19 @@ Per vraag:
 De status van het spel staat in de database. Tv en telefoons volgen die via Supabase Realtime.
 
 1. **Wachtruimte:** het tv-scherm toont de titel, de sfeerfoto, een QR-code naar `#speler?code=XXXX`, de link en de kamercode (4 tekens, zonder verwarrende tekens zoals O/0 en I/1), het aantal spelers en hun namen. Rutger tikt op "Start de quiz".
-2. **Vragenronde:** alle vragen in volgorde.
+2. **Uitleg:** na "Start de quiz" toont de tv eerst "Zo werkt het": de spelregels en welke soorten vragen (rubrieken, met aantallen) er komen. De telefoons tonen "De quiz begint zo!" met de belangrijkste regels. Rutger tikt op "Eerste vraag".
+3. **Vragenronde:** alle vragen in volgorde.
    - De tv toont het rubriek-label, "Vraag x van y", de vraag, de foto, de opties (bij meerkeuze), een timer en "n van m geantwoord".
    - De telefoon toont het antwoordscherm (zie 6).
    - Is de tijd om, of heeft iedereen geantwoord, dan kan Rutger op "Volgende vraag" tikken. Er gaat niets automatisch door.
    - Er worden **geen antwoorden en geen tussenstand** getoond.
-3. **Antwoordenronde:** alle vragen nog eens, nu met het juiste antwoord.
+4. **Antwoordenronde:** alle vragen nog eens, nu met het juiste antwoord.
    - **Meerkeuze:** het goede antwoord oplichten, plus hoeveel spelers het goed hadden.
    - **Open:** de beoordelingslijst (zie 5.2). Rutger kan per groep goed/fout omzetten.
    - **Schatting:** het juiste antwoord, een getallenlijn met alle schattingen als stippen, en de puntwinnaars.
    - De telefoons tonen alleen "Kijk naar het grote scherm".
-4. **Eindstand:** top 10 met punten.
-5. **Mooiste kerstboom:** de winnende boom met foto, de naam van de eigenaar, het gemiddelde cijfer en het aantal stemmen, met de nummers 2 en 3 eronder. Dit is het laatste scherm.
+5. **Eindstand:** top 10 met punten.
+6. **Mooiste kerstboom:** de winnende boom met foto, de naam van de eigenaar, het gemiddelde cijfer en het aantal stemmen, met de nummers 2 en 3 eronder. Dit is het laatste scherm.
 
 Rutger kan altijd een stap terug (vorige vraag of vorig antwoord), voor het geval hij te snel tikt.
 
