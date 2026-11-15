@@ -52,7 +52,7 @@ Per vraag:
 
 De status van het spel staat in de database. Tv en telefoons volgen die via Supabase Realtime.
 
-1. **Wachtruimte:** het tv-scherm toont de titel, de sfeerfoto, een QR-code naar `#speler?code=XXXX`, de link en de kamercode (4 tekens, zonder verwarrende tekens zoals O/0 en I/1), het aantal spelers en hun namen. Rutger tikt op "Start de quiz".
+1. **Wachtruimte:** het tv-scherm toont de titel, de sfeerfoto, een QR-code naar `#speler?code=XXXX` en de kamercode (geen losse link) (4 tekens, zonder verwarrende tekens zoals O/0 en I/1), het aantal spelers en hun namen. Rutger tikt op "Start de quiz".
 2. **Uitleg:** na "Start de quiz" toont de tv eerst "Zo werkt het": de spelregels en welke soorten vragen (rubrieken, met aantallen) er komen. De telefoons tonen "De quiz begint zo!" met de belangrijkste regels. Rutger tikt op "Eerste vraag".
 3. **Vragenronde:** alle vragen in volgorde.
    - De tv toont het rubriek-label, "Vraag x van y", de vraag, de foto, de opties (bij meerkeuze), een timer en "n van m geantwoord".
