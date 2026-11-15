@@ -3,11 +3,11 @@ import {
   sb, h, mount, toast, load, save, LETTERS, syncClock, secondsLeft,
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
-} from './common.js?v=13';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=13';
+} from './common.js?v=14';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=14';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking,
-} from './scoring.js?v=13';
+} from './scoring.js?v=14';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
