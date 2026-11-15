@@ -2,8 +2,8 @@
 import {
   sb, h, mount, toast, load, save, LETTERS, syncClock, secondsLeft,
   fetchQuestions, fetchGame, errorText, liveSync, spotifyPlayer, hiddenSpotifyPlayer,
-} from './common.js?v=17';
-import { parseNumber, formatNumber } from './scoring.js?v=17';
+} from './common.js?v=18';
+import { parseNumber, formatNumber } from './scoring.js?v=18';
 
 const PLAYER_KEY = 'kerstquiz_speler';
 
