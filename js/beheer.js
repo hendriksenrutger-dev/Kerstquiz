@@ -2,9 +2,9 @@
 // spelinstellingen en een spel starten. Licht thema; werkt op iPad en iPhone.
 import {
   sb, h, mount, toast, LETTERS, errorText, loginForm, parseSpotify, cleanSpotifyLink, spotifyPlayer,
-} from './common.js?v=23';
-import { parseNumber, formatNumber } from './scoring.js?v=23';
-import { addTestPlayers } from './proef.js?v=23';
+} from './common.js?v=24';
+import { parseNumber, formatNumber } from './scoring.js?v=24';
+import { addTestPlayers } from './proef.js?v=24';
 
 const TREE_CATEGORY = 'Van wie is deze kerstboom?';
 // Drie soorten muziekvragen (zie renderMusicForm)
@@ -256,6 +256,7 @@ function questionItem(q, i) {
         q.rate_tree && h('span', { class: 'muted' }, '★ cijfer'),
         q.tiebreak && h('span', { class: 'b-tiebreak' }, '⚖️ Schifting'),
         ans?.answer_photo_path && h('span', { class: 'muted' }, '📷 antwoordfoto'),
+        ans?.answer_media_url && h('span', { class: 'muted' }, '♪ antwoordnummer'),
         q.media_url && h('span', { class: 'b-music' }, q.media_mode === 'verbergen' ? '♪ Spotify (afgedekt)' : q.media_mode === 'alleen_tv' ? '♪ Spotify (alleen tv)' : '♪ Spotify'),
       ),
       h('div', { class: 'q-title' }, q.text),
@@ -475,6 +476,7 @@ function renderEdit(q) {
   const photo = photoPicker(q?.photo_path ? state.thumbs.get(q.photo_path) : null);
   const answerPhoto = photoPicker(ans?.answer_photo_path ? state.thumbs.get(ans.answer_photo_path) : null);
   const music = spotifyField(q?.media_url || '');
+  const answerMusic = spotifyField(ans?.answer_media_url || '', { label: 'Spotify-link bij het antwoord (optioneel)' });
   // Standaard afdekken: de speler toont titel en artiest en zou het antwoord kunnen verraden.
   const currentMode = q?.media_url ? (q.media_mode || 'tonen') : 'verbergen';
   const modeSelect = h('select', { class: 'b-select' }, MEDIA_MODES.map((m) => h('option', { value: m.value, selected: currentMode === m.value }, m.label)));
@@ -504,6 +506,8 @@ function renderEdit(q) {
       // Alleen meesturen als er een link is of was (dan werkt het ook zonder 003_muziek.sql).
       if (link || q?.media_url) row.media_url = link;
       if (link) row.media_mode = modeSelect.value;
+      const answerLink = answerMusic.value();
+      if (answerLink === false) return (err.textContent = 'De Spotify-link bij het antwoord wordt niet herkend.');
       const answerRow = { correct_option: null, correct_texts: null, correct_value: null };
 
       if (!row.text) return (err.textContent = 'Vul de vraag in.');
@@ -528,6 +532,8 @@ function renderEdit(q) {
       saveBtn.disabled = true;
       saveBtn.textContent = 'Bezig met opslaan…';
       try {
+        // Alleen meesturen als er een link is of was (dan werkt het ook zonder 008_antwoordnummer.sql).
+        if (answerLink || ans?.answer_media_url) answerRow.answer_media_url = answerLink;
         await saveQuestion(q, row, answerRow, photo.get(), answerPhoto.get());
         toast('Vraag opgeslagen');
         renderList();
@@ -548,6 +554,9 @@ function renderEdit(q) {
       answerPhoto.el),
     music.el,
     modeField,
+    h('div', { class: 'stack-tight' },
+      answerMusic.el,
+      h('span', { class: 'hint' }, 'De tv toont deze speler in de antwoordenronde, bijvoorbeeld het nummer van het antwoord. Spelers zien hem pas dan.')),
     mcBlock, openBlock, estBlock,
     h('label', {}, 'Tijd in seconden', time),
     h('label', { class: 'check' }, rate, 'Spelers geven deze boom een cijfer'),

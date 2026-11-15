@@ -10,7 +10,7 @@ Eigen pubquiz-app voor de kerst. Zie [SPEC.md](SPEC.md) voor de volledige specif
 
 ## Opzet
 
-1. Supabase → SQL Editor: voer `supabase/schema.sql` uit, daarna `supabase/002_beheer.sql`, `supabase/003_muziek.sql`, `supabase/004_extra.sql`, `supabase/005_muziek_start_einde.sql`, `supabase/006_antwoordfoto.sql` en `supabase/007_gif.sql`.
+1. Supabase → SQL Editor: voer `supabase/schema.sql` uit, daarna `supabase/002_beheer.sql`, `supabase/003_muziek.sql`, `supabase/004_extra.sql`, `supabase/005_muziek_start_einde.sql`, `supabase/006_antwoordfoto.sql`, `supabase/007_gif.sql` en `supabase/008_antwoordnummer.sql`.
 2. Voor testen: voer `supabase/test_vragen.sql` uit (5 meerkeuzevragen) en eventueel
    `supabase/test_vragen_open_schatting.sql` (een open vraag en een schatting).
 3. Supabase → Authentication → Users → *Add user*: maak het beheerdersaccount aan

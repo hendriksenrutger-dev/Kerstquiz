@@ -37,6 +37,7 @@ Elke vraag kan een **Spotify-link** hebben (muziek). Op de tv en op de telefoons
   - **Wie heeft dit nummer ingestuurd?** Meerkeuze: degene die het instuurde plus drie andere namen. Speler zichtbaar.
   - **Van wie is dit nummer?** Open: spelers typen de artiest (tikfouten zijn goed). De speler is tijdens de vraag **afgedekt** (eigen ▶-knop), zodat titel en artiest niet in beeld staan.
   - **Maak de zin af.** Meerkeuze: het begin van de zin staat op de tv, met het goede vervolg en drie foute. De speler staat **alleen op de tv**, niet op de telefoons.
+- Een vraag kan ook een **Spotify-link bij het antwoord** hebben: die speler toont de tv in de antwoordenronde in plaats van die van de vraag (bijv. het nummer waarop iemand danst). Staat bij de juiste antwoorden, alleen leesbaar voor de beheerder.
 - Bij het antwoord is de speler altijd zichtbaar. Per vraag is in beheer in te stellen: speler tonen, afdekken of alleen op de tv. Bij een nieuwe Spotify-link in "Bewerken" staat **afdekken** standaard aan.
 
 1. **Meerkeuze:** 4 opties (A–D), één goed.

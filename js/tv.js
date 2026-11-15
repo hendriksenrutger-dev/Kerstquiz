@@ -4,11 +4,11 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament,
-} from './common.js?v=23';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=23';
+} from './common.js?v=24';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=24';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking,
-} from './scoring.js?v=23';
+} from './scoring.js?v=24';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -887,7 +887,7 @@ async function renderReveal() {
       photo && h('div', { class: 'photo' }, h('img', { src: photo, alt: '' })),
       h('div', { class: 'q-main' },
         h('h2', { class: 'q-text q-text-small' }, q.text),
-        q.media_url && spotifyPlayer(q.media_url),
+        (r.key?.answer_media_url || q.media_url) && spotifyPlayer(r.key?.answer_media_url || q.media_url),
         body,
       ),
     ),
