@@ -4,11 +4,11 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer,
-} from './common.js?v=26';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=26';
+} from './common.js?v=27';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=27';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking,
-} from './scoring.js?v=26';
+} from './scoring.js?v=27';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -892,8 +892,8 @@ async function renderReveal() {
       photo && h('div', { class: 'photo' }, h('img', { src: photo, alt: '' })),
       h('div', { class: 'q-main' },
         h('h2', { class: 'q-text q-text-small' }, q.text),
-        (r.key?.answer_media_url || q.media_url) && mediaSlot(r.key?.answer_media_url || q.media_url, 'tonen'),
         body,
+        (r.key?.answer_media_url || q.media_url) && mediaSlot(r.key?.answer_media_url || q.media_url, 'tonen'),
       ),
     ),
     h('footer', { class: 'q-foot' },
@@ -916,6 +916,8 @@ function revealChoice(q, correct) {
 }
 
 function revealOpen(q, key, groups) {
+  // De ingezonden antwoorden staan standaard dicht; de quizmaster kan ze openklappen om iets goed/fout te rekenen.
+  const open = state.showGroups === q.id;
   const list = groups.length
     ? h('div', { class: 'groups' }, groups.map((g) => h('button', {
       class: `group ${g.correct ? 'group-good' : 'group-bad'} ${g.overridden ? 'group-overridden' : ''}`,
@@ -928,11 +930,18 @@ function revealOpen(q, key, groups) {
       h('span', { class: 'group-count' }, `×${g.count}`),
       h('span', { class: 'group-reason' }, g.reasonText),
     )))
-    : h('p', { class: 'lead muted' }, 'Niemand heeft deze vraag beantwoord.');
-  return h('div', { class: 'reveal-open' },
-    h('p', { class: 'correct-line' }, h('span', { class: 'mark mark-good' }, '✓'), ' ', (key.correct_texts || []).join(' / ')),
-    list,
-    groups.length > 0 && h('p', { class: 'muted small' }, 'Tik op een antwoord om het goed of fout te rekenen.'),
+    : h('p', { class: 'muted small' }, 'Niemand heeft deze vraag beantwoord.');
+  return h('div', { class: 'open-answer' },
+    h('div', { class: 'answer-card' },
+      h('span', { class: 'mark mark-good', 'aria-hidden': 'true' }, '✓'),
+      h('span', { class: 'answer-card-text' }, (key.correct_texts || []).join(' / ')),
+    ),
+    groups.length > 0 && h('button', {
+      class: 'link groups-toggle',
+      onclick: () => { state.showGroups = open ? null : q.id; renderReveal(); },
+    }, open ? 'Ingezonden antwoorden verbergen ▴' : `Ingezonden antwoorden bekijken (${groups.length}) ▾`),
+    open && list,
+    open && groups.length > 0 && h('p', { class: 'muted small' }, 'Tik op een antwoord om het goed of fout te rekenen.'),
   );
 }
 
