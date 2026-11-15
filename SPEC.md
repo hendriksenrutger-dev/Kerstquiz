@@ -32,6 +32,13 @@ Elke vraag heeft een **rubriek**: vrije tekst, met suggesties uit eerder gebruik
 
 Elke vraag kan een **foto** hebben. Bij een foto vult die het grootste deel van het tv-scherm.
 
+Elke vraag kan een **Spotify-link** hebben (muziek). Op de tv en op de telefoons staat dan een Spotify-speler; je tikt op ▶ om af te spelen. Zonder ingelogd Spotify-account in die browser speelt Spotify een fragment van 30 seconden.
+- Gasten geven vooraf hun favoriete nummer door aan Rutger. Er zijn drie soorten muziekvragen:
+  - **Wie heeft dit nummer ingestuurd?** Meerkeuze: degene die het instuurde plus drie andere namen. Speler zichtbaar.
+  - **Van wie is dit nummer?** Open: spelers typen de artiest (tikfouten zijn goed). De speler is tijdens de vraag **afgedekt** (eigen ▶-knop), zodat titel en artiest niet in beeld staan.
+  - **Maak de zin af.** Meerkeuze: het begin van de zin staat op de tv, met het goede vervolg en drie foute. De speler staat **alleen op de tv**, niet op de telefoons.
+- Bij het antwoord is de speler altijd zichtbaar. Per vraag is in beheer in te stellen: speler tonen, afdekken of alleen op de tv.
+
 1. **Meerkeuze:** 4 opties (A–D), één goed.
    - "Van wie is deze kerstboom?" is gewoon een meerkeuzevraag met foto. De eigenaar is het goede antwoord en er zijn drie andere namen. Rutger vult de namen zelf in; ze komen niet uit de spelerslijst.
 2. **Open:** de speler typt een antwoord. Rutger legt één of meer goede antwoorden vast.
@@ -46,18 +53,19 @@ Per vraag:
 De status van het spel staat in de database. Tv en telefoons volgen die via Supabase Realtime.
 
 1. **Wachtruimte:** het tv-scherm toont de titel, de sfeerfoto, een QR-code naar `#speler?code=XXXX`, de link en de kamercode (4 tekens, zonder verwarrende tekens zoals O/0 en I/1), het aantal spelers en hun namen. Rutger tikt op "Start de quiz".
-2. **Vragenronde:** alle vragen in volgorde.
+2. **Uitleg:** na "Start de quiz" toont de tv eerst "Zo werkt het": de spelregels en welke soorten vragen (rubrieken, met aantallen) er komen. De telefoons tonen "De quiz begint zo!" met de belangrijkste regels. Rutger tikt op "Eerste vraag".
+3. **Vragenronde:** alle vragen in volgorde.
    - De tv toont het rubriek-label, "Vraag x van y", de vraag, de foto, de opties (bij meerkeuze), een timer en "n van m geantwoord".
    - De telefoon toont het antwoordscherm (zie 6).
    - Is de tijd om, of heeft iedereen geantwoord, dan kan Rutger op "Volgende vraag" tikken. Er gaat niets automatisch door.
    - Er worden **geen antwoorden en geen tussenstand** getoond.
-3. **Antwoordenronde:** alle vragen nog eens, nu met het juiste antwoord.
+4. **Antwoordenronde:** alle vragen nog eens, nu met het juiste antwoord.
    - **Meerkeuze:** het goede antwoord oplichten, plus hoeveel spelers het goed hadden.
    - **Open:** de beoordelingslijst (zie 5.2). Rutger kan per groep goed/fout omzetten.
    - **Schatting:** het juiste antwoord, een getallenlijn met alle schattingen als stippen, en de puntwinnaars.
    - De telefoons tonen alleen "Kijk naar het grote scherm".
-4. **Eindstand:** top 10 met punten.
-5. **Mooiste kerstboom:** de winnende boom met foto, de naam van de eigenaar, het gemiddelde cijfer en het aantal stemmen, met de nummers 2 en 3 eronder. Dit is het laatste scherm.
+5. **Eindstand:** top 10 met punten.
+6. **Mooiste kerstboom:** de winnende boom met foto, de naam van de eigenaar, het gemiddelde cijfer en het aantal stemmen, met de nummers 2 en 3 eronder. Dit is het laatste scherm.
 
 Rutger kan altijd een stap terug (vorige vraag of vorig antwoord), voor het geval hij te snel tikt.
 
@@ -111,6 +119,8 @@ Het goede antwoord geeft 1 punt.
   - "Opslaan en volgende boom".
   - Rubriek automatisch "Van wie is deze kerstboom?".
   - Bovenin staat het aantal bomen.
+- **Snel een nummer toevoegen:** net als de kerstboom, maar met een Spotify-link in plaats van een foto. Eerst kies je de soort (ingestuurd, artiest, zin afmaken); rubriek en speler-instelling gaan automatisch. Standaard 30 seconden, geen cijfer.
+- **Test:** start een apart spel met 30 testspelers die zelf willekeurig antwoorden (de proefmodus uit 10).
 - **Foto's:** in de browser verkleinen tot maximaal 1600 px, JPEG kwaliteit 0,8, en daarna uploaden.
 - **Spelinstellingen:** het minimum aantal stemmen voor de mooiste boom.
 - **Spel starten:** "Start quiz op dit scherm" maakt een nieuw spel met een nieuwe kamercode en opent `#tv`.
@@ -119,7 +129,7 @@ Het goede antwoord geeft 1 punt.
 
 Voorstel; de precieze opzet mag Claude Code bepalen, binnen deze eisen:
 
-- **`questions`:** alles wat spelers mogen zien (rubriek, soort, tekst, foto-pad, opties, tijd, cijfer-vinkje, volgorde).
+- **`questions`:** alles wat spelers mogen zien (rubriek, soort, tekst, foto-pad, Spotify-link, opties, tijd, cijfer-vinkje, volgorde).
 - **`question_answers`:** de juiste antwoorden (goede optie, goede teksten, waarde). **Alleen leesbaar voor de beheerder.** Spelers mogen de antwoorden niet via de API kunnen opvragen.
 - **`games`:** kamercode, status, huidige vraag, starttijd van de vraag, minimum aantal stemmen.
 - **`players`:** spel, naam.
@@ -167,7 +177,7 @@ Voorstel; de precieze opzet mag Claude Code bepalen, binnen deze eisen:
 - **Tv:** het scherm aan houden via de Wake Lock API, als de browser dat ondersteunt, en een knop voor volledig scherm.
 - **Verbinding:** bij een weggevallen verbinding automatisch opnieuw verbinden en de actuele status ophalen (tv én telefoon).
 - **Timer:** de starttijd van een vraag komt uit de database. De timer op tv en telefoon wordt daaruit berekend, niet uit lokale tellers.
-- **Proefmodus:** in `#tv` een verborgen knop om 30 testspelers met willekeurige antwoorden toe te voegen, om de app vooraf te testen.
+- **Proefmodus:** de knop "Test" in beheer start een spel met 30 testspelers met willekeurige antwoorden, om de app vooraf te testen.
 
 ## 11. Bouwvolgorde (pull requests)
 

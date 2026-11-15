@@ -92,7 +92,7 @@ export function secondsLeft(game, question) {
 export async function fetchQuestions() {
   const { data, error } = await sb
     .from('questions')
-    .select('id, position, category, kind, text, photo_path, options, unit, time_limit, rate_tree')
+    .select('*')
     .order('position', { ascending: true })
     .order('created_at', { ascending: true });
   if (error) throw error;
@@ -116,6 +116,7 @@ export function errorText(err) {
     speler_onbekend: 'Je aanmelding is niet meer geldig. Meld je opnieuw aan.',
     keuze_ongeldig: 'Deze keuze kan niet.',
     geen_toegang: 'Je bent niet ingelogd als beheerder.',
+    media_url: 'Voer eerst supabase/003_muziek.sql uit in Supabase om Spotify-links op te slaan.',
     'Invalid login credentials': 'E-mailadres of wachtwoord klopt niet.',
     'Failed to fetch': 'Geen verbinding. Controleer het internet en probeer opnieuw.',
   };
@@ -311,4 +312,121 @@ export function loginForm(onSuccess, message) {
     err,
     btn,
   );
+}
+
+// ---------- Spotify ----------
+
+const SPOTIFY_RE = /(?:open\.spotify\.com\/(?:intl-[a-z-]+\/)?(?:embed\/)?|spotify:)(track|album|playlist|episode|show)[/:]([A-Za-z0-9]{22})/;
+
+/** Spotify-link → { type, id } of null. Werkt met "Link kopiëren" uit de Spotify-app. */
+export function parseSpotify(link) {
+  const m = SPOTIFY_RE.exec(String(link || '').trim());
+  return m ? { type: m[1], id: m[2] } : null;
+}
+
+/** Nette, opgeschoonde link om op te slaan. */
+export function cleanSpotifyLink(link) {
+  const s = parseSpotify(link);
+  return s ? `https://open.spotify.com/${s.type}/${s.id}` : null;
+}
+
+/**
+ * Spotify-speler (iframe). Spotify speelt zonder ingelogde Spotify-account in
+ * die browser alleen een fragment van 30 seconden.
+ * @param compact  kleine speler (80 px hoog) voor de telefoon
+ */
+export function spotifyPlayer(link, { compact = false } = {}) {
+  const s = parseSpotify(link);
+  if (!s) return null;
+  return h('iframe', {
+    class: `spotify ${compact ? 'spotify-compact' : ''}`,
+    src: `https://open.spotify.com/embed/${s.type}/${s.id}?utm_source=generator&theme=0`,
+    height: compact ? '80' : '152',
+    width: '100%',
+    title: 'Spotify-speler',
+    allow: 'autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture',
+    loading: 'lazy',
+  });
+}
+
+// ---------- Afgedekte Spotify-speler (antwoord niet verklappen) ----------
+
+let spotifyApiPromise = null;
+/** Laad de officiële Spotify iFrame API één keer. */
+function loadSpotifyApi() {
+  if (spotifyApiPromise) return spotifyApiPromise;
+  spotifyApiPromise = new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('Spotify laadt niet')), 8000);
+    window.onSpotifyIframeApiReady = (api) => { clearTimeout(timer); resolve(api); };
+    const script = document.createElement('script');
+    script.src = 'https://open.spotify.com/embed/iframe-api/v1';
+    script.async = true;
+    script.onerror = () => { clearTimeout(timer); reject(new Error('Spotify laadt niet')); };
+    document.head.append(script);
+  });
+  spotifyApiPromise.catch(() => { spotifyApiPromise = null; }); // later opnieuw proberen
+  return spotifyApiPromise;
+}
+
+/**
+ * Spotify-speler die tijdens de vraag is afgedekt: je ziet geen titel, artiest
+ * of hoes, alleen een eigen ▶/⏸-knop. De knop stuurt de verborgen speler aan.
+ * @param allowReveal  toon een linkje "Speler tonen" (voor de quizmaster, als afspelen niet lukt)
+ */
+export function hiddenSpotifyPlayer(link, { compact = false, allowReveal = false } = {}) {
+  const s = parseSpotify(link);
+  if (!s) return null;
+  const height = compact ? 80 : 152;
+  const holder = h('div', { class: 'spotify-holder' });
+  const label = h('span', { class: 'music-cover-text' }, 'Luister goed…');
+  const btn = h('button', { type: 'button', class: 'music-play', disabled: true, 'aria-label': 'Afspelen' }, '▶');
+  const cover = h('div', { class: 'music-cover' },
+    h('span', { class: 'music-bars', 'aria-hidden': 'true' }, h('i'), h('i'), h('i'), h('i')),
+    label,
+    btn,
+  );
+  const wrap = h('div', { class: `music-wrap ${compact ? 'music-compact' : ''}`, style: { height: `${height}px` } }, holder, cover);
+
+  const reveal = () => cover.remove();
+  if (allowReveal) {
+    cover.append(h('button', { type: 'button', class: 'music-reveal', onclick: reveal }, 'Speler tonen'));
+  }
+
+  let controller = null;
+  let playing = false;
+  const setPlaying = (p) => {
+    playing = p;
+    btn.textContent = p ? '⏸' : '▶';
+    btn.setAttribute('aria-label', p ? 'Pauzeren' : 'Afspelen');
+    wrap.classList.toggle('is-playing', p);
+  };
+  btn.addEventListener('click', () => {
+    if (!controller) return;
+    controller.togglePlay();
+    // Als Spotify niet reageert (bijv. geblokkeerd), na even een hint geven.
+    setTimeout(() => {
+      if (!playing) label.textContent = allowReveal ? 'Speelt het niet? Tik op "Speler tonen".' : 'Luister naar het grote scherm.';
+    }, 2500);
+  });
+
+  const start = () => {
+    if (!holder.isConnected) { requestAnimationFrame(start); return; }
+    loadSpotifyApi().then((api) => {
+      api.createController(holder, { uri: `spotify:${s.type}:${s.id}`, width: '100%', height }, (c) => {
+        controller = c;
+        btn.disabled = false;
+        c.addListener('playback_update', (e) => {
+          setPlaying(!e.data.isPaused);
+          if (!e.data.isPaused) label.textContent = 'Luister goed…';
+        });
+      });
+    }).catch(() => {
+      // Zonder de API: gewone speler eronder; op de tv kan Rutger hem tonen.
+      holder.replaceWith(spotifyPlayer(link, { compact }));
+      label.textContent = allowReveal ? 'Tik op "Speler tonen" om af te spelen.' : 'Luister naar het grote scherm.';
+      btn.remove();
+    });
+  };
+  start();
+  return wrap;
 }

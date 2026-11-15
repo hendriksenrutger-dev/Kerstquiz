@@ -1,7 +1,7 @@
 // Spelersscherm (#speler): telefoon, zonder login.
 import {
   sb, h, mount, toast, load, save, LETTERS, syncClock, secondsLeft,
-  fetchQuestions, fetchGame, errorText, liveSync,
+  fetchQuestions, fetchGame, errorText, liveSync, spotifyPlayer, hiddenSpotifyPlayer,
 } from './common.js';
 import { parseNumber, formatNumber } from './scoring.js';
 
@@ -130,7 +130,7 @@ function currentQuestion() {
 async function render() {
   const g = state.game;
   let q = null;
-  if (g.status === 'question') {
+  if (g.status === 'question' && g.current_question_id) {
     q = currentQuestion();
     if (!q) {
       // nieuwe of gewijzigde vraag: lijst opnieuw ophalen
@@ -145,6 +145,7 @@ async function render() {
   state.timeUp = timeUp;
 
   if (g.status === 'lobby') return renderWaiting();
+  if (g.status === 'question' && !g.current_question_id) return renderStarting();
   if (g.status === 'question' && q) {
     if (state.mineFor !== q.id) {
       state.mineFor = q.id;
@@ -164,7 +165,7 @@ async function render() {
 
 function tick() {
   const g = state.game;
-  if (!g || g.status !== 'question') return;
+  if (!g || g.status !== 'question' || !g.current_question_id) return;
   const q = currentQuestion();
   const left = secondsLeft(g, q);
   const t = document.getElementById('p-timer');
@@ -209,6 +210,7 @@ function renderQuestion(q) {
       q.category && h('span', { class: 'label' }, q.category),
       h('h2', { class: 'p-question' }, q.text),
       photo && h('img', { class: 'p-photo', src: photo, alt: '' }),
+      q.media_url && phonePlayer(q),
       answerArea,
       q.rate_tree && ratingArea(q),
     ),
@@ -232,6 +234,13 @@ function choiceArea(q) {
     h('div', { class: 'p-options' }, buttons),
     h('p', { class: 'hint center' }, 'Je kunt je keuze wijzigen tot de tijd om is.'),
   ];
+}
+
+/** Muziek op de telefoon: zichtbaar, afgedekt of alleen op de tv. */
+function phonePlayer(q) {
+  if (q.media_mode === 'alleen_tv') return h('p', { class: 'p-listen' }, '♪ Luister naar het grote scherm');
+  if (q.media_mode === 'verbergen') return hiddenSpotifyPlayer(q.media_url, { compact: true });
+  return spotifyPlayer(q.media_url, { compact: true });
 }
 
 /** Cijfer 1–10 voor de boom (telt niet voor de score). */
@@ -367,6 +376,22 @@ function renderDone() {
       answered && h('p', { class: 'muted' }, `Jouw antwoord: ${mineText(q)}`),
       q?.rate_tree && state.mine.rating != null && h('p', { class: 'muted' }, `Jouw cijfer voor de boom: ${state.mine.rating}`),
       h('p', { class: 'lead' }, 'Kijk naar het grote scherm'),
+    ),
+  ));
+}
+
+/** Na "Start de quiz": korte uitleg terwijl de tv de spelregels toont. */
+function renderStarting() {
+  mount(h('div', { class: 'phone-page' },
+    h('header', { class: 'p-top' }, h('span', {}), h('span', {}), h('span', { class: 'p-name' }, state.player.name)),
+    h('div', { class: 'phone-body stack' },
+      h('p', { class: 'big center' }, 'De quiz begint zo!'),
+      h('ul', { class: 'p-rules' },
+        h('li', {}, 'Antwoord hier op je telefoon; je kunt het wijzigen tot de tijd om is.'),
+        h('li', {}, 'Elk goed antwoord is 1 punt.'),
+        h('li', {}, 'Tussendoor is er geen stand.'),
+      ),
+      h('p', { class: 'lead center' }, 'Kijk naar het grote scherm'),
     ),
   ));
 }

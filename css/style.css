@@ -644,3 +644,64 @@ body.beheer {
   padding: 4px 12px; border-radius: 999px; border: 1px dashed var(--opt-b);
   background: rgba(240, 156, 143, .15); color: var(--opt-b); font: 600 14px var(--sans); cursor: pointer;
 }
+
+/* Spotify-speler */
+.spotify { display: block; border: 0; border-radius: 12px; background: var(--surface); max-width: 100%; }
+.q-main .spotify { max-width: 900px; }
+.spotify-compact { border-radius: 10px; }
+.spotify-preview:empty { display: none; }
+.b-music { padding: 2px 10px; border-radius: 999px; font-size: .8em; font-weight: 600; background: #E6F4EA; color: #1E7A43; }
+
+/* Uitleg na de start (tv) */
+.rules { display: grid; grid-template-rows: auto 1fr auto; height: 100%; padding: 3cqh 4cqw; gap: 2.5cqh; }
+.rules-body { display: grid; grid-template-columns: 1.25fr 1fr; gap: 4cqw; min-height: 0; overflow: hidden; }
+.rules-col { display: flex; flex-direction: column; gap: 1.6cqh; min-height: 0; }
+.rules-h { font-family: var(--serif); color: var(--gold); font-size: max(28px, 2.2cqw); }
+.rules-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1.1cqh; }
+.rules-list li { display: flex; gap: 1cqw; align-items: flex-start; font-size: max(20px, 1.55cqw); line-height: 1.25; }
+.rules-icon { flex: none; width: 1.6em; text-align: center; }
+.rubrics { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1cqh; overflow: hidden; }
+.rubric {
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 1cqw;
+  padding: 1cqh 1.2cqw; border-radius: var(--radius); background: var(--surface); border: 2px solid var(--border);
+  font-size: max(20px, 1.5cqw); font-weight: 600;
+}
+.rubric-icon { min-width: 2.4em; text-align: center; color: var(--gold); font-weight: 700; font-size: .85em; }
+.rubric-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rubric-count { color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* Uitleg na de start (telefoon) */
+.p-rules { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 8px; font-size: 17px; }
+
+/* Afgedekte Spotify-speler */
+.music-wrap { position: relative; width: 100%; max-width: 900px; border-radius: 12px; overflow: hidden; background: var(--surface); }
+.music-wrap .spotify-holder, .music-wrap iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.music-cover {
+  position: absolute; inset: 0; z-index: 2; display: flex; align-items: center; gap: 16px; padding: 0 20px;
+  background: linear-gradient(135deg, #17392A, #1E4D36); border: 2px solid var(--gold); border-radius: 12px;
+  color: var(--text); font-weight: 700; font-size: max(20px, 1.6cqw);
+}
+.music-compact .music-cover { font-size: 17px; padding: 0 12px; gap: 10px; }
+.music-cover-text { flex: 1; }
+.music-play {
+  flex: none; width: 64px; height: 64px; border-radius: 999px; border: 0; cursor: pointer;
+  background: var(--gold); color: var(--bg); font-size: 26px; font-weight: 700;
+}
+.music-compact .music-play { width: 52px; height: 52px; font-size: 22px; }
+.music-play:disabled { opacity: .5; cursor: wait; }
+.music-reveal { position: absolute; right: 10px; bottom: 6px; background: none; border: 0; color: var(--muted); font: 500 13px var(--sans); text-decoration: underline; cursor: pointer; }
+.music-bars { display: inline-flex; align-items: flex-end; gap: 3px; height: 28px; flex: none; }
+.music-bars i { width: 5px; height: 30%; background: var(--gold); border-radius: 2px; }
+.music-wrap.is-playing .music-bars i { animation: bar 0.9s ease-in-out infinite; }
+.music-wrap.is-playing .music-bars i:nth-child(2) { animation-delay: .15s; }
+.music-wrap.is-playing .music-bars i:nth-child(3) { animation-delay: .3s; }
+.music-wrap.is-playing .music-bars i:nth-child(4) { animation-delay: .45s; }
+@keyframes bar { 0%, 100% { height: 25%; } 50% { height: 100%; } }
+.p-listen { text-align: center; color: var(--gold); font-weight: 600; }
+
+/* Beheer: keuzelijst en segmenten met langere tekst */
+.beheer .b-select {
+  width: 100%; min-height: 48px; padding: 0 12px; border-radius: 10px;
+  border: 1.5px solid var(--b-border); background: #fff; color: var(--beheer-text); font: 500 16px var(--sans);
+}
+.segmented-wrap .seg { font-size: 14px; line-height: 1.2; padding: 6px 8px; }
