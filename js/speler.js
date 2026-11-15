@@ -3,6 +3,7 @@ import {
   sb, h, mount, toast, load, save, LETTERS, syncClock, secondsLeft,
   fetchQuestions, fetchGame, errorText, liveSync,
 } from './common.js';
+import { parseNumber, formatNumber } from './scoring.js';
 
 const PLAYER_KEY = 'kerstquiz_speler';
 
@@ -11,8 +12,8 @@ const state = {
   game: null,
   questions: [],
   screen: '',       // sleutel van het getoonde scherm
-  choice: null,     // eigen keuze bij de huidige vraag
-  choiceFor: null,  // vraag-id waar `choice` bij hoort
+  mine: {},         // eigen antwoord bij de huidige vraag: { choice, text, number }
+  mineFor: null,    // vraag-id waar `mine` bij hoort
   timeUp: false,
   stopSync: null,
   tick: null,
@@ -145,16 +146,15 @@ async function render() {
 
   if (g.status === 'lobby') return renderWaiting();
   if (g.status === 'question' && q) {
-    if (state.choiceFor !== q.id) {
-      state.choiceFor = q.id;
-      state.choice = null;
+    if (state.mineFor !== q.id) {
+      state.mineFor = q.id;
+      state.mine = {};
       // eerder gegeven antwoord terughalen (na herladen of bij "vorige vraag")
       sb.rpc('get_my_answer', { p_player_id: state.player.id, p_question_id: q.id }).then(({ data }) => {
-        if (state.choiceFor === q.id && data?.[0]?.choice != null && state.choice == null) {
-          state.choice = data[0].choice;
-          markChoice();
-          if (state.timeUp) { state.screen = ''; render(); }
-        }
+        const row = data?.[0];
+        if (state.mineFor !== q.id || !row || hasAnswer()) return;
+        state.mine = { choice: row.choice, text: row.text_answer, number: row.number_answer };
+        if (state.timeUp) { state.screen = ''; render(); } else showMine(q);
       });
     }
     return timeUp ? renderDone() : renderQuestion(q);
@@ -197,17 +197,11 @@ function renderWaiting() {
 
 function renderQuestion(q) {
   const photo = state.game.photo_url;
-  const buttons = (q.options || []).map((text, k) =>
-    h('button', {
-      class: `p-option opt-${LETTERS[k].toLowerCase()}`,
-      'data-choice': k,
-      'aria-pressed': 'false',
-      onclick: () => choose(q, k),
-    },
-      h('span', { class: 'letter', 'aria-hidden': 'true' }, LETTERS[k]),
-      h('span', { class: 'option-text' }, h('span', { class: 'sr-only' }, `${LETTERS[k]}: `), text),
-      h('span', { class: 'check', 'aria-hidden': 'true' }, '✓'),
-    ));
+  let answerArea;
+  if (q.kind === 'meerkeuze') answerArea = choiceArea(q);
+  else if (q.kind === 'open') answerArea = textArea(q);
+  else if (q.kind === 'schatting') answerArea = numberArea(q);
+  else answerArea = h('p', { class: 'muted center' }, 'Kijk naar het grote scherm.');
 
   mount(h('div', { class: 'phone-page' },
     topBar(q),
@@ -215,53 +209,142 @@ function renderQuestion(q) {
       q.category && h('span', { class: 'label' }, q.category),
       h('h2', { class: 'p-question' }, q.text),
       photo && h('img', { class: 'p-photo', src: photo, alt: '' }),
-      q.kind === 'meerkeuze'
-        ? [h('div', { class: 'p-options' }, buttons),
-          h('p', { class: 'hint center' }, 'Je kunt je keuze wijzigen tot de tijd om is.')]
-        : h('p', { class: 'muted center' }, 'Kijk naar het grote scherm.'),
+      answerArea,
     ),
   ));
-  markChoice();
+  showMine(q);
 }
 
-function markChoice() {
-  document.querySelectorAll('.p-option').forEach((b) => {
-    const on = Number(b.dataset.choice) === state.choice;
-    b.classList.toggle('selected', on);
-    b.setAttribute('aria-pressed', on ? 'true' : 'false');
-  });
+function choiceArea(q) {
+  const buttons = (q.options || []).map((text, k) =>
+    h('button', {
+      class: `p-option opt-${LETTERS[k].toLowerCase()}`,
+      'data-choice': k,
+      'aria-pressed': 'false',
+      onclick: () => submit(q, { choice: k }),
+    },
+      h('span', { class: 'letter', 'aria-hidden': 'true' }, LETTERS[k]),
+      h('span', { class: 'option-text' }, h('span', { class: 'sr-only' }, `${LETTERS[k]}: `), text),
+      h('span', { class: 'check', 'aria-hidden': 'true' }, '✓'),
+    ));
+  return [
+    h('div', { class: 'p-options' }, buttons),
+    h('p', { class: 'hint center' }, 'Je kunt je keuze wijzigen tot de tijd om is.'),
+  ];
 }
 
-async function choose(q, k) {
-  const previous = state.choice;
-  state.choice = k;
-  markChoice();
-  const { error } = await sb.rpc('submit_answer', {
-    p_player_id: state.player.id, p_question_id: q.id, p_choice: k,
+/** Open vraag: tekstveld en "Verstuur". */
+function textArea(q) {
+  const input = h('input', {
+    type: 'text', id: 'p-input', maxlength: '200', autocomplete: 'off', enterkeyhint: 'send',
+    placeholder: 'Typ je antwoord', 'aria-label': 'Jouw antwoord',
   });
-  if (error) {
-    const msg = errorText(error);
-    if (error.message?.includes('vraag_gesloten')) {
-      state.choice = previous;
-      state.screen = '';
-      await refresh();
-      return;
-    }
-    if (error.message?.includes('speler_onbekend')) return rejoin();
-    state.choice = previous;
-    markChoice();
-    toast(msg);
+  return answerForm(input, null, 'Kleine tikfouten zijn niet erg.', () => {
+    const text = input.value.trim();
+    if (!text) { toast('Typ eerst een antwoord.'); return null; }
+    return { text };
+  }, q);
+}
+
+/** Schatting: getalveld (numeriek toetsenbord) met eenheid en "Verstuur". */
+function numberArea(q) {
+  const input = h('input', {
+    type: 'text', id: 'p-input', inputmode: 'decimal', autocomplete: 'off', enterkeyhint: 'send',
+    maxlength: '20', placeholder: 'Jouw schatting', 'aria-label': 'Jouw schatting', class: 'p-number',
+  });
+  return answerForm(input, q.unit, 'De drie die het dichtst zitten krijgen een punt.', () => {
+    const number = parseNumber(input.value);
+    if (number == null) { toast('Vul een getal in.'); return null; }
+    return { number };
+  }, q);
+}
+
+function answerForm(input, unit, tip, read, q) {
+  const btn = h('button', { class: 'btn btn-gold btn-block', type: 'submit', id: 'p-send' }, 'Verstuur');
+  return h('form', {
+    class: 'stack p-answer-form',
+    onsubmit: (e) => {
+      e.preventDefault();
+      const value = read();
+      if (value) { input.blur(); submit(q, value); }
+    },
+  },
+    h('div', { class: 'p-input-row' }, input, unit && h('span', { class: 'p-unit' }, unit)),
+    btn,
+    h('p', { class: 'p-sent', id: 'p-sent', role: 'status' }),
+    h('p', { class: 'hint center' }, tip),
+  );
+}
+
+const hasAnswer = () => state.mine.choice != null || Boolean(state.mine.text) || state.mine.number != null;
+
+/** Toon het eigen (verstuurde) antwoord in het huidige scherm. */
+function showMine(q) {
+  if (q.kind === 'meerkeuze') {
+    document.querySelectorAll('.p-option').forEach((b) => {
+      const on = Number(b.dataset.choice) === state.mine.choice;
+      b.classList.toggle('selected', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    return;
   }
+  const input = document.getElementById('p-input');
+  const sent = document.getElementById('p-sent');
+  const value = q.kind === 'open' ? state.mine.text : state.mine.number;
+  if (input && value != null && !input.value) {
+    input.value = q.kind === 'schatting' ? formatNumber(value) : value;
+  }
+  if (sent) {
+    sent.textContent = value != null && value !== ''
+      ? `✓ Verstuurd: ${mineText(q)}. Je kunt het nog aanpassen tot de tijd om is.`
+      : '';
+  }
+  const btn = document.getElementById('p-send');
+  if (btn) btn.textContent = value != null && value !== '' ? 'Wijzig antwoord' : 'Verstuur';
+}
+
+
+function mineText(q) {
+  if (!q) return '';
+  if (q.kind === 'meerkeuze') return state.mine.choice != null ? LETTERS[state.mine.choice] : '';
+  if (q.kind === 'open') return state.mine.text ? `"${state.mine.text}"` : '';
+  if (q.kind === 'schatting' && state.mine.number != null) return `${formatNumber(state.mine.number)}${q.unit ? ` ${q.unit}` : ''}`;
+  return '';
+}
+
+/** Antwoord insturen: { choice } | { text } | { number }. */
+async function submit(q, value) {
+  const previous = { ...state.mine };
+  state.mine = { ...state.mine, ...value };
+  showMine(q);
+  const { error } = await sb.rpc('submit_answer', {
+    p_player_id: state.player.id,
+    p_question_id: q.id,
+    p_choice: value.choice ?? null,
+    p_text: value.text ?? null,
+    p_number: value.number ?? null,
+  });
+  if (!error) return;
+  state.mine = previous;
+  if (error.message?.includes('vraag_gesloten')) {
+    state.screen = '';
+    await refresh();
+    return;
+  }
+  if (error.message?.includes('speler_onbekend')) return rejoin();
+  showMine(q);
+  toast(errorText(error));
 }
 
 function renderDone() {
-  const answered = state.choice != null;
+  const q = currentQuestion();
+  const answered = hasAnswer();
   mount(h('div', { class: 'phone-page' },
-    topBar(currentQuestion()),
+    topBar(q),
     h('div', { class: 'phone-body center stack' },
       h('div', { class: `done-icon ${answered ? 'ok' : ''}`, 'aria-hidden': 'true' }, answered ? '✓' : '⏱'),
       h('p', { class: 'big' }, answered ? 'Antwoord ontvangen' : 'De tijd is om'),
-      answered && h('p', { class: 'muted' }, `Jouw keuze: ${LETTERS[state.choice]}`),
+      answered && h('p', { class: 'muted' }, `Jouw antwoord: ${mineText(q)}`),
       h('p', { class: 'lead' }, 'Kijk naar het grote scherm'),
     ),
   ));

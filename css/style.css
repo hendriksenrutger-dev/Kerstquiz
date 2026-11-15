@@ -257,6 +257,71 @@ body.tv { background: #000; overflow: hidden; }
 
 .q-foot { display: flex; justify-content: space-between; align-items: center; }
 
+/* Hint bij open vraag / schatting */
+.q-hint {
+  align-self: flex-start; padding: .6em 1em; border-radius: var(--radius);
+  background: var(--surface); border: 2px dashed var(--border);
+  font-size: max(26px, 2cqw); color: var(--muted); font-weight: 600;
+}
+
+/* Antwoordenronde */
+.score-pill {
+  padding: .35em .9em; border-radius: 999px; font-weight: 700; font-size: max(20px, 1.5cqw);
+  background: rgba(143, 224, 168, .14); color: var(--good); border: 2px solid var(--good);
+}
+.q-text-small { font-size: max(34px, 2.6cqw); }
+.reveal .q-main { justify-content: flex-start; gap: 3cqh; min-height: 0; }
+.mark {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 1.4em; height: 1.4em; border-radius: 999px; font-weight: 700; color: var(--bg);
+}
+.mark-good { background: var(--good); }
+.mark-bad { background: var(--bad); }
+.option.is-correct { border-color: var(--good); border-width: 4px; border-left-width: 8px; background: rgba(143, 224, 168, .16); }
+.option.is-correct .mark { margin-left: auto; }
+.option.is-wrong { opacity: .35; }
+
+.reveal-open { display: flex; flex-direction: column; gap: 2cqh; min-height: 0; flex: 1; }
+.correct-line, .correct-value {
+  display: flex; align-items: center; gap: .4em; flex-wrap: wrap;
+  font-weight: 700; color: var(--good);
+}
+.correct-line { font-size: max(30px, 2.3cqw); }
+.groups {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(max(280px, 26cqw), 1fr));
+  gap: 1.2cqh 1.2cqw; overflow-y: auto; min-height: 0; padding-right: 4px; align-content: start;
+  -webkit-overflow-scrolling: touch;
+}
+.group {
+  display: grid; grid-template-columns: auto 1fr auto; grid-template-areas: 'mark text count' 'mark reason reason';
+  align-items: center; gap: 2px 12px; text-align: left; cursor: pointer;
+  padding: 1cqh 1.1cqw; min-height: 64px; border-radius: var(--radius);
+  background: var(--surface); color: var(--text); border: 2px solid var(--border);
+  font: 600 max(22px, 1.6cqw)/1.2 var(--sans);
+  -webkit-tap-highlight-color: transparent;
+}
+.group .mark { grid-area: mark; }
+.group-text { grid-area: text; overflow-wrap: anywhere; }
+.group-count { grid-area: count; color: var(--muted); font-variant-numeric: tabular-nums; }
+.group-reason { grid-area: reason; color: var(--muted); font-size: .7em; font-weight: 500; }
+.group-good { border-color: var(--good); }
+.group-bad { border-color: rgba(240, 156, 143, .6); }
+.group-overridden { border-style: dashed; }
+.group:active { transform: scale(.98); }
+.small { font-size: max(16px, 1.1cqw); }
+
+.reveal-estimate { display: flex; flex-direction: column; gap: 2cqh; }
+.correct-value { font-family: var(--serif); font-size: max(48px, 4.2cqw); }
+.number-line { width: 100%; height: auto; overflow: visible; }
+.nl-axis { stroke: var(--border); stroke-width: 4; stroke-linecap: round; }
+.nl-dot { fill: var(--muted); opacity: .75; }
+.nl-win { fill: var(--good); opacity: 1; stroke: var(--bg); stroke-width: 2; }
+.nl-target { stroke: var(--gold); stroke-width: 4; stroke-dasharray: 8 6; }
+.nl-label { fill: var(--muted); font: 600 22px var(--sans); }
+.nl-label-target { fill: var(--gold); font-size: 26px; font-weight: 700; }
+.winners { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: max(20px, 1.4cqw); }
+.chip-good { border-color: var(--good); color: var(--good); font-weight: 600; }
+
 /* =====================================================================
    Telefoon (#speler)
    ===================================================================== */
@@ -466,3 +531,12 @@ body.beheer {
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }
+
+/* Telefoon: open vraag en schatting */
+.p-answer-form { gap: 12px; }
+.p-input-row { display: flex; align-items: center; gap: 10px; }
+.p-input-row input { font-size: 20px; min-height: 56px; }
+.p-number { font-variant-numeric: tabular-nums; }
+.p-unit { flex: none; font-weight: 700; color: var(--muted); font-size: 18px; }
+.p-sent { color: var(--good); font-weight: 600; min-height: 1.4em; }
+.p-sent:empty { min-height: 0; }
