@@ -445,37 +445,70 @@ export function hiddenSpotifyPlayer(link, { compact = false, allowReveal = false
 export function loopingSpotifyPlayer(link) {
   const s = parseSpotify(link);
   if (!s) return null;
+  const uri = `spotify:${s.type}:${s.id}`;
+  const isList = s.type !== 'track'; // playlist/album: Spotify speelt zelf het volgende nummer
   const holder = h('div', { class: 'spotify-holder' });
+  const debug = h('div', { class: 'bg-music-debug', hidden: !musicDebug() });
   const el = h('div', { class: 'bg-music', 'data-link': link },
     h('span', { class: 'bg-music-label', 'aria-hidden': 'true' }, '♪'),
-    h('div', { class: 'bg-music-frame' }, holder));
+    h('div', { class: 'bg-music-frame' }, holder),
+    debug);
 
   let ctrl = null;
-  let wanted = false;   // moet er muziek klinken?
-  let restarting = false;
+  let wanted = false;          // moet er muziek klinken?
   let last = { position: 0, duration: 0, isPaused: true };
+  let lastUpdate = 0;          // tijdstip van het laatste signaal van Spotify
+  let restartTimer = null;
+  let restarts = 0;
 
   const startPlayback = () => {
     if (!ctrl) return;
     if (typeof ctrl.play === 'function') ctrl.play(); else ctrl.togglePlay();
   };
+  const restart = (why) => {
+    if (!ctrl || !wanted) return;
+    restarts++;
+    note(`opnieuw (${why})`);
+    if (isList && typeof ctrl.loadUri === 'function') { ctrl.loadUri(uri); setTimeout(startPlayback, 800); return; }
+    if (typeof ctrl.seek === 'function') ctrl.seek(0);
+    startPlayback();
+  };
+  const note = (extra = '') => {
+    if (debug.hidden) return;
+    debug.textContent = `pos ${Math.round(last.position)} / dur ${Math.round(last.duration)} · ${last.isPaused ? 'pauze' : 'speelt'} · herstart ${restarts} ${extra}`;
+  };
+
+  // Is dit het einde (van het nummer of van het fragment van 30 s), of pauzeerde iemand zelf?
+  const looksEnded = (d) => {
+    const pos = d.position || 0;
+    const dur = d.duration || 0;
+    if (dur > 0 && pos >= dur - 2000) return true;               // einde van het nummer
+    if (pos >= 28000 && pos <= 32500) return true;                 // einde van het fragment (preview)
+    if (pos === 0 && last.position > 1000) return true;            // teruggesprongen naar het begin
+    return false;
+  };
 
   const init = () => {
     if (!holder.isConnected) { requestAnimationFrame(init); return; }
     loadSpotifyApi().then((api) => {
-      api.createController(holder, { uri: `spotify:${s.type}:${s.id}`, width: '100%', height: 80 }, (c) => {
+      api.createController(holder, { uri, width: '100%', height: 80 }, (c) => {
         ctrl = c;
         c.addListener('playback_update', (e) => {
           const d = e.data || {};
-          const ended = d.isPaused && wanted && !restarting
-            && ((d.duration > 0 && d.position >= d.duration - 1500) || (d.position === 0 && last.position > 0 && !last.isPaused));
-          last = { position: d.position || 0, duration: d.duration || 0, isPaused: d.isPaused };
-          if (!d.isPaused) restarting = false;
-          if (ended) {
-            restarting = true; // klaar: opnieuw vanaf het begin (herhalen)
-            if (typeof c.seek === 'function') c.seek(0);
-            startPlayback();
+          const wasPlaying = !last.isPaused;
+          lastUpdate = Date.now();
+          clearTimeout(restartTimer);
+          if (d.isPaused && wanted && wasPlaying) {
+            if (looksEnded(d)) {
+              // Bij een playlist even wachten: misschien start Spotify zelf het volgende nummer.
+              restartTimer = setTimeout(() => { if (last.isPaused && wanted) restart('einde'); }, isList ? 3000 : 300);
+            } else {
+              wanted = false; // zelf gepauzeerd
+            }
           }
+          if (!d.isPaused) wanted = true; // zelf op ▶ getikt telt ook
+          last = { position: d.position || 0, duration: d.duration || 0, isPaused: Boolean(d.isPaused) };
+          note();
         });
         if (wanted) startPlayback();
       });
@@ -486,20 +519,34 @@ export function loopingSpotifyPlayer(link) {
   };
   init();
 
+  // Vangnet: speelt er niets meer terwijl dat wel zou moeten (geen signalen meer), dan opnieuw.
+  setInterval(() => {
+    if (!wanted || !ctrl || !el.classList.contains('bg-music-on')) return;
+    const silentFor = Date.now() - lastUpdate;
+    if (!last.isPaused && silentFor > 6000) restart('stil');
+    else if (last.isPaused && silentFor > 8000 && looksEnded(last)) restart('stil na einde');
+  }, 2000);
+
   return {
     el,
-    play() { wanted = true; startPlayback(); },
+    play() { wanted = true; lastUpdate = Date.now(); startPlayback(); },
     pause() {
       wanted = false;
+      clearTimeout(restartTimer);
       if (ctrl && !last.isPaused) { if (typeof ctrl.pause === 'function') ctrl.pause(); else ctrl.togglePlay(); }
     },
   };
 }
 
+/** Met #tv?debug=1 toont de muziekspeler de signalen van Spotify (om problemen te zoeken). */
+function musicDebug() {
+  return /[?&]debug=1/.test(location.hash) || /[?&]debug=1/.test(location.search);
+}
+
 // ---------- Versie (altijd de nieuwste versie laden) ----------
 
 // Bij elke nieuwe versie ophogen, samen met version.txt en de ?v=… in index.html en de imports.
-export const APP_VERSION = '13';
+export const APP_VERSION = '14';
 
 /**
  * GitHub Pages en Safari bewaren bestanden een tijd in de cache. Is er een nieuwere

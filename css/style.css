@@ -784,3 +784,5 @@ body.beheer {
 .p-rating-big .p-rate { min-height: 60px; font-size: 22px; }
 
 .version { color: var(--muted); font-size: 13px; opacity: .7; }
+.bg-music { flex-wrap: wrap; }
+.bg-music-debug { flex-basis: 100%; color: var(--muted); font: 500 11px/1.3 ui-monospace, monospace; padding: 2px 4px 0; }
