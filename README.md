@@ -10,7 +10,8 @@ Eigen pubquiz-app voor de kerst. Zie [SPEC.md](SPEC.md) voor de volledige specif
 ## Opzet
 
 1. Supabase → SQL Editor: voer `supabase/schema.sql` uit, daarna `supabase/002_beheer.sql`.
-2. Voor testen: voer `supabase/test_vragen.sql` uit (5 meerkeuzevragen).
+2. Voor testen: voer `supabase/test_vragen.sql` uit (5 meerkeuzevragen) en eventueel
+   `supabase/test_vragen_open_schatting.sql` (een open vraag en een schatting).
 3. Supabase → Authentication → Users → *Add user*: maak het beheerdersaccount aan
    (e-mail + wachtwoord, "Auto Confirm User" aan). Zet onder Authentication →
    Sign In / Providers "Allow new users to sign up" uit.
@@ -18,3 +19,7 @@ Eigen pubquiz-app voor de kerst. Zie [SPEC.md](SPEC.md) voor de volledige specif
 
 Geen build-stap: GitHub Pages serveert de bestanden direct.
 Foto's van kerstbomen komen alleen in de privé Supabase-bucket `fotos`, nooit in deze repo.
+
+## Tests
+
+De puntentelling (`js/scoring.js`) heeft tests: `node tests/scoring.test.mjs`.

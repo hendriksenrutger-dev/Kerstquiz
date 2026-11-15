@@ -1,6 +1,7 @@
 // Beheer (#beheer): vragen beheren, foto's uploaden, kerstbomen toevoegen,
 // spelinstellingen en een spel starten. Licht thema; werkt op iPad en iPhone.
 import { sb, h, mount, toast, LETTERS, errorText, loginForm } from './common.js';
+import { parseNumber, formatNumber } from './scoring.js';
 
 const TREE_CATEGORY = 'Van wie is deze kerstboom?';
 const DEFAULT_CATEGORIES = [TREE_CATEGORY, 'In welke stad staat deze kerstboom?', 'Kerstfeitje'];
@@ -243,7 +244,6 @@ function answerSummary(q, ans) {
   return '⚠ Nog geen goed antwoord';
 }
 
-const formatNumber = (n) => Number(n).toLocaleString('nl-NL', { maximumFractionDigits: 6 });
 
 async function move(i, dir) {
   const list = [...state.questions];
@@ -379,14 +379,12 @@ function renderEdit(q) {
     h('div', { class: 'row' }, h('label', {}, 'Waarde', value), h('label', {}, 'Eenheid (optioneel)', unit)),
   );
 
-  const laterNote = h('p', { class: 'b-warning' }, 'Let op: open vragen en schattingen werken in het spel pas vanaf de volgende versie (PR 3).');
 
   const updateKind = () => {
     kindButtons.forEach((b, i) => b.setAttribute('aria-pressed', String(KINDS[i].value === kind)));
     mcBlock.hidden = kind !== 'meerkeuze';
     openBlock.hidden = kind !== 'open';
     estBlock.hidden = kind !== 'schatting';
-    laterNote.hidden = kind === 'meerkeuze';
   };
 
   const photo = photoPicker(q?.photo_path ? state.thumbs.get(q.photo_path) : null);
@@ -424,8 +422,8 @@ function renderEdit(q) {
         if (!lines.length) return (err.textContent = 'Vul minstens één goed antwoord in.');
         answerRow.correct_texts = lines;
       } else {
-        const v = Number(value.value.trim().replace(/\s/g, '').replace(',', '.'));
-        if (value.value.trim() === '' || !Number.isFinite(v)) return (err.textContent = 'Vul een geldig getal in als juiste waarde.');
+        const v = parseNumber(value.value);
+        if (v == null) return (err.textContent = 'Vul een geldig getal in als juiste waarde.');
         answerRow.correct_value = v;
         row.unit = unit.value.trim() || null;
       }
@@ -445,7 +443,6 @@ function renderEdit(q) {
   },
     h('label', {}, 'Rubriek', category, datalist),
     h('div', { class: 'stack-tight' }, h('span', { class: 'field-label' }, 'Soort'), h('div', { class: 'segmented' }, kindButtons)),
-    laterNote,
     h('label', {}, 'Vraag', text),
     h('div', { class: 'stack-tight' }, h('span', { class: 'field-label' }, 'Foto (optioneel)'), photo.el),
     mcBlock, openBlock, estBlock,
