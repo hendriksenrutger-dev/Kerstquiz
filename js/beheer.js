@@ -427,8 +427,10 @@ function renderEdit(q) {
 
   const photo = photoPicker(q?.photo_path ? state.thumbs.get(q.photo_path) : null);
   const music = spotifyField(q?.media_url || '');
-  const modeSelect = h('select', { class: 'b-select' }, MEDIA_MODES.map((m) => h('option', { value: m.value, selected: (q?.media_mode || 'tonen') === m.value }, m.label)));
-  const modeField = h('label', {}, 'Speler tijdens de vraag', modeSelect, h('span', { class: 'hint' }, 'Bij het antwoord is de speler altijd zichtbaar.'));
+  // Standaard afdekken: de speler toont titel en artiest en zou het antwoord kunnen verraden.
+  const currentMode = q?.media_url ? (q.media_mode || 'tonen') : 'verbergen';
+  const modeSelect = h('select', { class: 'b-select' }, MEDIA_MODES.map((m) => h('option', { value: m.value, selected: currentMode === m.value }, m.label)));
+  const modeField = h('label', {}, 'Speler tijdens de vraag', modeSelect, h('span', { class: 'hint' }, 'De Spotify-speler toont titel en artiest. Kies "tonen" alleen als dat het antwoord niet verraadt. Bij het antwoord is de speler altijd zichtbaar.'));
   const err = h('p', { class: 'form-error', role: 'alert' });
   const saveBtn = h('button', { class: 'btn btn-green btn-lg', type: 'submit' }, 'Opslaan');
 
