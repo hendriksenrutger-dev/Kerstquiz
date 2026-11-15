@@ -3,12 +3,12 @@ import {
   sb, h, mount, toast, load, save, LETTERS, syncClock, secondsLeft,
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
-  brandTitle, ornament,
-} from './common.js?v=24';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=24';
+  brandTitle, ornament, deckPlayer,
+} from './common.js?v=25';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=25';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking,
-} from './scoring.js?v=24';
+} from './scoring.js?v=25';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -140,7 +140,8 @@ async function openGame(game) {
   stopLive();
   state.game = game;
   save(TV_GAME_KEY, game.id);
-  await Promise.all([loadPlayers(), loadAnswered()]);
+  await Promise.all([loadPlayers(), loadAnswered(), loadKeys()]);
+  preloadDeck();
   render();
 
   let debounce;
@@ -167,6 +168,7 @@ async function openGame(game) {
 }
 
 function stopLive() {
+  stopMedia();
   if (state.stopSync) state.stopSync();
   state.stopSync = null;
   clearInterval(state.tick);
@@ -215,6 +217,9 @@ async function goTo(status, index) {
   if (state.busy) return;
   const q = state.questions[index];
   if (!q) return;
+  // Muziek van het volgende scherm meteen starten, nog binnen de tik op de knop.
+  const link = mediaLinkFor(status, q);
+  if (link) playMedia(link); else stopMedia();
   state.busy = true;
   try {
     // In de antwoordenronde: de foto bij het antwoord, als die er is.
@@ -236,6 +241,8 @@ async function goTo(status, index) {
 const goToQuestion = (index) => goTo('question', index);
 
 async function setState(status, questionId = null, photoUrl = null) {
+  if (status !== 'question' && status !== 'answers') stopMedia();
+  else if (!questionId) stopMedia();
   const { data, error } = await sb.rpc('set_game_state', {
     p_game_id: state.game.id, p_status: status, p_question_id: questionId, p_photo_url: photoUrl,
   });
@@ -493,9 +500,7 @@ function renderQuestion() {
       photo && h('div', { class: 'photo' }, h('img', { src: photo, alt: '' })),
       h('div', { class: 'q-main' },
         h('h2', { class: 'q-text' }, q.text),
-        q.media_url && (q.media_mode === 'verbergen'
-          ? hiddenSpotifyPlayer(q.media_url, { allowReveal: true })
-          : spotifyPlayer(q.media_url)),
+        q.media_url && mediaSlot(q.media_url, q.media_mode),
         q.kind === 'meerkeuze'
           ? h('div', { class: 'options' }, options)
           : h('p', { class: 'q-hint' }, q.kind === 'open'
@@ -887,7 +892,7 @@ async function renderReveal() {
       photo && h('div', { class: 'photo' }, h('img', { src: photo, alt: '' })),
       h('div', { class: 'q-main' },
         h('h2', { class: 'q-text q-text-small' }, q.text),
-        (r.key?.answer_media_url || q.media_url) && spotifyPlayer(r.key?.answer_media_url || q.media_url),
+        (r.key?.answer_media_url || q.media_url) && mediaSlot(r.key?.answer_media_url || q.media_url, 'tonen'),
         body,
       ),
     ),
@@ -1115,6 +1120,8 @@ async function startPreview(id) {
   preview.index = Math.max(0, preview.list.findIndex((q) => q.id === id));
   const { data } = await sb.from('question_answers').select('*');
   preview.keys = new Map((data || []).map((k) => [k.question_id, k]));
+  state.keys = preview.keys;
+  preloadDeck();
   state.players = [];
   clearInterval(state.tick);
   state.tick = setInterval(updateTimer, 250);
@@ -1175,10 +1182,15 @@ function previewChrome(q) {
   document.body.classList.toggle('pv-with-phone', showPhone);
   document.getElementById('preview-bar')?.remove();
   const n = preview.list.length;
-  const go = (d) => { preview.index = (preview.index + d + n) % n; showPreview(); };
+  const previewMedia = () => {
+    const t = preview.list[preview.index];
+    const link = t && !t.tiebreak ? mediaLinkFor(preview.mode === 'antwoord' ? 'answers' : 'question', t) : null;
+    if (link) playMedia(link); else stopMedia();
+  };
+  const go = (d) => { preview.index = (preview.index + d + n) % n; previewMedia(); showPreview(); };
   const normal = state.questions.length;
   const count = q.tiebreak ? `Schifting ${preview.index - normal + 1}/${state.tiebreaks.length}` : `Vraag ${preview.index + 1}/${normal}`;
-  const setMode = (m) => { preview.mode = m; showPreview(); };
+  const setMode = (m) => { preview.mode = m; previewMedia(); showPreview(); };
   const bar = h('div', { id: 'preview-bar', class: 'preview-bar' },
     h('strong', { title: 'Er wordt niets opgeslagen' }, '👁 Voorbeeld'),
     h('button', { class: 'pv-btn', onclick: () => go(-1), 'aria-label': 'Vorige vraag' }, '◀'),
@@ -1203,6 +1215,98 @@ function previewChrome(q) {
 
 /** Timer (en telefoon) opnieuw laten beginnen. */
 function startQuestion() { showPreview(); }
+
+// ---------------------------------------------------------------- muziek bij vraag en antwoord
+
+/**
+ * Alle Spotify-spelers van de vragen en antwoorden worden bij het openen van een
+ * spel alvast (onzichtbaar) geladen. Een tik op "Volgende vraag" e.d. start dan
+ * meteen het nummer van het volgende scherm. Op het scherm staat een vak
+ * (.media-slot); de speler wordt daar precies overheen gelegd, zodat hij niet
+ * opnieuw hoeft te laden (en de muziek doorloopt).
+ */
+const deck = new Map(); // link → deckPlayer
+let deckBox = null;
+
+async function loadKeys() {
+  const { data } = await sb.from('question_answers').select('*');
+  state.keys = new Map((data || []).map((k) => [k.question_id, k]));
+}
+
+function mediaLinkFor(status, q) {
+  if (!q) return null;
+  if (status === 'answers') return state.keys?.get(q.id)?.answer_media_url || q.media_url || null;
+  if (status === 'question') return q.media_url || null;
+  return null;
+}
+
+function deckFor(link) {
+  if (!link) return null;
+  let p = deck.get(link);
+  if (!p) {
+    p = deckPlayer(link);
+    if (!p) return null;
+    if (!deckBox) { deckBox = h('div', { id: 'media-deck', 'aria-hidden': 'true' }); document.body.append(deckBox); }
+    deck.set(link, p);
+    deckBox.append(p.el);
+  }
+  return p;
+}
+
+function preloadDeck() {
+  for (const q of state.questions) {
+    deckFor(q.media_url);
+    deckFor(state.keys?.get(q.id)?.answer_media_url);
+  }
+}
+
+function playMedia(link) {
+  for (const [l, p] of deck) if (l !== link) p.pause();
+  deckFor(link)?.play();
+}
+
+function stopMedia() {
+  for (const p of deck.values()) p.pause();
+}
+
+/** Vak voor de speler op het scherm. Afgedekt: eigen ▶/⏸-knop, speler onzichtbaar. */
+function mediaSlot(link, mode) {
+  const covered = mode === 'verbergen';
+  const slot = h('div', { class: `media-slot ${covered ? 'media-covered' : ''}`, 'data-link': link, 'data-covered': String(covered) });
+  if (covered) {
+    const p = deckFor(link);
+    const btn = h('button', { type: 'button', class: 'music-play', 'aria-label': 'Afspelen', onclick: () => p?.toggle() }, '▶');
+    const wrap = h('div', { class: 'music-wrap' },
+      h('div', { class: 'music-cover' },
+        h('span', { class: 'music-bars', 'aria-hidden': 'true' }, h('i'), h('i'), h('i'), h('i')),
+        h('span', { class: 'music-cover-text' }, 'Luister goed…'),
+        btn));
+    p?.onChange((playing) => {
+      btn.textContent = playing ? '⏸' : '▶';
+      btn.setAttribute('aria-label', playing ? 'Pauzeren' : 'Afspelen');
+      wrap.classList.toggle('is-playing', playing);
+    });
+    slot.append(wrap);
+  }
+  requestAnimationFrame(placeDeck);
+  return slot;
+}
+
+/** Leg de speler van het zichtbare vak over dat vak; de rest buiten beeld. */
+function placeDeck() {
+  const slot = document.querySelector('.media-slot');
+  const showLink = slot && slot.dataset.covered !== 'true' ? slot.dataset.link : null;
+  const r = showLink ? slot.getBoundingClientRect() : null;
+  for (const [l, p] of deck) {
+    const on = l === showLink && r && r.width > 0;
+    p.el.classList.toggle('deck-show', Boolean(on));
+    if (on) Object.assign(p.el.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
+    else Object.assign(p.el.style, { left: '', top: '', width: '', height: '' });
+  }
+}
+window.addEventListener('resize', () => requestAnimationFrame(placeDeck));
+document.addEventListener('fullscreenchange', () => setTimeout(placeDeck, 300));
+setInterval(placeDeck, 1000);
 
 // ---------------------------------------------------------------- achtergronden
 
