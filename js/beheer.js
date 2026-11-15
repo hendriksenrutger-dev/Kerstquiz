@@ -2,9 +2,9 @@
 // spelinstellingen en een spel starten. Licht thema; werkt op iPad en iPhone.
 import {
   sb, h, mount, toast, LETTERS, errorText, loginForm, parseSpotify, cleanSpotifyLink, spotifyPlayer,
-} from './common.js?v=16';
-import { parseNumber, formatNumber } from './scoring.js?v=16';
-import { addTestPlayers } from './proef.js?v=16';
+} from './common.js?v=17';
+import { parseNumber, formatNumber } from './scoring.js?v=17';
+import { addTestPlayers } from './proef.js?v=17';
 
 const TREE_CATEGORY = 'Van wie is deze kerstboom?';
 // Drie soorten muziekvragen (zie renderMusicForm)
@@ -251,6 +251,7 @@ function questionItem(q, i) {
     h('div', { class: 'q-buttons' },
       h('button', { class: 'icon-btn', 'aria-label': 'Omhoog', title: 'Omhoog', disabled: i === 0, onclick: () => move(i, -1) }, '↑'),
       h('button', { class: 'icon-btn', 'aria-label': 'Omlaag', title: 'Omlaag', disabled: i === state.questions.length - 1, onclick: () => move(i, 1) }, '↓'),
+      h('a', { class: 'btn btn-light btn-small', href: `#tv?voorbeeld=${q.id}`, title: 'Bekijk deze vraag zoals op de tv' }, '👁 Voorbeeld'),
       h('button', { class: 'btn btn-light btn-small', onclick: () => renderEdit(q) }, 'Bewerken'),
       h('button', { class: 'btn btn-danger btn-small', onclick: () => removeQuestion(q) }, 'Verwijderen'),
     ),
@@ -544,6 +545,7 @@ function renderEdit(q) {
   mount(h('div', { class: 'beheer-page' },
     h('header', { class: 'b-header' },
       h('button', { class: 'link', onclick: renderList }, '← Terug naar de vragen'),
+      !isNew && h('a', { class: 'link', href: `#tv?voorbeeld=${q.id}` }, '👁 Voorbeeld (opgeslagen versie)'),
     ),
     h('h1', { class: 'serif' }, isNew ? 'Nieuwe vraag' : 'Vraag bewerken'),
     h('div', { class: 'b-card' }, form),

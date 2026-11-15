@@ -2,8 +2,8 @@
 import {
   sb, h, mount, toast, load, save, LETTERS, syncClock, secondsLeft,
   fetchQuestions, fetchGame, errorText, liveSync, spotifyPlayer, hiddenSpotifyPlayer,
-} from './common.js?v=16';
-import { parseNumber, formatNumber } from './scoring.js?v=16';
+} from './common.js?v=17';
+import { parseNumber, formatNumber } from './scoring.js?v=17';
 
 const PLAYER_KEY = 'kerstquiz_speler';
 
@@ -21,6 +21,7 @@ const state = {
 
 export async function startSpeler(params) {
   document.body.className = 'phone';
+  if (params.get('voorbeeld')) return startPreview(params.get('voorbeeld'));
   const code = (params.get('code') || '').toUpperCase().trim();
   const stored = load(PLAYER_KEY);
 
@@ -159,7 +160,7 @@ async function render() {
       state.mine = {};
       editingChoice = false;
       // eerder gegeven antwoord terughalen (na herladen of bij "vorige vraag")
-      sb.rpc('get_my_answer', { p_player_id: state.player.id, p_question_id: q.id }).then(({ data }) => {
+      if (!state.preview) sb.rpc('get_my_answer', { p_player_id: state.player.id, p_question_id: q.id }).then(({ data }) => {
         const row = data?.[0];
         if (state.mineFor !== q.id || !row || hasAnswer() || state.mine.rating != null) return;
         state.mine = { choice: row.choice, text: row.text_answer, number: row.number_answer, rating: row.rating };
@@ -380,6 +381,7 @@ async function submit(q, value) {
   const previous = { ...state.mine };
   state.mine = { ...state.mine, ...value };
   showMine(q);
+  if (state.preview) return; // voorbeeld: niets opslaan
   const { error } = await sb.rpc('submit_answer', {
     p_player_id: state.player.id,
     p_question_id: q.id,
@@ -469,6 +471,33 @@ function renderWinner(place) {
       h('p', { class: 'lead' }, 'Gefeliciteerd! Kijk naar het grote scherm.'),
     ),
   ));
+}
+
+// ---------------------------------------------------------------- voorbeeld (vanuit beheer)
+
+/** Telefoonweergave van één vraag, zonder spel: antwoorden worden niet opgeslagen. */
+async function startPreview(id) {
+  state.preview = true;
+  state.questions = await fetchQuestions().catch(() => []);
+  const q = state.questions.find((x) => x.id === id);
+  if (!q) return renderLookUp('?', 'Vraag niet gevonden');
+  let photo = null;
+  if (q.photo_path) {
+    // lukt alleen als je als beheerder bent ingelogd (zoals in het voorbeeld vanuit beheer)
+    const { data } = await sb.storage.from('fotos').createSignedUrl(q.photo_path, 60 * 60);
+    photo = data?.signedUrl || null;
+  }
+  state.player = { id: null, name: 'Voorbeeld', code: '' };
+  state.game = {
+    status: q.tiebreak ? 'schifting' : 'question',
+    current_question_id: q.id,
+    question_started_at: new Date(Date.now()).toISOString(),
+    photo_url: photo,
+    tiebreak_names: q.tiebreak ? ['Voorbeeld'] : null,
+    winners: null,
+  };
+  await render();
+  state.tick = setInterval(tick, 250);
 }
 
 function rejoin() {
