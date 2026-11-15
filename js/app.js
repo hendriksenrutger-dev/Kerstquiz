@@ -1,8 +1,8 @@
 // Router: #tv, #speler (standaard) en #beheer.
-import { h, mount, parseHash } from './common.js';
-import { startTv } from './tv.js';
-import { startSpeler } from './speler.js';
-import { startBeheer } from './beheer.js';
+import { h, mount, parseHash, checkVersion } from './common.js?v=13';
+import { startTv } from './tv.js?v=13';
+import { startSpeler } from './speler.js?v=13';
+import { startBeheer } from './beheer.js?v=13';
 
 function start() {
   const { view, params } = parseHash();
@@ -13,6 +13,8 @@ function start() {
 
 // Andere weergave of kamercode gekozen: schoon opnieuw beginnen.
 window.addEventListener('hashchange', () => location.reload());
+
+checkVersion();
 
 if (!window.supabase || !window.KERSTQUIZ_CONFIG) {
   mount(h('div', { class: 'phone-page center' },

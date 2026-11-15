@@ -29,3 +29,9 @@ De puntentelling (`js/scoring.js`) heeft tests: `node tests/scoring.test.mjs`.
 
 In beheer start de knop **Test** een apart spel met 30 testspelers die zelf willekeurig antwoorden.
 Gebruik voor de echte avond "Start quiz op dit scherm" of "Start nieuwe quiz".
+
+## Nieuwe versie uitbrengen
+
+Verhoog het versienummer op vier plekken, zodat browsers meteen de nieuwe bestanden laden:
+`version.txt`, `APP_VERSION` in `js/common.js`, de `?v=…` in `index.html` en de `?v=…` in alle `import`-regels in `js/`.
+De app vergelijkt bij het laden zijn eigen versie met `version.txt` en herlaadt zichzelf als er een nieuwere online staat.
