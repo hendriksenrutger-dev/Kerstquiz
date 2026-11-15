@@ -2,7 +2,7 @@
 import {
   sb, h, mount, toast, load, save, LETTERS, syncClock, secondsLeft,
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
-  keepScreenOn, fullscreenButton, spotifyPlayer,
+  keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer,
 } from './common.js';
 import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js';
 import {
@@ -311,7 +311,7 @@ function renderRules() {
     ['⭐', 'Elk goed antwoord is 1 punt.'],
     has((q) => q.kind === 'open') && ['✎', 'Open vragen: kleine tikfouten zijn niet erg.'],
     has((q) => q.kind === 'schatting') && ['≈', 'Schatting: de drie die het dichtst zitten krijgen een punt.'],
-    has((q) => q.media_url) && ['♪', 'Muziek: tik op ▶ om te luisteren, ook op je telefoon.'],
+    has((q) => q.media_url) && ['♪', 'Muziek: luister goed! Soms is de speler afgedekt, zodat je het antwoord niet ziet.'],
     has((q) => q.rate_tree) && ['🎄', 'Kerstbomen: geef ook een cijfer (1–10). Telt niet mee, maar kiest de mooiste boom.'],
     ['🤫', 'Geen tussenstand: de antwoorden en de eindstand komen aan het eind.'],
   ].filter(Boolean);
@@ -402,7 +402,9 @@ function renderQuestion() {
       photo && h('div', { class: 'photo' }, h('img', { src: photo, alt: '' })),
       h('div', { class: 'q-main' },
         h('h2', { class: 'q-text' }, q.text),
-        q.media_url && spotifyPlayer(q.media_url),
+        q.media_url && (q.media_mode === 'verbergen'
+          ? hiddenSpotifyPlayer(q.media_url, { allowReveal: true })
+          : spotifyPlayer(q.media_url)),
         q.kind === 'meerkeuze'
           ? h('div', { class: 'options' }, options)
           : h('p', { class: 'q-hint' }, q.kind === 'open'

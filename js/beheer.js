@@ -7,8 +7,18 @@ import { parseNumber, formatNumber } from './scoring.js';
 import { addTestPlayers } from './proef.js';
 
 const TREE_CATEGORY = 'Van wie is deze kerstboom?';
-const MUSIC_CATEGORY = 'Van wie is dit nummer?';
-const DEFAULT_CATEGORIES = [TREE_CATEGORY, MUSIC_CATEGORY, 'In welke stad staat deze kerstboom?', 'Kerstfeitje'];
+// Drie soorten muziekvragen (zie renderMusicForm)
+const MUSIC = {
+  ingestuurd: { category: 'Wie heeft dit nummer ingestuurd?', mode: 'tonen' },
+  artiest: { category: 'Van wie is dit nummer?', mode: 'verbergen' },
+  zin: { category: 'Maak de zin af', mode: 'alleen_tv' },
+};
+const MEDIA_MODES = [
+  { value: 'tonen', label: 'Speler tonen op tv en telefoons' },
+  { value: 'verbergen', label: 'Speler afdekken (titel en artiest niet zichtbaar)' },
+  { value: 'alleen_tv', label: 'Alleen op de tv, niet op de telefoons' },
+];
+const DEFAULT_CATEGORIES = [TREE_CATEGORY, ...Object.values(MUSIC).map((m) => m.category), 'In welke stad staat deze kerstboom?', 'Kerstfeitje'];
 const KINDS = [
   { value: 'meerkeuze', label: 'Meerkeuze' },
   { value: 'open', label: 'Open' },
@@ -83,13 +93,13 @@ function categorySuggestions() {
 
 function treeNameSuggestions() {
   const names = state.questions
-    .filter((q) => (q.category === TREE_CATEGORY || q.category === MUSIC_CATEGORY) && Array.isArray(q.options))
+    .filter((q) => (q.category === TREE_CATEGORY || q.category === MUSIC.ingestuurd.category) && Array.isArray(q.options))
     .flatMap((q) => q.options);
   return [...new Set(names.filter(Boolean))].sort((a, b) => a.localeCompare(b, 'nl'));
 }
 
 const treeCount = () => state.questions.filter((q) => q.category === TREE_CATEGORY).length;
-const musicCount = () => state.questions.filter((q) => q.category === MUSIC_CATEGORY).length;
+const musicCount = () => state.questions.filter((q) => q.media_url).length;
 
 function setScreen(scherm) {
   history.replaceState(null, '', scherm ? `#beheer?scherm=${scherm}` : '#beheer');
@@ -232,7 +242,7 @@ function questionItem(q, i) {
         h('span', { class: 'b-kind' }, KIND_LABEL[q.kind] || q.kind),
         h('span', { class: 'muted' }, `${q.time_limit} s`),
         q.rate_tree && h('span', { class: 'muted' }, '★ cijfer'),
-        q.media_url && h('span', { class: 'b-music' }, '♪ Spotify'),
+        q.media_url && h('span', { class: 'b-music' }, q.media_mode === 'verbergen' ? '♪ Spotify (afgedekt)' : q.media_mode === 'alleen_tv' ? '♪ Spotify (alleen tv)' : '♪ Spotify'),
       ),
       h('div', { class: 'q-title' }, q.text),
       h('div', { class: 'muted q-answer' }, answerSummary(q, ans)),
@@ -417,6 +427,8 @@ function renderEdit(q) {
 
   const photo = photoPicker(q?.photo_path ? state.thumbs.get(q.photo_path) : null);
   const music = spotifyField(q?.media_url || '');
+  const modeSelect = h('select', { class: 'b-select' }, MEDIA_MODES.map((m) => h('option', { value: m.value, selected: (q?.media_mode || 'tonen') === m.value }, m.label)));
+  const modeField = h('label', {}, 'Speler tijdens de vraag', modeSelect, h('span', { class: 'hint' }, 'Bij het antwoord is de speler altijd zichtbaar.'));
   const err = h('p', { class: 'form-error', role: 'alert' });
   const saveBtn = h('button', { class: 'btn btn-green btn-lg', type: 'submit' }, 'Opslaan');
 
@@ -441,6 +453,7 @@ function renderEdit(q) {
       if (link === false) return (err.textContent = 'Deze Spotify-link wordt niet herkend. Gebruik in Spotify: Delen → Link kopiëren.');
       // Alleen meesturen als er een link is of was (dan werkt het ook zonder 003_muziek.sql).
       if (link || q?.media_url) row.media_url = link;
+      if (link) row.media_mode = modeSelect.value;
       const answerRow = { correct_option: null, correct_texts: null, correct_value: null };
 
       if (!row.text) return (err.textContent = 'Vul de vraag in.');
@@ -479,6 +492,7 @@ function renderEdit(q) {
     h('label', {}, 'Vraag', text),
     h('div', { class: 'stack-tight' }, h('span', { class: 'field-label' }, 'Foto (optioneel)'), photo.el),
     music.el,
+    modeField,
     mcBlock, openBlock, estBlock,
     h('label', {}, 'Tijd in seconden', time),
     h('label', { class: 'check' }, rate, 'Spelers geven deze boom een cijfer'),
@@ -650,17 +664,65 @@ function spotifyField(initial, { label = 'Spotify-link (optioneel)', required = 
 
 // ---------------------------------------------------------------- snel een nummer toevoegen
 
+let musicVariant = 'ingestuurd';
+
+/**
+ * Snel een muziekvraag toevoegen. Drie soorten:
+ *  - ingestuurd: "Wie heeft dit nummer ingestuurd?" – meerkeuze met namen, speler zichtbaar
+ *  - artiest:    "Van wie is dit nummer?" – open (artiest typen), speler afgedekt
+ *  - zin:        "Maak de zin af" – meerkeuze met vervolgen, speler alleen op de tv
+ */
 function renderMusicForm() {
   setScreen('nummer');
   const listId = 'nummernamen';
   const names = h('datalist', { id: listId }, treeNameSuggestions().map((n) => h('option', { value: n })));
   const music = spotifyField('', { label: 'Spotify-link van het nummer', required: true });
-  const owner = h('input', { type: 'text', list: listId, maxlength: '80', autocapitalize: 'words', placeholder: 'Naam van wie dit nummer koos' });
-  const others = [1, 2, 3].map((n) => h('input', { type: 'text', list: listId, maxlength: '80', autocapitalize: 'words', placeholder: `Andere naam ${n}` }));
   const time = h('input', { type: 'number', inputmode: 'numeric', min: '5', max: '600', value: '30', class: 'input-short' });
   const err = h('p', { class: 'form-error', role: 'alert' });
   const count = h('span', { class: 'tree-count' }, musicCountText());
   const saveBtn = h('button', { class: 'btn btn-green btn-lg btn-block', type: 'submit' }, 'Opslaan en volgend nummer');
+  const txt = (placeholder, extra = {}) => h('input', { type: 'text', maxlength: '80', placeholder, ...extra });
+
+  // ingestuurd
+  const owner = txt('Naam van wie het instuurde', { list: listId, autocapitalize: 'words' });
+  const others = [1, 2, 3].map((n) => txt(`Andere naam ${n}`, { list: listId, autocapitalize: 'words' }));
+  const blockSubmit = h('div', { class: 'stack' },
+    h('label', {}, 'Wie heeft dit nummer ingestuurd?', owner, h('span', { class: 'hint' }, 'Dit is het goede antwoord.')),
+    h('fieldset', { class: 'b-fieldset' }, h('legend', {}, 'Drie andere namen'), others),
+  );
+  // artiest
+  const artist = txt('Bijv. Wham!');
+  const artistAlt = h('textarea', { rows: '2', placeholder: 'Bijv. George Michael' });
+  const blockArtist = h('div', { class: 'stack' },
+    h('label', {}, 'Juiste artiest', artist),
+    h('label', {}, 'Ook goed (optioneel, één per regel)', artistAlt),
+    h('p', { class: 'hint' }, 'Spelers typen de artiest; kleine tikfouten zijn goed. De speler is tijdens de vraag afgedekt, zodat de artiest niet in beeld staat.'),
+  );
+  // zin
+  const begin = h('input', { type: 'text', maxlength: '200', placeholder: 'Bijv. Last Christmas, I gave you my' });
+  const good = txt('Bijv. heart');
+  const wrong = [1, 2, 3].map((n) => txt(`Fout vervolg ${n}`));
+  const blockLyric = h('div', { class: 'stack' },
+    h('label', {}, 'Begin van de zin (staat op de tv)', begin),
+    h('label', {}, 'Goed vervolg', good),
+    h('fieldset', { class: 'b-fieldset' }, h('legend', {}, 'Drie foute vervolgen'), wrong),
+    h('p', { class: 'hint' }, 'De speler staat alleen op de tv. Zet het nummer op pauze vóór het antwoord klinkt.'),
+  );
+
+  const variants = [
+    { value: 'ingestuurd', label: 'Wie stuurde het in?', block: blockSubmit },
+    { value: 'artiest', label: 'Van wie is dit nummer?', block: blockArtist },
+    { value: 'zin', label: 'Maak de zin af', block: blockLyric },
+  ];
+  const segButtons = variants.map((v) => h('button', {
+    type: 'button', class: 'seg', onclick: () => { musicVariant = v.value; updateVariant(); },
+  }, v.label));
+  const updateVariant = () => variants.forEach((v, i) => {
+    segButtons[i].setAttribute('aria-pressed', String(v.value === musicVariant));
+    v.block.hidden = v.value !== musicVariant;
+  });
+
+  const differentFour = (list) => new Set(list.map((n) => n.toLowerCase())).size === 4;
 
   const form = h('form', {
     class: 'stack',
@@ -668,28 +730,49 @@ function renderMusicForm() {
     onsubmit: async (e) => {
       e.preventDefault();
       const link = music.value();
-      const ownerName = owner.value.trim();
-      const otherNames = others.map((i) => i.value.trim());
       if (!link) return (err.textContent = 'Plak een Spotify-link (Delen → Link kopiëren).');
-      if (!ownerName) return (err.textContent = 'Vul in wie dit nummer koos.');
-      if (otherNames.some((n) => !n)) return (err.textContent = 'Vul drie andere namen in.');
-      const all = [ownerName, ...otherNames];
-      if (new Set(all.map((n) => n.toLowerCase())).size < 4) return (err.textContent = 'Gebruik vier verschillende namen.');
       const seconds = parseInt(time.value, 10);
       if (!(seconds >= 5 && seconds <= 600)) return (err.textContent = 'De tijd moet tussen 5 en 600 seconden liggen.');
+      const cfg = MUSIC[musicVariant];
+      const row = { category: cfg.category, time_limit: seconds, rate_tree: false, unit: null, media_url: link, media_mode: cfg.mode };
+      let answerRow;
+      let label;
 
-      const options = shuffle(all);
+      if (musicVariant === 'ingestuurd') {
+        const all = [owner.value.trim(), ...others.map((i) => i.value.trim())];
+        if (!all[0]) return (err.textContent = 'Vul in wie dit nummer instuurde.');
+        if (all.some((n) => !n)) return (err.textContent = 'Vul drie andere namen in.');
+        if (!differentFour(all)) return (err.textContent = 'Gebruik vier verschillende namen.');
+        const options = shuffle(all);
+        Object.assign(row, { kind: 'meerkeuze', text: cfg.category, options });
+        answerRow = { correct_option: options.indexOf(all[0]), correct_texts: null, correct_value: null };
+        label = `Nummer van ${all[0]}`;
+      } else if (musicVariant === 'artiest') {
+        const texts = [artist.value.trim(), ...artistAlt.value.split('\n').map((l) => l.trim())].filter(Boolean);
+        if (!artist.value.trim()) return (err.textContent = 'Vul de juiste artiest in.');
+        Object.assign(row, { kind: 'open', text: cfg.category, options: null });
+        answerRow = { correct_option: null, correct_texts: texts, correct_value: null };
+        label = `Nummer van ${texts[0]}`;
+      } else {
+        const start = begin.value.trim().replace(/[.…\s]+$/, '');
+        const all = [good.value.trim(), ...wrong.map((i) => i.value.trim())];
+        if (!start) return (err.textContent = 'Vul het begin van de zin in.');
+        if (!all[0]) return (err.textContent = 'Vul het goede vervolg in.');
+        if (all.some((n) => !n)) return (err.textContent = 'Vul drie foute vervolgen in.');
+        if (!differentFour(all)) return (err.textContent = 'Gebruik vier verschillende vervolgen.');
+        const options = shuffle(all);
+        Object.assign(row, { kind: 'meerkeuze', text: `“${start} …”`, options });
+        answerRow = { correct_option: options.indexOf(all[0]), correct_texts: null, correct_value: null };
+        label = 'Zin';
+      }
+
       saveBtn.disabled = true;
       saveBtn.textContent = 'Bezig met opslaan…';
       try {
-        await saveQuestion(null, {
-          category: MUSIC_CATEGORY, kind: 'meerkeuze', text: MUSIC_CATEGORY,
-          time_limit: seconds, rate_tree: false, options, unit: null, media_url: link,
-        }, { correct_option: options.indexOf(ownerName), correct_texts: null, correct_value: null }, { blob: null, removed: false });
-        toast(`Nummer van ${ownerName} opgeslagen`);
+        await saveQuestion(null, row, answerRow, { blob: null, removed: false });
+        toast(`${label} opgeslagen`);
         music.reset();
-        owner.value = '';
-        others.forEach((i) => { i.value = ''; });
+        for (const el of [owner, ...others, artist, artistAlt, begin, good, ...wrong]) el.value = '';
         count.textContent = musicCountText();
         names.replaceChildren(...treeNameSuggestions().map((n) => h('option', { value: n })));
         window.scrollTo(0, 0);
@@ -700,14 +783,15 @@ function renderMusicForm() {
       saveBtn.textContent = 'Opslaan en volgend nummer';
     },
   },
+    h('div', { class: 'stack-tight' }, h('span', { class: 'field-label' }, 'Soort vraag'), h('div', { class: 'segmented segmented-wrap' }, segButtons)),
     music.el,
-    h('label', {}, 'Van wie is dit nummer?', owner, h('span', { class: 'hint' }, 'Dit is het goede antwoord.')),
-    h('fieldset', { class: 'b-fieldset' }, h('legend', {}, 'Drie andere namen'), others),
+    blockSubmit, blockArtist, blockLyric,
     names,
-    h('label', {}, 'Tijd in seconden', time, h('span', { class: 'hint' }, 'Tijd om te luisteren en te kiezen.')),
+    h('label', {}, 'Tijd in seconden', time, h('span', { class: 'hint' }, 'Tijd om te luisteren en te antwoorden.')),
     err,
     saveBtn,
   );
+  updateVariant();
 
   mount(h('div', { class: 'beheer-page tree-page' },
     h('header', { class: 'b-header' },

@@ -33,7 +33,11 @@ Elke vraag heeft een **rubriek**: vrije tekst, met suggesties uit eerder gebruik
 Elke vraag kan een **foto** hebben. Bij een foto vult die het grootste deel van het tv-scherm.
 
 Elke vraag kan een **Spotify-link** hebben (muziek). Op de tv en op de telefoons staat dan een Spotify-speler; je tikt op ▶ om af te spelen. Zonder ingelogd Spotify-account in die browser speelt Spotify een fragment van 30 seconden.
-- "Van wie is dit nummer?" is net als de kerstboom een meerkeuzevraag: gasten geven vooraf hun favoriete nummer door aan Rutger; de eigenaar is het goede antwoord en er zijn drie andere namen.
+- Gasten geven vooraf hun favoriete nummer door aan Rutger. Er zijn drie soorten muziekvragen:
+  - **Wie heeft dit nummer ingestuurd?** Meerkeuze: degene die het instuurde plus drie andere namen. Speler zichtbaar.
+  - **Van wie is dit nummer?** Open: spelers typen de artiest (tikfouten zijn goed). De speler is tijdens de vraag **afgedekt** (eigen ▶-knop), zodat titel en artiest niet in beeld staan.
+  - **Maak de zin af.** Meerkeuze: het begin van de zin staat op de tv, met het goede vervolg en drie foute. De speler staat **alleen op de tv**, niet op de telefoons.
+- Bij het antwoord is de speler altijd zichtbaar. Per vraag is in beheer in te stellen: speler tonen, afdekken of alleen op de tv.
 
 1. **Meerkeuze:** 4 opties (A–D), één goed.
    - "Van wie is deze kerstboom?" is gewoon een meerkeuzevraag met foto. De eigenaar is het goede antwoord en er zijn drie andere namen. Rutger vult de namen zelf in; ze komen niet uit de spelerslijst.
@@ -115,7 +119,7 @@ Het goede antwoord geeft 1 punt.
   - "Opslaan en volgende boom".
   - Rubriek automatisch "Van wie is deze kerstboom?".
   - Bovenin staat het aantal bomen.
-- **Snel een nummer toevoegen:** net als de kerstboom, maar met een Spotify-link in plaats van een foto. Rubriek automatisch "Van wie is dit nummer?", geen cijfer, standaard 30 seconden.
+- **Snel een nummer toevoegen:** net als de kerstboom, maar met een Spotify-link in plaats van een foto. Eerst kies je de soort (ingestuurd, artiest, zin afmaken); rubriek en speler-instelling gaan automatisch. Standaard 30 seconden, geen cijfer.
 - **Test:** start een apart spel met 30 testspelers die zelf willekeurig antwoorden (de proefmodus uit 10).
 - **Foto's:** in de browser verkleinen tot maximaal 1600 px, JPEG kwaliteit 0,8, en daarna uploaden.
 - **Spelinstellingen:** het minimum aantal stemmen voor de mooiste boom.

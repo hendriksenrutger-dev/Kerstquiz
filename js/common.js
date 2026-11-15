@@ -348,3 +348,85 @@ export function spotifyPlayer(link, { compact = false } = {}) {
     loading: 'lazy',
   });
 }
+
+// ---------- Afgedekte Spotify-speler (antwoord niet verklappen) ----------
+
+let spotifyApiPromise = null;
+/** Laad de officiële Spotify iFrame API één keer. */
+function loadSpotifyApi() {
+  if (spotifyApiPromise) return spotifyApiPromise;
+  spotifyApiPromise = new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('Spotify laadt niet')), 8000);
+    window.onSpotifyIframeApiReady = (api) => { clearTimeout(timer); resolve(api); };
+    const script = document.createElement('script');
+    script.src = 'https://open.spotify.com/embed/iframe-api/v1';
+    script.async = true;
+    script.onerror = () => { clearTimeout(timer); reject(new Error('Spotify laadt niet')); };
+    document.head.append(script);
+  });
+  spotifyApiPromise.catch(() => { spotifyApiPromise = null; }); // later opnieuw proberen
+  return spotifyApiPromise;
+}
+
+/**
+ * Spotify-speler die tijdens de vraag is afgedekt: je ziet geen titel, artiest
+ * of hoes, alleen een eigen ▶/⏸-knop. De knop stuurt de verborgen speler aan.
+ * @param allowReveal  toon een linkje "Speler tonen" (voor de quizmaster, als afspelen niet lukt)
+ */
+export function hiddenSpotifyPlayer(link, { compact = false, allowReveal = false } = {}) {
+  const s = parseSpotify(link);
+  if (!s) return null;
+  const height = compact ? 80 : 152;
+  const holder = h('div', { class: 'spotify-holder' });
+  const label = h('span', { class: 'music-cover-text' }, 'Luister goed…');
+  const btn = h('button', { type: 'button', class: 'music-play', disabled: true, 'aria-label': 'Afspelen' }, '▶');
+  const cover = h('div', { class: 'music-cover' },
+    h('span', { class: 'music-bars', 'aria-hidden': 'true' }, h('i'), h('i'), h('i'), h('i')),
+    label,
+    btn,
+  );
+  const wrap = h('div', { class: `music-wrap ${compact ? 'music-compact' : ''}`, style: { height: `${height}px` } }, holder, cover);
+
+  const reveal = () => cover.remove();
+  if (allowReveal) {
+    cover.append(h('button', { type: 'button', class: 'music-reveal', onclick: reveal }, 'Speler tonen'));
+  }
+
+  let controller = null;
+  let playing = false;
+  const setPlaying = (p) => {
+    playing = p;
+    btn.textContent = p ? '⏸' : '▶';
+    btn.setAttribute('aria-label', p ? 'Pauzeren' : 'Afspelen');
+    wrap.classList.toggle('is-playing', p);
+  };
+  btn.addEventListener('click', () => {
+    if (!controller) return;
+    controller.togglePlay();
+    // Als Spotify niet reageert (bijv. geblokkeerd), na even een hint geven.
+    setTimeout(() => {
+      if (!playing) label.textContent = allowReveal ? 'Speelt het niet? Tik op "Speler tonen".' : 'Luister naar het grote scherm.';
+    }, 2500);
+  });
+
+  const start = () => {
+    if (!holder.isConnected) { requestAnimationFrame(start); return; }
+    loadSpotifyApi().then((api) => {
+      api.createController(holder, { uri: `spotify:${s.type}:${s.id}`, width: '100%', height }, (c) => {
+        controller = c;
+        btn.disabled = false;
+        c.addListener('playback_update', (e) => {
+          setPlaying(!e.data.isPaused);
+          if (!e.data.isPaused) label.textContent = 'Luister goed…';
+        });
+      });
+    }).catch(() => {
+      // Zonder de API: gewone speler eronder; op de tv kan Rutger hem tonen.
+      holder.replaceWith(spotifyPlayer(link, { compact }));
+      label.textContent = allowReveal ? 'Tik op "Speler tonen" om af te spelen.' : 'Luister naar het grote scherm.';
+      btn.remove();
+    });
+  };
+  start();
+  return wrap;
+}

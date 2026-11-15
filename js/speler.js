@@ -1,7 +1,7 @@
 // Spelersscherm (#speler): telefoon, zonder login.
 import {
   sb, h, mount, toast, load, save, LETTERS, syncClock, secondsLeft,
-  fetchQuestions, fetchGame, errorText, liveSync, spotifyPlayer,
+  fetchQuestions, fetchGame, errorText, liveSync, spotifyPlayer, hiddenSpotifyPlayer,
 } from './common.js';
 import { parseNumber, formatNumber } from './scoring.js';
 
@@ -210,7 +210,7 @@ function renderQuestion(q) {
       q.category && h('span', { class: 'label' }, q.category),
       h('h2', { class: 'p-question' }, q.text),
       photo && h('img', { class: 'p-photo', src: photo, alt: '' }),
-      q.media_url && spotifyPlayer(q.media_url, { compact: true }),
+      q.media_url && phonePlayer(q),
       answerArea,
       q.rate_tree && ratingArea(q),
     ),
@@ -234,6 +234,13 @@ function choiceArea(q) {
     h('div', { class: 'p-options' }, buttons),
     h('p', { class: 'hint center' }, 'Je kunt je keuze wijzigen tot de tijd om is.'),
   ];
+}
+
+/** Muziek op de telefoon: zichtbaar, afgedekt of alleen op de tv. */
+function phonePlayer(q) {
+  if (q.media_mode === 'alleen_tv') return h('p', { class: 'p-listen' }, '♪ Luister naar het grote scherm');
+  if (q.media_mode === 'verbergen') return hiddenSpotifyPlayer(q.media_url, { compact: true });
+  return spotifyPlayer(q.media_url, { compact: true });
 }
 
 /** Cijfer 1–10 voor de boom (telt niet voor de score). */
