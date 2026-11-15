@@ -555,7 +555,7 @@ function musicDebug() {
 // ---------- Versie (altijd de nieuwste versie laden) ----------
 
 // Bij elke nieuwe versie ophogen, samen met version.txt en de ?v=… in index.html en de imports.
-export const APP_VERSION = '25';
+export const APP_VERSION = '26';
 
 /**
  * GitHub Pages en Safari bewaren bestanden een tijd in de cache. Is er een nieuwere
@@ -615,12 +615,22 @@ export function deckPlayer(link, { height = 152 } = {}) {
   let ctrl = null;
   let wanted = false;
   let playing = false;
+  let startedAt = 0;     // tijdstip van de laatste start door de app
+  let kicks = 0;         // hoe vaak we het nummer na een onverwachte stop opnieuw hebben aangezet
   const listeners = [];
 
+  // Alleen "speel af" sturen (geen terugspoelen ervoor: die twee berichten kwamen
+  // op de iPad soms in de verkeerde volgorde aan, waardoor het na 1 s stopte).
   const start = () => {
     if (!ctrl) return;
-    if (typeof ctrl.seek === 'function') ctrl.seek(0);
+    startedAt = Date.now();
+    kicks = 0;
     if (typeof ctrl.play === 'function') ctrl.play(); else ctrl.togglePlay();
+  };
+  const kick = () => {
+    if (!ctrl || !wanted) return;
+    kicks++;
+    if (typeof ctrl.resume === 'function') ctrl.resume(); else ctrl.togglePlay();
   };
   const init = () => {
     if (!holder.isConnected) { requestAnimationFrame(init); return; }
@@ -628,7 +638,10 @@ export function deckPlayer(link, { height = 152 } = {}) {
       api.createController(holder, { uri: `spotify:${s.type}:${s.id}`, width: '100%', height }, (c) => {
         ctrl = c;
         c.addListener('playback_update', (e) => {
-          playing = !e.data.isPaused;
+          const nowPlaying = !e.data.isPaused;
+          // Stopt het vlak na de start uit zichzelf? Dan nog een duwtje geven.
+          if (!nowPlaying && playing && wanted && Date.now() - startedAt < 3500 && kicks < 2) setTimeout(kick, 250);
+          playing = nowPlaying;
           listeners.forEach((f) => f(playing));
         });
         if (wanted) start();
@@ -649,6 +662,8 @@ export function deckPlayer(link, { height = 152 } = {}) {
     toggle() {
       if (playing) { api.pause(); return; }
       wanted = true;
+      startedAt = Date.now();
+      kicks = 0;
       if (!ctrl) return;
       if (typeof ctrl.resume === 'function') ctrl.resume(); else ctrl.togglePlay();
     },
