@@ -2,7 +2,9 @@
 import {
   sb, h, mount, toast, load, save, LETTERS, syncClock, secondsLeft,
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
+  keepScreenOn, fullscreenButton,
 } from './common.js';
+import { testPlayers, addTestPlayers, stopTestMode, answerAsTestPlayers } from './proef.js';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking,
 } from './scoring.js';
@@ -26,6 +28,7 @@ let requestedGameId = null;
 export async function startTv(params) {
   document.body.className = 'tv';
   requestedGameId = params?.get('spel') || null;
+  keepScreenOn();
   const { data } = await sb.auth.getSession();
   if (!data.session) return renderLogin();
   await afterLogin();
@@ -34,7 +37,7 @@ export async function startTv(params) {
 // ---------------------------------------------------------------- inloggen
 
 function renderLogin(message) {
-  mount(stage('screen-hero', heroLayout(h('h1', { class: 'title' }, 'Kerstquiz'), loginForm(afterLogin, message))));
+  mount(stage('screen-free', heroLayout(h('h1', { class: 'title' }, 'Kerstquiz'), loginForm(afterLogin, message))));
 }
 
 async function afterLogin() {
@@ -59,23 +62,31 @@ async function afterLogin() {
 
 // ---------------------------------------------------------------- startscherm
 
+/** Beginscherm van de quizmaster: werkt op iPad én telefoon. */
 function renderHome(savedGame) {
   stopLive();
   const n = state.questions.length;
-  const content = h('div', { class: 'stack' },
+  const trees = state.questions.filter((q) => q.rate_tree).length;
+  const running = savedGame && savedGame.status !== 'tree' ? savedGame : null;
+  const content = h('div', { class: 'stack home' },
     h('h1', { class: 'title' }, 'Kerstquiz'),
     h('p', { class: 'lead' },
       n === 0
-        ? 'Er staan nog geen vragen klaar. Voer eerst supabase/test_vragen.sql uit in Supabase.'
-        : `${n} ${n === 1 ? 'vraag' : 'vragen'} klaar.`),
-    h('div', { class: 'row' },
-      h('button', { class: 'btn btn-gold btn-lg', onclick: newGame }, 'Nieuw spel'),
-      savedGame && h('button', { class: 'btn btn-ghost btn-lg', onclick: () => openGame(savedGame) },
-        `Verder met spel ${savedGame.code}`),
+        ? 'Er staan nog geen vragen klaar. Voeg ze toe via "Vragen beheren".'
+        : `${n} ${n === 1 ? 'vraag' : 'vragen'} klaar${trees ? `, waarvan ${trees} ${trees === 1 ? 'boom' : 'bomen'} met cijfer` : ''}.`),
+    h('div', { class: 'home-buttons' },
+      h('button', { class: 'btn btn-gold btn-lg', onclick: newGame, disabled: n === 0 }, '▶ Start nieuwe quiz'),
+      running && h('button', { class: 'btn btn-ghost btn-lg', onclick: () => openGame(running) },
+        `Verder met spel ${running.code}`),
+      h('a', { class: 'btn btn-ghost btn-lg', href: '#beheer' }, '✎ Vragen beheren'),
+      h('a', { class: 'btn btn-ghost btn-lg', href: '#beheer?scherm=boom' }, '🎄 Kerstboom toevoegen'),
     ),
-    h('button', { class: 'link', onclick: logout }, 'Uitloggen'),
+    h('div', { class: 'row' },
+      fullscreenButton(),
+      h('button', { class: 'link', onclick: logout }, 'Uitloggen'),
+    ),
   );
-  mount(stage('screen-hero', heroLayout(content)));
+  mount(stage('screen-free', heroLayout(content)));
 }
 
 async function newGame() {
@@ -242,7 +253,7 @@ function renderLobby() {
 
   const content = h('div', { class: 'lobby' },
     h('div', { class: 'lobby-head' },
-      h('h1', { class: 'title' }, 'Kerstquiz'),
+      h('h1', { class: 'title', onclick: secretTap }, 'Kerstquiz'),
       h('p', { class: 'lead' }, 'Pak je telefoon en doe mee!'),
     ),
     h('div', { class: 'join' },
@@ -255,7 +266,7 @@ function renderLobby() {
     ),
     h('div', { class: 'players-block' },
       h('div', { class: 'players-count', id: 'players-count' }, playersCountText()),
-      h('div', { class: 'chips', id: 'player-chips' }, playerChips()),
+      h('div', { class: 'chips', id: 'player-chips' }),
     ),
     h('div', { class: 'row' },
       h('button', {
@@ -267,6 +278,25 @@ function renderLobby() {
   );
 
   mount(stage('screen-hero', heroLayout(content), cornerMenu()));
+  fitChips();
+}
+
+// Verborgen knop: 5× snel op de titel tikken in de wachtruimte → proefmodus.
+let taps = [];
+async function secretTap() {
+  const now = Date.now();
+  taps = [...taps.filter((t) => now - t < 3000), now];
+  if (taps.length < 5) return;
+  taps = [];
+  if (!confirm('Proefmodus: 30 testspelers toevoegen die zelf willekeurig antwoorden?\n\nGebruik dit alleen om te testen, niet tijdens de echte quiz.')) return;
+  try {
+    const n = await addTestPlayers(state.game.id, state.game.code);
+    toast(`${n} testspelers toegevoegd`);
+    await loadPlayers();
+    render();
+  } catch (e) {
+    toast(errorText(e));
+  }
 }
 
 function playersCountText() {
@@ -275,10 +305,23 @@ function playersCountText() {
 }
 
 function playerChips() {
-  const max = 40;
-  const list = state.players.slice(-max).map((p) => h('span', { class: 'chip' }, p.name));
-  if (state.players.length > max) list.unshift(h('span', { class: 'chip chip-more' }, `+${state.players.length - max}`));
-  return list;
+  return state.players.map((p) => h('span', { class: 'chip' }, p.name));
+}
+
+/** Toon zoveel namen als er passen (nieuwste eerst zichtbaar), de rest als "+N". */
+function fitChips() {
+  const box = document.getElementById('player-chips');
+  if (!box) return;
+  box.replaceChildren(...playerChips());
+  if (box.scrollHeight <= box.clientHeight + 1) return;
+  const more = h('span', { class: 'chip chip-more' });
+  box.prepend(more);
+  let hidden = 0;
+  while (box.scrollHeight > box.clientHeight + 1 && box.children.length > 1) {
+    box.children[1].remove();
+    hidden++;
+    more.textContent = `+${hidden}`;
+  }
 }
 
 function renderQuestion() {
@@ -332,6 +375,11 @@ function renderQuestion() {
 
   mount(stage('screen-plain', view));
   updateTimer();
+
+  const startedAt = state.game.question_started_at;
+  answerAsTestPlayers(state.game, q, () => state.game.status === 'question'
+    && state.game.current_question_id === q.id && state.game.question_started_at === startedAt
+    && secondsLeft(state.game, q) > 0);
 }
 
 function renderAnswersIntro() {
@@ -671,7 +719,7 @@ function updateCounts() {
     const c = document.getElementById('players-count');
     const chips = document.getElementById('player-chips');
     if (c) c.textContent = playersCountText();
-    if (chips) chips.replaceChildren(...playerChips());
+    if (chips) fitChips();
   }
   const a = document.getElementById('answered');
   if (a) a.textContent = answeredText();
@@ -706,7 +754,17 @@ function heroLayout(...children) {
 }
 
 function cornerMenu() {
+  const proef = state.game && testPlayers(state.game.id).length > 0;
   return h('div', { class: 'corner' },
+    proef && h('button', {
+      class: 'proef-badge', title: 'Proefmodus uitzetten',
+      onclick: () => {
+        if (!confirm('Proefmodus uitzetten? De testspelers blijven in dit spel, maar antwoorden niet meer.')) return;
+        stopTestMode(state.game.id);
+        render();
+      },
+    }, 'Proefmodus'),
+    fullscreenButton(),
     h('button', { class: 'link', onclick: () => { stopLive(); renderHome(state.game); } }, 'Menu'),
   );
 }
