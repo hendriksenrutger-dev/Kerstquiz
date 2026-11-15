@@ -2,18 +2,12 @@
 import { h, mount, parseHash } from './common.js';
 import { startTv } from './tv.js';
 import { startSpeler } from './speler.js';
+import { startBeheer } from './beheer.js';
 
 function start() {
   const { view, params } = parseHash();
-  if (view === 'tv') return startTv();
-  if (view === 'beheer') {
-    document.body.className = 'beheer';
-    return mount(h('div', { class: 'beheer-page center stack' },
-      h('h1', { class: 'serif' }, 'Beheer'),
-      h('p', {}, 'Het beheerscherm komt in de volgende versie. Vragen staan nu nog in supabase/test_vragen.sql.'),
-      h('a', { class: 'btn btn-green', href: '#tv' }, 'Naar het tv-scherm'),
-    ));
-  }
+  if (view === 'tv') return startTv(params);
+  if (view === 'beheer') return startBeheer(params);
   return startSpeler(params);
 }
 
