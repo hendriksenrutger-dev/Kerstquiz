@@ -385,7 +385,7 @@ function renderRules() {
     ['⭐', '1 punt per goed antwoord', has((q) => q.kind === 'open') ? 'Een tikfout is niet erg' : 'Hoe meer goed, hoe beter'],
     has((q) => q.kind === 'schatting') && ['🎯', 'Schatten', 'De 3 dichtstbij krijgen een punt'],
     has((q) => q.rate_tree) && ['🎄', 'Kerstbomen', 'Geef elke boom een cijfer'],
-    ['🏆', 'Uitslag aan het eind', state.tiebreaks.length ? 'Gelijk? Dan een schiftingsvraag' : 'Eerst alle vragen, dan de antwoorden'],
+    ['🏆', 'Uitslag aan het eind', state.tiebreaks.length ? 'Gelijk? Extra vraag!' : 'Eerst alle vragen, dan de antwoorden'],
   ].filter(Boolean);
 
   const view = h('div', { class: 'rules' },
