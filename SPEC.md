@@ -100,7 +100,7 @@ Het goede antwoord geeft 1 punt.
   - Laat aanmelden tijdens het spel is toegestaan. Gemiste vragen tellen als 0.
 - Het speler-id wordt in `localStorage` bewaard. Na herladen of een weggevallen verbinding gaat de speler verder in hetzelfde spel.
 - **Meerkeuze:** de vier opties met letter en tekst, grote knoppen. Bij een foto ook een kleine versie ervan op de telefoon. Je kunt je keuze wijzigen tot de tijd om is.
-- **Cijfer** (als het vinkje aan staat): onder de opties een rij 1–10 met de tekst "Welk cijfer geef je deze boom?" en "telt niet voor je score".
+- **Cijfer** (als het vinkje aan staat): bij een meerkeuzevraag in twee stappen. Eerst kies je van wie de boom is; daarna verschijnt in hetzelfde scherm "Welk cijfer geef je deze boom?" met grote knoppen 1–10 en "telt niet voor je score", met bovenaan je antwoord en "Wijzigen".
 - **Open:** de vraag, een tekstveld en "Verstuur". Tip eronder: "Kleine tikfouten zijn niet erg."
 - **Schatting:** de vraag, een getalveld (numeriek toetsenbord) met de eenheid, en "Verstuur". Tip eronder: "De drie die het dichtst zitten krijgen een punt."
 - Bovenin: het vraagnummer, de resterende tijd en de naam van de speler. **Geen punten tonen**; die zijn pas na de antwoordenronde bekend.
@@ -122,7 +122,7 @@ Het goede antwoord geeft 1 punt.
 - **Snel een nummer toevoegen:** net als de kerstboom, maar met een Spotify-link in plaats van een foto. Eerst kies je de soort (ingestuurd, artiest, zin afmaken); rubriek en speler-instelling gaan automatisch. Standaard 30 seconden, geen cijfer.
 - **Test:** start een apart spel met 30 testspelers die zelf willekeurig antwoorden (de proefmodus uit 10).
 - **Foto's:** in de browser verkleinen tot maximaal 1600 px, JPEG kwaliteit 0,8, en daarna uploaden.
-- **Spelinstellingen:** het minimum aantal stemmen voor de mooiste boom, en muziek (Spotify-link) bij de start en bij het einde. Het startnummer speelt op de tv in de wachtruimte en bij "Zo werkt het"; het eindnummer vanaf de definitieve eindstand tot en met de mooiste kerstboom. Een kleine speler onderin; tik op ▶.
+- **Spelinstellingen:** het minimum aantal stemmen voor de mooiste boom, en muziek (Spotify-link) bij de start en bij het einde. Het startnummer speelt op de tv in de wachtruimte en bij "Zo werkt het"; het eindnummer vanaf de definitieve eindstand tot en met de mooiste kerstboom. Een kleine speler onderin. De muziek start door de tik op "Start nieuwe quiz" (beginscherm) en op "Einde antwoordenronde" / "Naar de eindstand"; anders tik op ▶. Het nummer (of het Spotify-fragment) herhaalt zich.
 - **Spel starten:** "Start quiz op dit scherm" maakt een nieuw spel met een nieuwe kamercode en opent `#tv`.
 
 ## 8. Data en beveiliging (Supabase)

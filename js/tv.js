@@ -2,7 +2,7 @@
 import {
   sb, h, mount, toast, load, save, LETTERS, syncClock, secondsLeft,
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
-  keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer,
+  keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer,
 } from './common.js';
 import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js';
 import {
@@ -53,6 +53,7 @@ async function afterLogin() {
     // Muziek bij de start en het einde (Beheer → Spelinstellingen); ontbreekt de tabel/kolom, dan geen muziek.
     const { data: settings } = await sb.from('settings').select('*').eq('id', 1).maybeSingle();
     state.music = { start: settings?.start_music || null, end: settings?.end_music || null };
+    preloadMusic();
   } catch (e) {
     return renderLogin(errorText(e));
   }
@@ -85,7 +86,7 @@ function renderHome(savedGame) {
         : `${n} ${n === 1 ? 'vraag' : 'vragen'} klaar${trees ? `, waarvan ${trees} ${trees === 1 ? 'boom' : 'bomen'} met cijfer` : ''}.`),
     h('div', { class: 'home-buttons' },
       h('button', { class: 'btn btn-gold btn-lg', onclick: newGame, disabled: n === 0 }, '▶ Start nieuwe quiz'),
-      running && h('button', { class: 'btn btn-ghost btn-lg', onclick: () => openGame(running) },
+      running && h('button', { class: 'btn btn-ghost btn-lg', onclick: () => { if (running.status === 'lobby') playMusic(state.music?.start); openGame(running); } },
         `Verder met spel ${running.code}`),
     ),
     h('div', { class: 'row' },
@@ -98,6 +99,7 @@ function renderHome(savedGame) {
 }
 
 async function newGame() {
+  playMusic(state.music?.start); // binnen de tik starten
   const { data, error } = await sb.rpc('create_game');
   if (error) return toast(errorText(error));
   openGame(data);
@@ -731,7 +733,7 @@ async function renderSchiftingResult(q) {
     ),
     h('footer', { class: 'q-foot' },
       h('button', { class: 'btn btn-ghost', onclick: () => { state.schiftingResult = false; renderSchifting(); } }, '◀ Terug'),
-      h('button', { class: 'btn btn-gold btn-lg', onclick: next }, 'Naar de eindstand ▶'),
+      h('button', { class: 'btn btn-gold btn-lg', onclick: () => { playMusic(state.music?.end); next(); } }, 'Naar de eindstand ▶'),
     ),
   );
   mount(stage('screen-plain', view));
@@ -864,7 +866,7 @@ async function renderReveal() {
     ),
     h('footer', { class: 'q-foot' },
       h('button', { class: 'btn btn-ghost', onclick: previous }, '◀ Vorige'),
-      h('button', { class: 'btn btn-gold btn-lg', onclick: next }, isLast ? 'Einde antwoordenronde ▶' : 'Volgende antwoord ▶'),
+      h('button', { class: 'btn btn-gold btn-lg', onclick: () => { if (isLast) playMusic(state.music?.end); next(); } }, isLast ? 'Einde antwoordenronde ▶' : 'Volgende antwoord ▶'),
     ),
   );
   mount(stage('screen-plain', view));
@@ -1029,19 +1031,47 @@ function heroLayout(...children) {
   return [h('div', { class: 'hero-bg', 'aria-hidden': 'true' }), h('div', { class: 'hero-content' }, children)];
 }
 
+// ---------------------------------------------------------------- achtergrondmuziek
+
 /**
- * Muziek die doorspeelt terwijl de schermen wisselen: een kleine Spotify-speler
- * buiten het podium. Zelfde link = speler blijft staan (muziek loopt door).
+ * Muziek bij de start en het einde: kleine Spotify-spelers buiten het podium,
+ * zodat de muziek doorspeelt terwijl de schermen wisselen. Er staat er steeds
+ * hoogstens één in beeld; de andere is gepauzeerd.
  */
+const musicPlayers = new Map(); // link → loopingSpotifyPlayer
+
+function musicPlayer(link) {
+  if (!link) return null;
+  let p = musicPlayers.get(link);
+  if (!p) {
+    p = loopingSpotifyPlayer(link);
+    if (!p) return null;
+    musicPlayers.set(link, p);
+    document.body.append(p.el);
+  }
+  return p;
+}
+
+/** Laat de speler voor `link` zien (null = geen muziek); andere spelers pauzeren. */
 function bgMusic(link) {
-  let el = document.getElementById('bg-music');
-  if (el && el.dataset.link === (link || '')) return;
-  if (el) el.remove();
-  const player = link ? spotifyPlayer(link, { compact: true }) : null;
-  if (!player) return;
-  el = h('div', { id: 'bg-music', class: 'bg-music', 'data-link': link },
-    h('span', { class: 'bg-music-label' }, '♪'), player);
-  document.body.append(el);
+  musicPlayer(link);
+  for (const [l, p] of musicPlayers) {
+    const on = l === link;
+    p.el.classList.toggle('bg-music-on', on);
+    if (!on) p.pause();
+  }
+}
+
+/** Start muziek direct vanuit een tik (anders houdt de browser het tegen). */
+function playMusic(link) {
+  const p = musicPlayer(link);
+  if (p) p.play();
+}
+
+/** Spelers alvast laden, zodat ze bij een tik meteen kunnen starten. */
+function preloadMusic() {
+  musicPlayer(state.music?.start);
+  musicPlayer(state.music?.end);
 }
 
 function cornerMenu() {
