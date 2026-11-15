@@ -546,7 +546,7 @@ function musicDebug() {
 // ---------- Versie (altijd de nieuwste versie laden) ----------
 
 // Bij elke nieuwe versie ophogen, samen met version.txt en de ?v=… in index.html en de imports.
-export const APP_VERSION = '15';
+export const APP_VERSION = '16';
 
 /**
  * GitHub Pages en Safari bewaren bestanden een tijd in de cache. Is er een nieuwere
@@ -557,11 +557,20 @@ export async function checkVersion() {
   try {
     const res = await fetch(`version.txt?t=${Date.now()}`, { cache: 'no-store' });
     if (!res.ok) return;
-    const online = (await res.text()).trim();
-    if (!online || online === APP_VERSION) return;
+    const online = parseInt((await res.text()).trim(), 10);
+    const mine = parseInt(APP_VERSION, 10);
+    // Alleen herladen als er online een NIEUWERE versie staat. Vlak na een update
+    // geeft GitHub soms nog even het oude nummer; daar niet op reageren.
+    if (!(online > mine)) return;
     const params = new URLSearchParams(location.search);
-    if (params.get('v') === online) return; // al geprobeerd: niet blijven herladen
-    params.set('v', online);
+    if (params.get('v') === String(online)) return; // al geprobeerd
+    // Vangnet: hoogstens één automatische herlaadbeurt per minuut.
+    try {
+      const last = Number(sessionStorage.getItem('kerstquiz_reload') || 0);
+      if (Date.now() - last < 60000) return;
+      sessionStorage.setItem('kerstquiz_reload', String(Date.now()));
+    } catch { /* geen opslag: toch één keer proberen */ }
+    params.set('v', String(online));
     location.replace(`${location.pathname}?${params}${location.hash}`);
   } catch { /* offline: dan maar de huidige versie */ }
 }
