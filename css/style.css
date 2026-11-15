@@ -524,7 +524,8 @@ body.beheer {
 
 .b-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 .b-actions { display: flex; flex-wrap: wrap; gap: 12px; }
-.b-actions .btn { flex: 1 1 240px; }
+.b-actions .btn { flex: 1 1 220px; }
+.b-actions .btn-test { flex: 0 0 auto; min-width: 110px; }
 .b-section { display: flex; flex-direction: column; gap: 12px; }
 .b-section-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 .b-warning { background: #FFF5DD; border: 1px solid #E9CF8E; border-radius: 10px; padding: 10px 14px; color: #6B4E0E; }

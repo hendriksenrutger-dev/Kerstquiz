@@ -4,7 +4,7 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton,
 } from './common.js';
-import { testPlayers, addTestPlayers, stopTestMode, answerAsTestPlayers } from './proef.js';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking,
 } from './scoring.js';
@@ -72,17 +72,16 @@ function renderHome(savedGame) {
     h('h1', { class: 'title' }, 'Kerstquiz'),
     h('p', { class: 'lead' },
       n === 0
-        ? 'Er staan nog geen vragen klaar. Voeg ze toe via "Vragen beheren".'
+        ? 'Er staan nog geen vragen klaar. Voeg ze toe via "Beheer".'
         : `${n} ${n === 1 ? 'vraag' : 'vragen'} klaar${trees ? `, waarvan ${trees} ${trees === 1 ? 'boom' : 'bomen'} met cijfer` : ''}.`),
     h('div', { class: 'home-buttons' },
       h('button', { class: 'btn btn-gold btn-lg', onclick: newGame, disabled: n === 0 }, '▶ Start nieuwe quiz'),
       running && h('button', { class: 'btn btn-ghost btn-lg', onclick: () => openGame(running) },
         `Verder met spel ${running.code}`),
-      h('a', { class: 'btn btn-ghost btn-lg', href: '#beheer' }, '✎ Vragen beheren'),
-      h('a', { class: 'btn btn-ghost btn-lg', href: '#beheer?scherm=boom' }, '🎄 Kerstboom toevoegen'),
     ),
     h('div', { class: 'row' },
       fullscreenButton(),
+      h('a', { class: 'link', href: '#beheer' }, 'Beheer'),
       h('button', { class: 'link', onclick: logout }, 'Uitloggen'),
     ),
   );
@@ -253,7 +252,7 @@ function renderLobby() {
 
   const content = h('div', { class: 'lobby' },
     h('div', { class: 'lobby-head' },
-      h('h1', { class: 'title', onclick: secretTap }, 'Kerstquiz'),
+      h('h1', { class: 'title' }, 'Kerstquiz'),
       h('p', { class: 'lead' }, 'Pak je telefoon en doe mee!'),
     ),
     h('div', { class: 'join' },
@@ -279,24 +278,6 @@ function renderLobby() {
 
   mount(stage('screen-hero', heroLayout(content), cornerMenu()));
   fitChips();
-}
-
-// Verborgen knop: 5× snel op de titel tikken in de wachtruimte → proefmodus.
-let taps = [];
-async function secretTap() {
-  const now = Date.now();
-  taps = [...taps.filter((t) => now - t < 3000), now];
-  if (taps.length < 5) return;
-  taps = [];
-  if (!confirm('Proefmodus: 30 testspelers toevoegen die zelf willekeurig antwoorden?\n\nGebruik dit alleen om te testen, niet tijdens de echte quiz.')) return;
-  try {
-    const n = await addTestPlayers(state.game.id, state.game.code);
-    toast(`${n} testspelers toegevoegd`);
-    await loadPlayers();
-    render();
-  } catch (e) {
-    toast(errorText(e));
-  }
 }
 
 function playersCountText() {
