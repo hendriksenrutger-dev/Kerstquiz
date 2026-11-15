@@ -123,43 +123,80 @@ export function errorText(err) {
   return m || 'Er ging iets mis. Probeer het opnieuw.';
 }
 
+// ---------- Verbindingsmelding ----------
+
+let bannerTimer = null;
+/** Toon na een paar seconden zonder verbinding een melding onderin het scherm. */
+function setConnected(ok) {
+  let el = document.getElementById('conn-banner');
+  if (!el) {
+    el = h('div', { id: 'conn-banner', class: 'conn-banner', role: 'status', hidden: true },
+      h('span', { class: 'conn-dot', 'aria-hidden': 'true' }), 'Geen verbinding – opnieuw verbinden…');
+    document.body.append(el);
+  }
+  clearTimeout(bannerTimer);
+  if (ok) { el.hidden = true; return; }
+  bannerTimer = setTimeout(() => { el.hidden = false; }, 4000);
+}
+
 // ---------- Realtime met automatisch opnieuw verbinden ----------
 
 /**
- * Luister naar wijzigingen. `onChange` krijgt de payload; `refresh` wordt
- * aangeroepen na (her)verbinden, bij terugkeer naar de app en elke 15 s
- * als vangnet, zodat de status altijd actueel is.
+ * Luister naar wijzigingen. `onChange` krijgt de payload; `refresh` haalt de
+ * actuele status op. Dat gebeurt na elk (her)verbinden, bij terugkeer naar de
+ * app, als het netwerk terugkomt en als vangnet elke 15 s (elke 5 s zolang de
+ * verbinding weg is). Bij een fout wordt opnieuw verbonden met oplopende wachttijd.
  */
 export function liveSync(name, listeners, onChange, refresh) {
   let channel = null;
   let retryTimer = null;
   let stopped = false;
+  let connected = false;
+  let attempt = 0;
+  let lastRefresh = Date.now();
+
+  const doRefresh = () => { lastRefresh = Date.now(); return refresh(); };
 
   const connect = () => {
     if (stopped) return;
-    channel = sb.channel(`${name}-${Math.random().toString(36).slice(2, 8)}`);
+    if (channel) sb.removeChannel(channel);
+    const mine = sb.channel(`${name}-${Math.random().toString(36).slice(2, 8)}`);
+    channel = mine;
     for (const l of listeners) {
-      channel.on('postgres_changes', { schema: 'public', ...l }, (payload) => onChange(payload));
+      mine.on('postgres_changes', { schema: 'public', ...l }, (payload) => onChange(payload));
     }
-    channel.subscribe((status) => {
-      if (status === 'SUBSCRIBED') refresh();
+    mine.subscribe((status) => {
+      if (stopped || channel !== mine) return; // melding van een oud kanaal
+      if (status === 'SUBSCRIBED') {
+        connected = true; attempt = 0; setConnected(true);
+        doRefresh();
+        return;
+      }
       if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-        if (stopped) return;
+        connected = false; setConnected(false);
         clearTimeout(retryTimer);
-        retryTimer = setTimeout(() => {
-          if (channel) sb.removeChannel(channel);
-          connect();
-        }, 2000);
+        const delay = Math.min(15000, 2000 * 2 ** attempt++);
+        retryTimer = setTimeout(connect, delay);
       }
     });
   };
   connect();
 
-  const onWake = () => { if (document.visibilityState === 'visible') { syncClock(); refresh(); } };
+  const onWake = () => {
+    if (document.visibilityState !== 'visible') return;
+    syncClock();
+    doRefresh();
+    if (!connected) { attempt = 0; clearTimeout(retryTimer); connect(); }
+  };
+  const onOffline = () => { connected = false; setConnected(false); };
   document.addEventListener('visibilitychange', onWake);
   window.addEventListener('online', onWake);
   window.addEventListener('focus', onWake);
-  const poll = setInterval(refresh, 15000);
+  window.addEventListener('offline', onOffline);
+  const poll = setInterval(() => {
+    const every = connected && navigator.onLine !== false ? 15000 : 5000;
+    if (Date.now() - lastRefresh >= every) doRefresh();
+  }, 1000);
 
   return () => {
     stopped = true;
@@ -168,8 +205,48 @@ export function liveSync(name, listeners, onChange, refresh) {
     document.removeEventListener('visibilitychange', onWake);
     window.removeEventListener('online', onWake);
     window.removeEventListener('focus', onWake);
+    window.removeEventListener('offline', onOffline);
+    setConnected(true);
     if (channel) sb.removeChannel(channel);
+    channel = null;
   };
+}
+
+// ---------- Scherm aan houden en volledig scherm (tv) ----------
+
+let wakeLock = null;
+/** Houd het scherm aan (Wake Lock API), als de browser dat ondersteunt. */
+export function keepScreenOn() {
+  if (!('wakeLock' in navigator)) return;
+  const request = async () => {
+    if (document.visibilityState !== 'visible' || (wakeLock && !wakeLock.released)) return;
+    try { wakeLock = await navigator.wakeLock.request('screen'); } catch { /* bijv. batterijbesparing */ }
+  };
+  request();
+  // De browser laat de wake lock los als de app op de achtergrond gaat; daarna opnieuw vragen.
+  document.addEventListener('visibilitychange', request);
+  // Sommige browsers willen eerst een tik op het scherm.
+  document.addEventListener('pointerdown', request, { passive: true });
+}
+
+export const canFullscreen = () => Boolean(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
+const isFullscreen = () => Boolean(document.fullscreenElement || document.webkitFullscreenElement);
+
+export function toggleFullscreen() {
+  const el = document.documentElement;
+  if (isFullscreen()) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+  else (el.requestFullscreen || el.webkitRequestFullscreen).call(el);
+}
+
+/** Knop "Volledig scherm" (verborgen als de browser het niet kan, zoals op de iPhone). */
+export function fullscreenButton(cls = 'link') {
+  if (!canFullscreen()) return null;
+  const btn = h('button', { class: cls, type: 'button', onclick: toggleFullscreen });
+  const update = () => { btn.textContent = isFullscreen() ? '⤡ Venster' : '⤢ Volledig scherm'; };
+  update();
+  document.addEventListener('fullscreenchange', update);
+  document.addEventListener('webkitfullscreenchange', update);
+  return btn;
 }
 
 /** Realtime moet het token van de ingelogde beheerder gebruiken. */

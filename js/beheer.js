@@ -203,7 +203,7 @@ function header() {
   return h('header', { class: 'b-header' },
     h('h1', { class: 'serif' }, 'Kerstquiz beheer'),
     h('div', { class: 'row' },
-      h('a', { class: 'link', href: '#tv' }, 'Tv-scherm'),
+      h('a', { class: 'link', href: '#tv' }, '← Beginscherm'),
       h('button', { class: 'link', onclick: logout }, 'Uitloggen'),
     ),
   );
