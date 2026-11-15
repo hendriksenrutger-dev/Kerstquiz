@@ -2,6 +2,7 @@
 // spelinstellingen en een spel starten. Licht thema; werkt op iPad en iPhone.
 import { sb, h, mount, toast, LETTERS, errorText, loginForm } from './common.js';
 import { parseNumber, formatNumber } from './scoring.js';
+import { addTestPlayers } from './proef.js';
 
 const TREE_CATEGORY = 'Van wie is deze kerstboom?';
 const DEFAULT_CATEGORIES = [TREE_CATEGORY, 'In welke stad staat deze kerstboom?', 'Kerstfeitje'];
@@ -184,7 +185,11 @@ function renderList() {
     header(),
     h('section', { class: 'b-card b-actions' },
       h('button', { class: 'btn btn-green btn-lg', onclick: startGame, disabled: state.questions.length === 0 }, 'Start quiz op dit scherm'),
-      h('button', { class: 'btn btn-light btn-lg', onclick: renderTreeForm }, '🎄 Snel een kerstboom toevoegen'),
+      h('button', { class: 'btn btn-light btn-lg', onclick: renderTreeForm }, '🎄 Kerstboom toevoegen'),
+      h('button', {
+        class: 'btn btn-light btn-lg btn-test', onclick: startTestGame, disabled: state.questions.length === 0,
+        title: 'Testquiz met 30 testspelers die zelf antwoorden',
+      }, 'Test'),
     ),
     h('section', { class: 'b-section' },
       h('div', { class: 'b-section-head' },
@@ -312,6 +317,22 @@ function settingsCard() {
 }
 
 // ---------------------------------------------------------------- spel starten
+
+/** Testquiz: nieuw, apart spel met 30 testspelers die zelf willekeurig antwoorden. */
+async function startTestGame(e) {
+  if (!confirm('Testquiz starten?\n\nEr komt een apart testspel met 30 testspelers die zelf willekeurig antwoorden. Gebruik voor de echte avond "Start quiz op dit scherm".')) return;
+  const btn = e.currentTarget;
+  btn.disabled = true;
+  btn.textContent = 'Testspelers toevoegen…';
+  const { data, error } = await sb.rpc('create_game');
+  if (error) { btn.disabled = false; btn.textContent = 'Test'; return toast(errorText(error)); }
+  try {
+    await addTestPlayers(data.id, data.code);
+  } catch (ex) {
+    toast(errorText(ex));
+  }
+  location.hash = `#tv?spel=${data.id}`;
+}
 
 async function startGame() {
   const { data, error } = await sb.rpc('create_game');

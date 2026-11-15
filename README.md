@@ -2,7 +2,7 @@
 
 Eigen pubquiz-app voor de kerst. Zie [SPEC.md](SPEC.md) voor de volledige specificatie.
 
-- `#tv` – beginscherm van de quizmaster (start quiz, beheer, kerstboom toevoegen) en het grote scherm (iPad)
+- `#tv` – beginscherm van de quizmaster (start quiz, verder met spel, linkje naar beheer) en het grote scherm (iPad)
 - `#speler` – telefoon van de spelers (standaard)
 - `#beheer` – vragen beheren, spel starten (iPad of iPhone)
 - `#beheer?scherm=boom` – snel een kerstboom toevoegen (iPhone)
@@ -24,7 +24,7 @@ Foto's van kerstbomen komen alleen in de privé Supabase-bucket `fotos`, nooit i
 
 De puntentelling (`js/scoring.js`) heeft tests: `node tests/scoring.test.mjs`.
 
-## Proefmodus
+## Testquiz
 
-Tik in de wachtruimte op `#tv` 5× snel op de titel "Kerstquiz" om 30 testspelers toe te voegen die zelf willekeurig antwoorden.
-Gebruik dit alleen met een apart testspel.
+In beheer start de knop **Test** een apart spel met 30 testspelers die zelf willekeurig antwoorden.
+Gebruik voor de echte avond "Start quiz op dit scherm" of "Start nieuwe quiz".
