@@ -37,6 +37,7 @@ Elke vraag kan een **Spotify-link** hebben (muziek). Op de tv en op de telefoons
   - **Wie heeft dit nummer ingestuurd?** Meerkeuze: degene die het instuurde plus drie andere namen. Speler zichtbaar.
   - **Van wie is dit nummer?** Open: spelers typen de artiest (tikfouten zijn goed). De speler is tijdens de vraag **afgedekt** (eigen ▶-knop), zodat titel en artiest niet in beeld staan.
   - **Maak de zin af.** Meerkeuze: het begin van de zin staat op de tv, met het goede vervolg en drie foute. De speler staat **alleen op de tv**, niet op de telefoons.
+- Een vraag kan ook een **Spotify-link bij het antwoord** hebben: die speler toont de tv in de antwoordenronde in plaats van die van de vraag (bijv. het nummer waarop iemand danst). Staat bij de juiste antwoorden, alleen leesbaar voor de beheerder.
 - Bij het antwoord is de speler altijd zichtbaar. Per vraag is in beheer in te stellen: speler tonen, afdekken of alleen op de tv. Bij een nieuwe Spotify-link in "Bewerken" staat **afdekken** standaard aan.
 
 1. **Meerkeuze:** 4 opties (A–D), één goed.
@@ -122,7 +123,7 @@ Het goede antwoord geeft 1 punt.
   - Bovenin staat het aantal bomen.
 - **Snel een nummer toevoegen:** net als de kerstboom, maar met een Spotify-link in plaats van een foto. Eerst kies je de soort (ingestuurd, artiest, zin afmaken); rubriek en speler-instelling gaan automatisch. Standaard 30 seconden, geen cijfer.
 - **Test:** start een apart spel met 30 testspelers die zelf willekeurig antwoorden (de proefmodus uit 10).
-- **Foto's:** in de browser verkleinen tot maximaal 1600 px, JPEG kwaliteit 0,8, en daarna uploaden.
+- **Foto's:** in de browser verkleinen tot maximaal 1600 px, JPEG kwaliteit 0,8, en daarna uploaden. Uitzondering: een GIF wordt ongewijzigd geüpload (blijft bewegen), maximaal 10 MB.
 - **Spelinstellingen:** het minimum aantal stemmen voor de mooiste boom, en muziek (Spotify-link) bij de start en bij het einde. Het startnummer speelt op de tv in de wachtruimte en bij "Zo werkt het"; het eindnummer vanaf de definitieve eindstand tot en met de mooiste kerstboom. Een kleine speler onderin. De muziek start door de tik op "Start nieuwe quiz" (beginscherm) en op "Einde antwoordenronde" / "Naar de eindstand"; anders tik op ▶. Het nummer (of het Spotify-fragment van 30 seconden) herhaalt zich. Een playlist-link kan ook: Spotify speelt de nummers na elkaar en begint daarna opnieuw. Met `#tv?debug=1` toont de speler de signalen van Spotify.
 - **Spel starten:** "Start quiz op dit scherm" maakt een nieuw spel met een nieuwe kamercode en opent `#tv`.
 
