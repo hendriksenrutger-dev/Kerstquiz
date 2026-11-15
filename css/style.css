@@ -705,3 +705,69 @@ body.beheer {
   border: 1.5px solid var(--b-border); background: #fff; color: var(--beheer-text); font: 500 16px var(--sans);
 }
 .segmented-wrap .seg { font-size: 14px; line-height: 1.2; padding: 6px 8px; }
+
+/* Tussenstand (tv) */
+.interim-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1.6cqh; }
+.interim-row {
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 1.6cqw;
+  padding: 1.4cqh 1.6cqw; border-radius: var(--radius); background: var(--surface); border: 2px solid var(--border);
+  font-size: max(28px, 2.2cqw); font-weight: 700;
+}
+.interim-bar { height: 1.6cqh; min-height: 12px; background: var(--bg); border-radius: 999px; overflow: hidden; }
+.interim-bar span { display: block; height: 100%; background: var(--muted); border-radius: 999px; }
+.interim-first { border-color: var(--gold); }
+.interim-first .rank-place { background: var(--gold); color: var(--bg); }
+.interim-first .interim-bar span { background: var(--gold); }
+
+/* Eindstand met podium */
+.final-body { display: flex; flex-direction: column; gap: 2.5cqh; min-height: 0; }
+.podium { display: flex; align-items: flex-end; justify-content: center; gap: 2cqw; }
+.podium-step {
+  flex: 1; max-width: 32%; display: flex; flex-direction: column; align-items: center; gap: .6cqh;
+  padding: 2cqh 1.4cqw; border-radius: var(--radius) var(--radius) 6px 6px; text-align: center;
+  background: var(--surface); border: 2px solid var(--border);
+}
+.podium-1 { min-height: 34cqh; border-color: var(--gold); background: rgba(227, 176, 75, .16); box-shadow: 0 0 50px rgba(227, 176, 75, .25); }
+.podium-2 { min-height: 27cqh; }
+.podium-3 { min-height: 22cqh; }
+.podium-place {
+  width: 2.2em; height: 2.2em; border-radius: 999px; display: flex; align-items: center; justify-content: center;
+  background: var(--text); color: var(--bg); font-weight: 800; font-size: max(24px, 1.9cqw);
+}
+.podium-1 .podium-place { background: var(--gold); font-size: max(30px, 2.5cqw); }
+.podium-names { display: flex; flex-direction: column; font-family: var(--serif); font-weight: 700; font-size: max(30px, 2.8cqw); line-height: 1.1; overflow-wrap: anywhere; }
+.podium-1 .podium-names { font-size: max(38px, 3.6cqw); color: var(--gold); }
+.podium-points { color: var(--muted); font-weight: 600; font-size: max(20px, 1.5cqw); }
+.ranks-small .rank { font-size: max(20px, 1.5cqw); padding: .8cqh 1.4cqw; }
+.tie-banner { padding: 1.4cqh 1.6cqw; border-radius: var(--radius); border: 2px dashed var(--gold); color: var(--gold); font-size: max(24px, 1.9cqw); font-weight: 600; }
+.rank-tied { border-color: var(--gold); border-style: dashed; }
+.chip-gold { border-color: var(--gold); color: var(--gold); font-weight: 700; font-size: max(22px, 1.6cqw); }
+.tie-chips { max-height: none; }
+.tie-results { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1.2cqh; }
+.tie-results li {
+  display: grid; grid-template-columns: 1fr auto auto; gap: 2cqw; align-items: center;
+  padding: 1.2cqh 1.6cqw; border-radius: var(--radius); background: var(--surface); border: 2px solid var(--border);
+  font-size: max(24px, 1.9cqw); font-weight: 600;
+}
+.tie-results li.tie-best { border-color: var(--good); background: rgba(143, 224, 168, .14); }
+
+/* Winnaar op de telefoon: groen knipperend scherm */
+.winner-page { position: fixed; inset: 0; max-width: none; animation: winflash 0.9s ease-in-out infinite alternate; background: var(--good); }
+.winner-body { justify-content: center; }
+.winner-page .phone-body { width: 100%; max-width: 560px; margin: 0 auto; }
+.winner-body > * { background: var(--text); color: var(--bg); border-radius: 16px; padding: 10px 18px; max-width: 100%; text-align: center; overflow-wrap: anywhere; }
+.winner-trophy { font-size: 72px; background: none !important; padding: 0 !important; }
+.winner-title { font-family: var(--serif); font-size: 40px; font-weight: 700; }
+.winner-name { font-size: 24px; font-weight: 700; }
+@keyframes winflash { from { background: var(--good); } to { background: #2E8B57; } }
+.beheer .b-tiebreak { padding: 2px 10px; border-radius: 999px; font-size: .8em; font-weight: 600; background: #FBEFD5; color: #7A5612; }
+
+/* Achtergrondmuziek op de tv (start en einde) */
+.bg-music {
+  position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 40;
+  width: min(420px, 44vw); display: flex; align-items: center; gap: 8px;
+  padding: 6px 8px 6px 12px; border-radius: 14px; background: rgba(15, 42, 29, .85);
+  border: 1px solid var(--gold); box-shadow: 0 8px 24px rgba(0, 0, 0, .4);
+}
+.bg-music-label { color: var(--gold); font-size: 22px; font-weight: 700; }
+.bg-music .spotify { flex: 1; }

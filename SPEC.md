@@ -58,7 +58,7 @@ De status van het spel staat in de database. Tv en telefoons volgen die via Supa
    - De tv toont het rubriek-label, "Vraag x van y", de vraag, de foto, de opties (bij meerkeuze), een timer en "n van m geantwoord".
    - De telefoon toont het antwoordscherm (zie 6).
    - Is de tijd om, of heeft iedereen geantwoord, dan kan Rutger op "Volgende vraag" tikken. Er gaat niets automatisch door.
-   - Er worden **geen antwoorden en geen tussenstand** getoond.
+   - Er worden **geen antwoorden** getoond. Om de tien vragen volgt een tussenstand zonder namen (zie 12.1).
 4. **Antwoordenronde:** alle vragen nog eens, nu met het juiste antwoord.
    - **Meerkeuze:** het goede antwoord oplichten, plus hoeveel spelers het goed hadden.
    - **Open:** de beoordelingslijst (zie 5.2). Rutger kan per groep goed/fout omzetten.
@@ -122,7 +122,7 @@ Het goede antwoord geeft 1 punt.
 - **Snel een nummer toevoegen:** net als de kerstboom, maar met een Spotify-link in plaats van een foto. Eerst kies je de soort (ingestuurd, artiest, zin afmaken); rubriek en speler-instelling gaan automatisch. Standaard 30 seconden, geen cijfer.
 - **Test:** start een apart spel met 30 testspelers die zelf willekeurig antwoorden (de proefmodus uit 10).
 - **Foto's:** in de browser verkleinen tot maximaal 1600 px, JPEG kwaliteit 0,8, en daarna uploaden.
-- **Spelinstellingen:** het minimum aantal stemmen voor de mooiste boom.
+- **Spelinstellingen:** het minimum aantal stemmen voor de mooiste boom, en muziek (Spotify-link) bij de start en bij het einde. Het startnummer speelt op de tv in de wachtruimte en bij "Zo werkt het"; het eindnummer vanaf de definitieve eindstand tot en met de mooiste kerstboom. Een kleine speler onderin; tik op ▶.
 - **Spel starten:** "Start quiz op dit scherm" maakt een nieuw spel met een nieuwe kamercode en opent `#tv`.
 
 ## 8. Data en beveiliging (Supabase)
@@ -191,9 +191,9 @@ Elke PR moet zelfstandig te testen zijn op GitHub Pages.
 
 Elke PR bevat in de beschrijving: wat er nieuw is, hoe Rutger het kan testen (stap voor stap, vanaf iPad en telefoon) en of er een nieuw SQL-bestand in Supabase moet worden uitgevoerd.
 
-## 12. Wensen voor later
+## 12. Tussenstand, schifting en winnaars
 
-Nog niet gebouwd. Eerst overleggen voordat dit wordt opgepakt.
+Gebouwd na de oorspronkelijke vijf PR's (SQL: `supabase/004_extra.sql`).
 
 ### 12.1 Tussenstand om de tien vragen
 - Na vraag 10, 20, 30 enzovoort toont de tv een scherm **"Tussenstand"** met alleen de **scores van de top 5, zonder namen** (bijvoorbeeld "1e – 9 punten, 2e – 8 punten").
@@ -210,6 +210,8 @@ Nog niet gebouwd. Eerst overleggen voordat dit wordt opgepakt.
 - Wie het dichtst bij de juiste waarde zit, krijgt de hoogste plek in die groep.
 - Zitten spelers precies even ver ernaast, dan volgt de volgende schiftingsvraag, tot elke plek één naam heeft.
 - Rutger zet in beheer 2 à 3 schiftingsvragen klaar (schattingen, als reserve). Ze tellen niet mee als gewone vraag en staan niet in "Dit komt er".
+- Is er geen schiftingsvraag (meer) over, dan blijft de gelijke stand staan en geldt 12.3 zonder schifting.
+- "Vorige" bij een schiftingsvraag waarop nog niemand heeft geantwoord, telt die vraag niet als gesteld.
 
 ### 12.3 Winnaars in de spotlight
 - Bij de (definitieve) eindstand gaat het scherm van de telefoons van de **top 3** **groen knipperen**, met bijvoorbeeld "🏆 Jij staat 1e!".

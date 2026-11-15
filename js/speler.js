@@ -130,7 +130,8 @@ function currentQuestion() {
 async function render() {
   const g = state.game;
   let q = null;
-  if (g.status === 'question' && g.current_question_id) {
+  const asking = (g.status === 'question' || g.status === 'schifting') && g.current_question_id;
+  if (asking) {
     q = currentQuestion();
     if (!q) {
       // nieuwe of gewijzigde vraag: lijst opnieuw ophalen
@@ -139,14 +140,20 @@ async function render() {
     }
   }
   const timeUp = q ? secondsLeft(g, q) <= 0 : false;
-  const key = `${g.status}|${g.current_question_id}|${g.question_started_at}|${timeUp}|${g.photo_url || ''}`;
+  const key = `${g.status}|${g.current_question_id}|${g.question_started_at}|${timeUp}|${g.photo_url || ''}|${(g.tiebreak_names || []).join(',')}|${JSON.stringify(g.winners || null)}`;
   if (key === state.screen) return;
   state.screen = key;
   state.timeUp = timeUp;
 
   if (g.status === 'lobby') return renderWaiting();
   if (g.status === 'question' && !g.current_question_id) return renderStarting();
-  if (g.status === 'question' && q) {
+  if (g.status === 'tussenstand') return renderLookUp('📊', 'Tussenstand op het grote scherm');
+  if (g.status === 'schifting' && q && !inTiebreak()) return renderSchiftingWatch();
+  if (['final', 'tree'].includes(g.status)) {
+    const win = myWin();
+    if (win) return renderWinner(win.place);
+  }
+  if (asking && q) {
     if (state.mineFor !== q.id) {
       state.mineFor = q.id;
       state.mine = {};
@@ -165,7 +172,7 @@ async function render() {
 
 function tick() {
   const g = state.game;
-  if (!g || g.status !== 'question' || !g.current_question_id) return;
+  if (!g || !['question', 'schifting'].includes(g.status) || !g.current_question_id) return;
   const q = currentQuestion();
   const left = secondsLeft(g, q);
   const t = document.getElementById('p-timer');
@@ -176,9 +183,10 @@ function tick() {
 // ---------------------------------------------------------------- schermen
 
 function topBar(q) {
-  const i = state.questions.findIndex((x) => x.id === q?.id);
+  const normal = state.questions.filter((x) => !x.tiebreak);
+  const i = normal.findIndex((x) => x.id === q?.id);
   return h('header', { class: 'p-top' },
-    h('span', {}, q ? `Vraag ${i + 1}/${state.questions.length}` : ''),
+    h('span', {}, !q ? '' : q.tiebreak ? 'Schifting' : `Vraag ${i + 1}/${normal.length}`),
     h('span', { class: 'p-timer', id: 'p-timer' }, q ? `${Math.max(0, Math.ceil(secondsLeft(state.game, q)))} s` : ''),
     h('span', { class: 'p-name' }, state.player.name),
   );
@@ -275,7 +283,7 @@ function numberArea(q) {
     type: 'text', id: 'p-input', inputmode: 'decimal', autocomplete: 'off', enterkeyhint: 'send',
     maxlength: '20', placeholder: 'Jouw schatting', 'aria-label': 'Jouw schatting', class: 'p-number',
   });
-  return answerForm(input, q.unit, 'De drie die het dichtst zitten krijgen een punt.', () => {
+  return answerForm(input, q.unit, q.tiebreak ? 'Schiftingsvraag: wie het dichtst zit, wint.' : 'De drie die het dichtst zitten krijgen een punt.', () => {
     const number = parseNumber(input.value);
     if (number == null) { toast('Vul een getal in.'); return null; }
     return { number };
@@ -389,19 +397,49 @@ function renderStarting() {
       h('ul', { class: 'p-rules' },
         h('li', {}, 'Antwoord hier op je telefoon; je kunt het wijzigen tot de tijd om is.'),
         h('li', {}, 'Elk goed antwoord is 1 punt.'),
-        h('li', {}, 'Tussendoor is er geen stand.'),
+        h('li', {}, 'De antwoorden en de eindstand komen aan het eind.'),
       ),
       h('p', { class: 'lead center' }, 'Kijk naar het grote scherm'),
     ),
   ));
 }
 
-function renderLookUp() {
+function renderLookUp(icon = '★', text = 'Kijk naar het grote scherm') {
   mount(h('div', { class: 'phone-page' },
     h('header', { class: 'p-top' }, h('span', {}), h('span', {}), h('span', { class: 'p-name' }, state.player.name)),
     h('div', { class: 'phone-body center stack' },
-      h('div', { class: 'done-icon', 'aria-hidden': 'true' }, '★'),
-      h('p', { class: 'big' }, 'Kijk naar het grote scherm'),
+      h('div', { class: 'done-icon', 'aria-hidden': 'true' }, icon),
+      h('p', { class: 'big' }, text),
+    ),
+  ));
+}
+
+const sameName = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();
+const inTiebreak = () => (state.game.tiebreak_names || []).some((n) => sameName(n, state.player.name));
+const myWin = () => (Array.isArray(state.game.winners) ? state.game.winners : []).find((w) => sameName(w.name, state.player.name));
+
+/** Schiftingsvraag voor anderen: meekijken. */
+function renderSchiftingWatch() {
+  mount(h('div', { class: 'phone-page' },
+    h('header', { class: 'p-top' }, h('span', {}, 'Schifting'), h('span', {}), h('span', { class: 'p-name' }, state.player.name)),
+    h('div', { class: 'phone-body center stack' },
+      h('div', { class: 'done-icon', 'aria-hidden': 'true' }, '⚖️'),
+      h('p', { class: 'big' }, 'Schiftingsvraag'),
+      h('p', { class: 'lead' }, `Voor: ${(state.game.tiebreak_names || []).join(', ')}`),
+      h('p', { class: 'muted' }, 'Kijk mee op het grote scherm.'),
+    ),
+  ));
+}
+
+/** Winnaar: groen knipperend scherm. */
+function renderWinner(place) {
+  const label = place === 1 ? '1e' : place === 2 ? '2e' : `${place}e`;
+  mount(h('div', { class: 'phone-page winner-page', role: 'status' },
+    h('div', { class: 'phone-body center stack winner-body' },
+      h('div', { class: 'winner-trophy', 'aria-hidden': 'true' }, '🏆'),
+      h('p', { class: 'winner-title' }, `Jij staat ${label}!`),
+      h('p', { class: 'winner-name' }, state.player.name),
+      h('p', { class: 'lead' }, 'Gefeliciteerd! Kijk naar het grote scherm.'),
     ),
   ));
 }

@@ -242,6 +242,7 @@ function questionItem(q, i) {
         h('span', { class: 'b-kind' }, KIND_LABEL[q.kind] || q.kind),
         h('span', { class: 'muted' }, `${q.time_limit} s`),
         q.rate_tree && h('span', { class: 'muted' }, '★ cijfer'),
+        q.tiebreak && h('span', { class: 'b-tiebreak' }, '⚖️ Schifting'),
         q.media_url && h('span', { class: 'b-music' }, q.media_mode === 'verbergen' ? '♪ Spotify (afgedekt)' : q.media_mode === 'alleen_tv' ? '♪ Spotify (alleen tv)' : '♪ Spotify'),
       ),
       h('div', { class: 'q-title' }, q.text),
@@ -306,11 +307,16 @@ function settingsCard() {
     value: String(state.settings.min_votes), class: 'input-short',
   });
   const btn = h('button', { class: 'btn btn-green', type: 'submit' }, 'Opslaan');
+  const hasMusic = 'start_music' in state.settings;
+  const startMusic = spotifyField(state.settings.start_music || '', { label: 'Muziek bij de start (wachtruimte en "Zo werkt het")' });
+  const endMusic = spotifyField(state.settings.end_music || '', { label: 'Muziek bij het einde (eindstand en mooiste kerstboom)' });
+  const musicBtn = h('button', { class: 'btn btn-green', type: 'submit' }, 'Muziek opslaan');
+
   return h('section', { class: 'b-section' },
     h('h2', { class: 'serif' }, 'Spelinstellingen'),
     state.settingsMissing
       ? h('p', { class: 'b-card b-warning' }, 'Voer eerst supabase/002_beheer.sql uit in Supabase om de spelinstellingen te kunnen opslaan.')
-      : h('form', {
+      : [h('form', {
         class: 'b-card stack',
         onsubmit: async (e) => {
           e.preventDefault();
@@ -330,6 +336,29 @@ function settingsCard() {
           h('div', { class: 'row' }, input, btn)),
         h('p', { class: 'hint' }, 'Een boom met minder stemmen kan niet winnen.'),
       ),
+      hasMusic
+        ? h('form', {
+          class: 'b-card stack',
+          onsubmit: async (e) => {
+            e.preventDefault();
+            const start = startMusic.value();
+            const end = endMusic.value();
+            if (start === false || end === false) return toast('Een Spotify-link wordt niet herkend.');
+            musicBtn.disabled = true;
+            const { error } = await sb.from('settings').update({ start_music: start, end_music: end }).eq('id', 1);
+            musicBtn.disabled = false;
+            if (error) return toast(errorText(error));
+            Object.assign(state.settings, { start_music: start, end_music: end });
+            toast('Muziek opgeslagen');
+          },
+        },
+          startMusic.el,
+          endMusic.el,
+          h('p', { class: 'hint' }, 'Op de tv verschijnt onderin een kleine speler; tik op ▶ om te starten. Laat een veld leeg voor geen muziek.'),
+          musicBtn,
+        )
+        : h('p', { class: 'b-card b-warning' }, 'Voer supabase/005_muziek_start_einde.sql uit in Supabase om muziek bij de start en het einde in te stellen.'),
+      ],
   );
 }
 
@@ -412,9 +441,12 @@ function renderEdit(q) {
   // schatting
   const value = h('input', { type: 'text', inputmode: 'decimal', value: ans?.correct_value != null ? String(ans.correct_value).replace('.', ',') : '', placeholder: 'Bijv. 1843', class: 'input-short' });
   const unit = h('input', { type: 'text', value: q?.unit || '', maxlength: '20', placeholder: 'Bijv. jaar, kg', class: 'input-short' });
+  const tiebreak = h('input', { type: 'checkbox', checked: Boolean(q?.tiebreak) });
   const estBlock = h('fieldset', { class: 'b-fieldset' },
     h('legend', {}, 'Juiste waarde'),
     h('div', { class: 'row' }, h('label', {}, 'Waarde', value), h('label', {}, 'Eenheid (optioneel)', unit)),
+    h('label', { class: 'check' }, tiebreak, 'Schiftingsvraag'),
+    h('p', { class: 'hint' }, 'Een schiftingsvraag komt niet in de gewone quiz. Hij wordt alleen gesteld bij een gelijke stand in de top 3, aan de spelers die gelijk staan. Zet er 2 à 3 klaar.'),
   );
 
 
@@ -474,6 +506,7 @@ function renderEdit(q) {
         if (v == null) return (err.textContent = 'Vul een geldig getal in als juiste waarde.');
         answerRow.correct_value = v;
         row.unit = unit.value.trim() || null;
+        if (tiebreak.checked || q?.tiebreak !== undefined) row.tiebreak = tiebreak.checked;
       }
 
       saveBtn.disabled = true;

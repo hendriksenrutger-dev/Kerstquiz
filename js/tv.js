@@ -6,7 +6,7 @@ import {
 } from './common.js';
 import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js';
 import {
-  judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking,
+  judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking,
 } from './scoring.js';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
@@ -21,6 +21,9 @@ const state = {
   tick: null,
   busy: false,
   reveal: null,   // antwoordenronde: { qid, answers, key, overrides: Map }
+  tiebreaks: [],  // schiftingsvragen (niet in de gewone quiz)
+  finalInfo: null, // laatste eindstand: { rows, pending, winners }
+  schiftingResult: false, // uitslag van de schiftingsvraag tonen
 };
 
 let requestedGameId = null;
@@ -44,7 +47,12 @@ async function afterLogin() {
   await syncRealtimeAuth();
   syncClock();
   try {
-    state.questions = await fetchQuestions();
+    const all = await fetchQuestions();
+    state.questions = all.filter((q) => !q.tiebreak);
+    state.tiebreaks = all.filter((q) => q.tiebreak);
+    // Muziek bij de start en het einde (Beheer → Spelinstellingen); ontbreekt de tabel/kolom, dan geen muziek.
+    const { data: settings } = await sb.from('settings').select('*').eq('id', 1).maybeSingle();
+    state.music = { start: settings?.start_music || null, end: settings?.end_music || null };
   } catch (e) {
     return renderLogin(errorText(e));
   }
@@ -65,6 +73,7 @@ async function afterLogin() {
 /** Beginscherm van de quizmaster: werkt op iPad én telefoon. */
 function renderHome(savedGame) {
   stopLive();
+  bgMusic(null);
   const n = state.questions.length;
   const trees = state.questions.filter((q) => q.rate_tree).length;
   const running = savedGame && savedGame.status !== 'tree' ? savedGame : null;
@@ -162,7 +171,7 @@ async function loadPlayers() {
 
 async function loadAnswered() {
   const g = state.game;
-  if (g.status !== 'question' || !g.current_question_id) { state.answered = 0; return; }
+  if (!['question', 'schifting'].includes(g.status) || !g.current_question_id) { state.answered = 0; return; }
   // Alleen echte antwoorden tellen; alleen een cijfer voor de boom telt niet als "geantwoord".
   const { data } = await sb.from('answers').select('choice, text_answer, number_answer')
     .eq('game_id', g.id).eq('question_id', g.current_question_id);
@@ -171,6 +180,9 @@ async function loadAnswered() {
 
 const screenKey = (g) => `${g?.status}|${g?.current_question_id}|${g?.question_started_at}`;
 const currentIndex = () => state.questions.findIndex((q) => q.id === state.game.current_question_id);
+const currentTiebreak = () => state.tiebreaks.find((q) => q.id === state.game.current_question_id) || null;
+const nextTiebreak = () => state.tiebreaks.find((q) => !(state.game.tiebreak_done || []).includes(q.id)) || null;
+const INTERIM_EVERY = 10;
 
 // ---------------------------------------------------------------- spelstappen
 
@@ -204,16 +216,26 @@ async function setState(status, questionId = null, photoUrl = null) {
 }
 
 // Volgorde: wachtruimte → vragen → "De antwoorden" → antwoorden → einde.
+// Volgorde: wachtruimte → uitleg → vragen (om de 10 een tussenstand) → "De antwoorden"
+// → antwoorden → eindstand (→ schiftingsvraag → eindstand) → mooiste kerstboom.
 async function next() {
   const g = state.game;
   const i = currentIndex();
   const last = state.questions.length - 1;
-  if (g.status === 'question') return i < last ? goTo('question', i + 1) : setState('answers');
+  if (g.status === 'question') {
+    if (i >= 0 && i < last && (i + 1) % INTERIM_EVERY === 0) return setState('tussenstand', state.questions[i].id);
+    return i < last ? goTo('question', i + 1) : setState('answers');
+  }
+  if (g.status === 'tussenstand') return goTo('question', i + 1);
   if (g.status === 'answers') {
     if (!g.current_question_id) return goTo('answers', 0);
     return i < last ? goTo('answers', i + 1) : setState('final');
   }
-  if (g.status === 'final' && hasTrees()) return setState('tree');
+  if (g.status === 'final') {
+    if (state.finalInfo?.pending.length && nextTiebreak()) return startSchifting();
+    if (hasTrees()) return setState('tree');
+  }
+  if (g.status === 'schifting') return setState('final');
 }
 
 const hasTrees = () => state.questions.some((q) => q.rate_tree);
@@ -223,13 +245,44 @@ async function previous() {
   const i = currentIndex();
   const last = state.questions.length - 1;
   if (g.status === 'tree') return setState('final');
+  if (g.status === 'schifting') {
+    // Niemand heeft geantwoord? Dan telt deze schiftingsvraag niet als gesteld.
+    if (state.answered === 0) {
+      await sb.from('games').update({ tiebreak_done: (g.tiebreak_done || []).filter((id) => id !== g.current_question_id) }).eq('id', g.id);
+    }
+    return setState('final');
+  }
   if (g.status === 'final') return goTo('answers', last);
   if (g.status === 'answers') {
     if (!g.current_question_id) return goTo('question', last);
     return i > 0 ? goTo('answers', i - 1) : setState('answers');
   }
+  if (g.status === 'tussenstand') return goTo('question', i);
+  if (i > 0 && i % INTERIM_EVERY === 0) return setState('tussenstand', state.questions[i - 1].id);
   if (i > 0) return goTo('question', i - 1);
+  if (i === 0) return setState('question'); // terug naar de uitleg
   return setState('lobby');
+}
+
+/** Schiftingsvraag starten voor de spelers die gelijk staan in de top 3. */
+async function startSchifting() {
+  const g = state.game;
+  const q = nextTiebreak();
+  if (!q || state.busy) return;
+  state.busy = true;
+  try {
+    const { error } = await sb.from('games').update({
+      tiebreak_names: state.finalInfo.pending,
+      tiebreak_done: [...(g.tiebreak_done || []), q.id],
+      winners: null,
+    }).eq('id', g.id);
+    if (error) { toast(errorText(error)); return; }
+    state.game = { ...g, tiebreak_names: state.finalInfo.pending, tiebreak_done: [...(g.tiebreak_done || []), q.id], winners: null };
+    state.schiftingResult = false;
+    await setState('schifting', q.id);
+  } finally {
+    state.busy = false;
+  }
 }
 
 // ---------------------------------------------------------------- weergaven
@@ -237,9 +290,15 @@ async function previous() {
 function render() {
   const g = state.game;
   if (!g) return;
+  // Achtergrondmuziek: start in de wachtruimte en bij "Zo werkt het", einde vanaf de definitieve eindstand.
+  if (g.status === 'lobby' || (g.status === 'question' && !g.current_question_id)) bgMusic(state.music?.start);
+  else if (g.status === 'tree') bgMusic(state.music?.end);
+  else if (g.status !== 'final') bgMusic(null); // bij de eindstand beslist renderScoreboard
   if (g.status === 'lobby') return renderLobby();
   if (g.status !== 'answers') state.reveal = null; // bij terugkomen opnieuw laden
   if (g.status === 'question') return g.current_question_id ? renderQuestion() : renderRules();
+  if (g.status === 'tussenstand') return renderInterim();
+  if (g.status === 'schifting') return renderSchifting();
   if (g.status === 'answers') return g.current_question_id ? renderReveal() : renderAnswersIntro();
   if (g.status === 'tree') return renderTree();
   return renderScoreboard();
@@ -313,7 +372,10 @@ function renderRules() {
     has((q) => q.kind === 'schatting') && ['≈', 'Schatting: de drie die het dichtst zitten krijgen een punt.'],
     has((q) => q.media_url) && ['♪', 'Muziek: luister goed! Soms is de speler afgedekt, zodat je het antwoord niet ziet.'],
     has((q) => q.rate_tree) && ['🎄', 'Kerstbomen: geef ook een cijfer (1–10). Telt niet mee, maar kiest de mooiste boom.'],
-    ['🤫', 'Geen tussenstand: de antwoorden en de eindstand komen aan het eind.'],
+    qs.length > INTERIM_EVERY
+      ? ['📊', `Om de ${INTERIM_EVERY} vragen een tussenstand, zonder namen. De antwoorden en de eindstand komen aan het eind.`]
+      : ['🤫', 'Geen tussenstand: de antwoorden en de eindstand komen aan het eind.'],
+    state.tiebreaks.length > 0 && ['⚖️', 'Gelijke stand in de top 3? Dan beslist een schiftingsvraag.'],
   ].filter(Boolean);
 
   const view = h('div', { class: 'rules' },
@@ -473,39 +535,203 @@ function loadingScreen(text) {
 async function renderScoreboard() {
   const status = state.game.status;
   loadingScreen('Eindstand berekenen…');
-  let board;
+  let info = { rows: [], pending: [], winners: [] };
   try {
     const r = await loadResults();
-    board = scoreboard(state.players, state.questions, r.keys, r.answers, r.overrides);
+    const board = scoreboard(state.players, state.questions, r.keys, r.answers, r.overrides);
+    const tbValues = new Map(state.tiebreaks
+      .filter((q) => r.keys.get(q.id)?.correct_value != null)
+      .map((q) => [q.id, r.keys.get(q.id).correct_value]));
+    info = finalRanking(board, state.game.tiebreak_done || [], tbValues, r.answers, state.tiebreaks.length > 0);
   } catch (e) {
     toast(errorText(e));
-    board = [];
   }
   if (state.game.status !== status) return;
+  state.finalInfo = info;
 
-  const top = board.filter((row) => row.place <= 10).slice(0, 12);
-  const rows = top.map((row) => h('li', { class: `rank rank-${row.place <= 3 ? row.place : 'x'}` },
+  const tb = nextTiebreak();
+  const needsSchifting = info.pending.length > 0 && tb;
+  bgMusic(needsSchifting ? null : state.music?.end);
+  // Definitief? Dan de winnaars doorgeven aan de telefoons (die gaan groen knipperen).
+  const winners = needsSchifting ? null : info.winners;
+  if (JSON.stringify(winners) !== JSON.stringify(state.game.winners ?? null)) {
+    sb.from('games').update({ winners }).eq('id', state.game.id).then(({ error }) => { if (!error) state.game.winners = winners; });
+  }
+
+  const pts = (n) => `${n} ${n === 1 ? 'punt' : 'punten'}`;
+  const winnerNames = new Set(info.winners.map((w) => w.name));
+  const rest = info.rows.filter((r) => !(needsSchifting ? false : winnerNames.has(r.name)) && r.place <= 10).slice(0, needsSchifting ? 12 : 8);
+  const restList = rest.length > 0 && h('ol', {
+    class: `ranks ${rest.length > 4 ? 'ranks-two' : ''} ${needsSchifting ? '' : 'ranks-small'}`,
+    style: rest.length > 4 ? { gridTemplateRows: `repeat(${Math.ceil(rest.length / 2)}, minmax(0, auto))` } : null,
+  }, rest.map((row) => h('li', { class: `rank ${needsSchifting && info.pending.includes(row.name) ? 'rank-tied' : ''}` },
     h('span', { class: 'rank-place' }, `${row.place}`),
     h('span', { class: 'rank-name' }, row.name),
-    h('span', { class: 'rank-points' }, `${row.points} ${row.points === 1 ? 'punt' : 'punten'}`),
-  ));
+    h('span', { class: 'rank-points' }, pts(row.points)),
+  )));
+
+  let main;
+  if (!info.rows.length) {
+    main = h('p', { class: 'lead muted' }, 'Er hebben geen spelers meegedaan.');
+  } else if (needsSchifting) {
+    main = h('div', { class: 'stack' },
+      h('p', { class: 'tie-banner' }, '⚖️ Gelijke stand in de top 3! Schiftingsvraag voor: ', h('strong', {}, info.pending.join(', '))),
+      restList,
+    );
+  } else {
+    main = h('div', { class: 'final-body' }, podium(info, pts), restList);
+  }
+
+  const footerNext = needsSchifting
+    ? h('button', { class: 'btn btn-gold btn-lg', onclick: next }, 'Schiftingsvraag ▶')
+    : hasTrees()
+      ? h('button', { class: 'btn btn-gold btn-lg', onclick: next }, 'Mooiste kerstboom ▶')
+      : h('button', { class: 'btn btn-ghost', onclick: () => { stopLive(); renderHome(state.game); } }, 'Menu');
 
   const view = h('div', { class: 'scoreboard' },
     h('header', { class: 'sb-head' },
-      h('h1', { class: 'title' }, 'Eindstand'),
-      h('span', { class: 'muted' }, `${state.questions.length} vragen · ${state.players.length} spelers`),
+      h('h1', { class: 'title' }, needsSchifting ? 'Eindstand – nog niet beslist' : 'Eindstand'),
+      h('span', { class: 'muted' }, info.pending.length && !tb
+        ? 'Nog steeds gelijk; er zijn geen schiftingsvragen meer.'
+        : `${state.questions.length} vragen · ${state.players.length} spelers`),
     ),
-    top.length
-      ? h('ol', {
-        class: `ranks ${top.length > 5 ? 'ranks-two' : ''}`,
-        style: top.length > 5 ? { gridTemplateRows: `repeat(${Math.ceil(top.length / 2)}, minmax(0, auto))` } : null,
-      }, rows)
-      : h('p', { class: 'lead muted' }, 'Er hebben geen spelers meegedaan.'),
+    main,
     h('footer', { class: 'q-foot' },
       h('button', { class: 'btn btn-ghost', onclick: previous }, '◀ Vorige'),
-      hasTrees()
-        ? h('button', { class: 'btn btn-gold btn-lg', onclick: next }, 'Mooiste kerstboom ▶')
-        : h('button', { class: 'btn btn-ghost', onclick: () => { stopLive(); renderHome(state.game); } }, 'Menu'),
+      footerNext,
+    ),
+  );
+  mount(stage('screen-plain', view));
+}
+
+/** Podium met de top 3 groot in beeld (2 – 1 – 3). Bij gelijke stand meerdere namen per plek. */
+function podium(info, pts) {
+  const rowsByPlace = new Map();
+  for (const w of info.winners) {
+    const row = info.rows.find((r) => r.name === w.name);
+    if (!rowsByPlace.has(w.place)) rowsByPlace.set(w.place, []);
+    rowsByPlace.get(w.place).push(row);
+  }
+  const places = [...rowsByPlace.keys()].sort((a, b) => a - b);
+  const order = places.length === 3 ? [places[1], places[0], places[2]] : places;
+  return h('div', { class: 'podium' }, order.map((place) => {
+    const rows = rowsByPlace.get(place);
+    return h('div', { class: `podium-step podium-${Math.min(place, 3)}` },
+      h('div', { class: 'podium-place' }, place === 1 ? '🏆' : `${place}`),
+      h('div', { class: 'podium-names' }, rows.map((r) => h('span', {}, r.name))),
+      h('div', { class: 'podium-points' }, pts(rows[0].points)),
+    );
+  }));
+}
+
+// ---------------------------------------------------------------- tussenstand
+
+async function renderInterim() {
+  const i = currentIndex();
+  loadingScreen('Tussenstand berekenen…');
+  let top = [];
+  try {
+    const r = await loadResults();
+    top = interimTop(state.players, state.questions.slice(0, i + 1), r.keys, r.answers, 5);
+  } catch (e) {
+    toast(errorText(e));
+  }
+  if (state.game.status !== 'tussenstand') return;
+  const max = Math.max(1, ...top.map((t) => t.points));
+  const view = h('div', { class: 'scoreboard interim' },
+    h('header', { class: 'sb-head' },
+      h('h1', { class: 'title' }, 'Tussenstand'),
+      h('span', { class: 'muted' }, `na ${i + 1} van ${state.questions.length} vragen · zonder namen`),
+    ),
+    h('ol', { class: 'interim-list' }, top.map((t) => h('li', { class: `interim-row ${t.place === 1 ? 'interim-first' : ''}` },
+      h('span', { class: 'rank-place' }, `${t.place}`),
+      h('span', { class: 'interim-bar' }, h('span', { style: { width: `${Math.max(4, (t.points / max) * 100)}%` } })),
+      h('span', { class: 'rank-points' }, `${t.points} ${t.points === 1 ? 'punt' : 'punten'}`),
+    ))),
+    h('p', { class: 'muted small' }, 'Open vragen tellen hier met het automatische oordeel; de eindstand kan nog iets anders uitvallen.'),
+    h('footer', { class: 'q-foot' },
+      h('button', { class: 'btn btn-ghost', onclick: previous }, '◀ Vorige'),
+      h('button', { class: 'btn btn-gold btn-lg', onclick: next }, 'Volgende vraag ▶'),
+    ),
+  );
+  mount(stage('screen-plain', view));
+}
+
+// ---------------------------------------------------------------- schiftingsvraag
+
+function renderSchifting() {
+  const g = state.game;
+  const q = currentTiebreak();
+  if (!q) return renderScoreboard();
+  if (state.schiftingResult) return renderSchiftingResult(q);
+  const names = g.tiebreak_names || [];
+
+  const view = h('div', { class: 'question' },
+    h('header', { class: 'q-head' },
+      h('div', { class: 'q-meta' },
+        h('span', { class: 'label' }, '⚖️ Schiftingsvraag'),
+        h('span', { class: 'muted q-count' }, 'Gelijke stand in de top 3'),
+      ),
+      h('div', { class: 'q-status' },
+        h('span', { class: 'answered', id: 'answered' }, answeredText()),
+        h('div', { class: 'timer', id: 'timer', role: 'timer' }, ''),
+      ),
+    ),
+    h('div', { class: 'q-body' },
+      h('div', { class: 'q-main' },
+        h('div', { class: 'chips tie-chips' }, names.map((n) => h('span', { class: 'chip chip-gold' }, n))),
+        h('h2', { class: 'q-text' }, q.text),
+        h('p', { class: 'q-hint' }, `✎ Alleen deze spelers vullen hun schatting in${q.unit ? ` (in ${q.unit})` : ''}. Wie het dichtst zit, wint.`),
+      ),
+    ),
+    h('footer', { class: 'q-foot' },
+      h('button', { class: 'btn btn-ghost', onclick: previous }, '◀ Vorige'),
+      h('button', { class: 'btn btn-gold btn-lg', id: 'next-btn', onclick: () => { state.schiftingResult = true; renderSchifting(); } }, 'Toon uitslag ▶'),
+    ),
+  );
+  mount(stage('screen-plain', view));
+  updateTimer();
+
+  const ids = state.players.filter((p) => names.some((n) => n.toLowerCase() === p.name.toLowerCase())).map((p) => p.id);
+  const startedAt = g.question_started_at;
+  answerAsTestPlayers(g, q, () => state.game.status === 'schifting' && state.game.current_question_id === q.id
+    && state.game.question_started_at === startedAt && secondsLeft(state.game, q) > 0, ids);
+}
+
+async function renderSchiftingResult(q) {
+  const g = state.game;
+  const [{ data: ans }, { data: key }] = await Promise.all([
+    sb.from('answers').select('player_id, number_answer').eq('game_id', g.id).eq('question_id', q.id),
+    sb.from('question_answers').select('correct_value').eq('question_id', q.id).maybeSingle(),
+  ]);
+  if (state.game.status !== 'schifting') return;
+  const target = Number(key?.correct_value);
+  const byId = new Map((ans || []).map((a) => [a.player_id, a.number_answer]));
+  const list = (g.tiebreak_names || []).map((name) => {
+    const p = state.players.find((x) => x.name.toLowerCase() === name.toLowerCase());
+    const v = p ? byId.get(p.id) : null;
+    return { name, v, d: v == null ? Infinity : Math.abs(Number(v) - target) };
+  }).sort((a, b) => a.d - b.d);
+  const unit = q.unit ? ` ${q.unit}` : '';
+
+  const view = h('div', { class: 'question reveal' },
+    h('header', { class: 'q-head' },
+      h('div', { class: 'q-meta' }, h('span', { class: 'label' }, '⚖️ Schiftingsvraag'), h('span', { class: 'muted q-count' }, 'Uitslag')),
+    ),
+    h('div', { class: 'q-body' },
+      h('div', { class: 'q-main' },
+        h('h2', { class: 'q-text q-text-small' }, q.text),
+        h('p', { class: 'correct-value' }, h('span', { class: 'mark mark-good' }, '✓'), ` ${formatNumber(target)}${unit}`),
+        h('ol', { class: 'tie-results' }, list.map((x, k) => h('li', { class: k === 0 && x.d < Infinity ? 'tie-best' : '' },
+          h('span', { class: 'rank-name' }, x.name),
+          h('span', {}, x.v == null ? 'geen antwoord' : `${formatNumber(x.v)}${unit}`),
+          h('span', { class: 'muted' }, x.d === Infinity ? '' : x.d === 0 ? 'precies goed!' : `${formatNumber(x.d)} ernaast`),
+        ))),
+      ),
+    ),
+    h('footer', { class: 'q-foot' },
+      h('button', { class: 'btn btn-ghost', onclick: () => { state.schiftingResult = false; renderSchifting(); } }, '◀ Terug'),
+      h('button', { class: 'btn btn-gold btn-lg', onclick: next }, 'Naar de eindstand ▶'),
     ),
   );
   mount(stage('screen-plain', view));
@@ -758,7 +984,8 @@ function numberLine(est, target, winners) {
 // ---------------------------------------------------------------- live bijwerken
 
 function answeredText() {
-  return `${state.answered} van ${state.players.length} geantwoord`;
+  const total = state.game?.status === 'schifting' ? (state.game.tiebreak_names || []).length : state.players.length;
+  return `${state.answered} van ${total} geantwoord`;
 }
 
 function updateCounts() {
@@ -776,8 +1003,8 @@ function updateCounts() {
 
 function updateTimer() {
   const g = state.game;
-  if (!g || g.status !== 'question') return;
-  const q = state.questions[currentIndex()];
+  if (!g || !['question', 'schifting'].includes(g.status)) return;
+  const q = g.status === 'schifting' ? currentTiebreak() : state.questions[currentIndex()];
   const left = Math.max(0, Math.ceil(secondsLeft(g, q)));
   const timer = document.getElementById('timer');
   if (timer) {
@@ -785,7 +1012,8 @@ function updateTimer() {
     timer.classList.toggle('timer-done', left <= 0);
     timer.classList.toggle('timer-low', left > 0 && left <= 5);
   }
-  const everyone = state.players.length > 0 && state.answered >= state.players.length;
+  const total = g.status === 'schifting' ? (g.tiebreak_names || []).length : state.players.length;
+  const everyone = total > 0 && state.answered >= total;
   const btn = document.getElementById('next-btn');
   if (btn) btn.disabled = state.busy || !(left <= 0 || everyone);
 }
@@ -799,6 +1027,21 @@ function stage(kind, ...children) {
 
 function heroLayout(...children) {
   return [h('div', { class: 'hero-bg', 'aria-hidden': 'true' }), h('div', { class: 'hero-content' }, children)];
+}
+
+/**
+ * Muziek die doorspeelt terwijl de schermen wisselen: een kleine Spotify-speler
+ * buiten het podium. Zelfde link = speler blijft staan (muziek loopt door).
+ */
+function bgMusic(link) {
+  let el = document.getElementById('bg-music');
+  if (el && el.dataset.link === (link || '')) return;
+  if (el) el.remove();
+  const player = link ? spotifyPlayer(link, { compact: true }) : null;
+  if (!player) return;
+  el = h('div', { id: 'bg-music', class: 'bg-music', 'data-link': link },
+    h('span', { class: 'bg-music-label' }, '♪'), player);
+  document.body.append(el);
 }
 
 function cornerMenu() {

@@ -213,3 +213,74 @@ export function treeRanking(questions, keys, answers, minVotes) {
     tooFew: all.filter((t) => t.votes < minVotes).sort(byScore),
   };
 }
+
+// ---------------------------------------------------------------- tussenstand
+
+/**
+ * Tussenstand zonder namen: de scores van de eerste 5, met gedeelde plaatsen.
+ * Open vragen tellen met het automatische oordeel (geen omzettingen).
+ * @returns [{ place, points }]
+ */
+export function interimTop(players, questionsSoFar, keys, answers, count = 5) {
+  return scoreboard(players, questionsSoFar, keys, answers, []).slice(0, count)
+    .map((r) => ({ place: r.place, points: r.points }));
+}
+
+// ---------------------------------------------------------------- schifting en winnaars
+
+/**
+ * Eindstand inclusief schiftingsvragen.
+ * Volgorde: punten (hoog → laag), dan per gestelde schiftingsvraag de afstand
+ * tot de juiste waarde (dichtst bij eerst; geen antwoord = achteraan).
+ *
+ * @param board       uitkomst van scoreboard()
+ * @param doneIds     gestelde schiftingsvragen, in volgorde (games.tiebreak_done)
+ * @param tbValues    Map question_id → juiste waarde
+ * @param answers     alle antwoorden van dit spel
+ * @param tiebreaksAvailable  zijn er schiftingsvragen klaargezet in beheer?
+ * @returns {{
+ *   rows: [{ player_id, name, points, place, distances }],
+ *   pending: string[],   // namen die (nog) gelijk staan in de top 3
+ *   winners: [{ name, place }],
+ * }}
+ */
+export function finalRanking(board, doneIds, tbValues, answers, tiebreaksAvailable) {
+  const dist = new Map(); // `${player}|${question}` → afstand
+  for (const a of answers) {
+    if (!tbValues.has(a.question_id) || a.number_answer == null) continue;
+    dist.set(`${a.player_id}|${a.question_id}`, Math.abs(Number(a.number_answer) - Number(tbValues.get(a.question_id))));
+  }
+  const rows = board.map((r) => ({
+    ...r,
+    distances: doneIds.map((q) => dist.get(`${r.player_id}|${q}`) ?? Infinity),
+  }));
+  const cmp = (a, b) => {
+    if (a.points !== b.points) return b.points - a.points;
+    for (let i = 0; i < doneIds.length; i++) {
+      if (a.distances[i] !== b.distances[i]) return a.distances[i] - b.distances[i];
+    }
+    return 0;
+  };
+  rows.sort((a, b) => cmp(a, b) || a.name.localeCompare(b.name, 'nl'));
+  rows.forEach((r, i) => { r.place = i > 0 && cmp(r, rows[i - 1]) === 0 ? rows[i - 1].place : i + 1; });
+
+  // Groepen die gelijk staan en (deels) in de top 3 vallen.
+  const pending = [];
+  for (let i = 0; i < rows.length && i < 3;) {
+    let j = i + 1;
+    while (j < rows.length && cmp(rows[i], rows[j]) === 0) j++;
+    if (j - i > 1) pending.push(...rows.slice(i, j).map((r) => r.name));
+    i = j;
+  }
+
+  let winners;
+  if (tiebreaksAvailable) {
+    // Met schifting: de plaatsen 1–3 (precies drie zodra alles is beslist).
+    winners = rows.filter((r) => r.place <= 3);
+  } else {
+    // Zonder schifting: iedereen met een van de drie hoogste scores.
+    const top = [...new Set(rows.map((r) => r.points))].slice(0, 3);
+    winners = rows.filter((r) => top.includes(r.points)).map((r) => ({ ...r, place: top.indexOf(r.points) + 1 }));
+  }
+  return { rows, pending, winners: winners.map((r) => ({ name: r.name, place: r.place })) };
+}

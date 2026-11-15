@@ -147,3 +147,54 @@ import { treeRanking, ownerOf } from '../js/scoring.js';
   assert.equal(ownerOf({ kind: 'open' }, { correct_texts: ['Oma'] }), 'Oma');
   console.log('✓ mooiste kerstboom');
 }
+
+import { interimTop, finalRanking } from '../js/scoring.js';
+{
+  const pl = (names) => names.map((n) => ({ id: n, name: n }));
+  const board = (pts) => Object.entries(pts).map(([name, points]) => ({ player_id: name, name, points }));
+  const sortB = (b) => b.sort((x, y) => y.points - x.points);
+
+  // tussenstand: alleen scores, max 5, gedeelde plaatsen
+  const qs = [{ id: 'q1', kind: 'meerkeuze' }];
+  const keys = new Map([['q1', { correct_option: 0 }]]);
+  const ans = ['a', 'b', 'c'].map((p) => ({ question_id: 'q1', player_id: p, choice: 0 }));
+  const top = interimTop(pl(['a', 'b', 'c', 'd', 'e', 'f']), qs, keys, ans);
+  assert.deepEqual(top, [{ place: 1, points: 1 }, { place: 1, points: 1 }, { place: 1, points: 1 }, { place: 4, points: 0 }, { place: 4, points: 0 }]);
+
+  // 9, 9, 9, 8 → drie in de schifting; 8 wordt 4e
+  let r = finalRanking(sortB(board({ A: 9, B: 9, C: 9, D: 8 })), [], new Map(), [], true);
+  assert.deepEqual(r.pending.sort(), ['A', 'B', 'C']);
+  // 10, 8, 8, 8 → alleen de drie met 8
+  r = finalRanking(sortB(board({ A: 10, B: 8, C: 8, D: 8 })), [], new Map(), [], true);
+  assert.deepEqual(r.pending.sort(), ['B', 'C', 'D']);
+  // 10, 9, 7, 7 → alleen de twee met 7
+  r = finalRanking(sortB(board({ A: 10, B: 9, C: 7, D: 7, E: 5 })), [], new Map(), [], true);
+  assert.deepEqual(r.pending.sort(), ['C', 'D']);
+  // 10, 9, 8, 8 → geen schifting nodig (plek 4 doet er niet toe)
+  r = finalRanking(sortB(board({ A: 10, B: 9, C: 8, D: 7, E: 7 })), [], new Map(), [], true);
+  assert.deepEqual(r.pending, []);
+  assert.deepEqual(r.winners.map((w) => w.name), ['A', 'B', 'C']);
+
+  // schifting beslist: 9,9,9,8 met schatting 100 → C 99 (1), A 105 (5), B geen antwoord
+  const b1 = sortB(board({ A: 9, B: 9, C: 9, D: 8 }));
+  const tb = new Map([['t1', 100], ['t2', 50]]);
+  let a = [{ question_id: 't1', player_id: 'C', number_answer: 99 }, { question_id: 't1', player_id: 'A', number_answer: 105 }];
+  r = finalRanking(b1, ['t1'], tb, a, true);
+  assert.deepEqual(r.rows.map((x) => [x.name, x.place]), [['C', 1], ['A', 2], ['B', 3], ['D', 4]]);
+  assert.deepEqual(r.pending, []);
+  assert.deepEqual(r.winners, [{ name: 'C', place: 1 }, { name: 'A', place: 2 }, { name: 'B', place: 3 }]);
+
+  // even ver ernaast → nog gelijk, tweede schifting beslist
+  a = [{ question_id: 't1', player_id: 'C', number_answer: 98 }, { question_id: 't1', player_id: 'A', number_answer: 102 }, { question_id: 't1', player_id: 'B', number_answer: 90 }];
+  r = finalRanking(b1, ['t1'], tb, a, true);
+  assert.deepEqual(r.pending.sort(), ['A', 'C']);
+  a.push({ question_id: 't2', player_id: 'A', number_answer: 51 }, { question_id: 't2', player_id: 'C', number_answer: 60 });
+  r = finalRanking(b1, ['t1', 't2'], tb, a, true);
+  assert.deepEqual(r.rows.map((x) => x.name), ['A', 'C', 'B', 'D']);
+  assert.deepEqual(r.pending, []);
+
+  // zonder schiftingsvragen: iedereen met een van de drie hoogste scores
+  r = finalRanking(sortB(board({ A: 9, B: 9, C: 8, D: 7, E: 7, F: 5 })), [], new Map(), [], false);
+  assert.deepEqual(r.winners.map((w) => `${w.name}${w.place}`), ['A1', 'B1', 'C2', 'D3', 'E3']);
+  console.log('✓ tussenstand, schifting en winnaars');
+}
