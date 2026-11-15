@@ -4,11 +4,12 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer,
-} from './common.js?v=28';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=28';
+} from './common.js?v=29';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=29';
+import { scheduleScare } from './schrik.js?v=29';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking,
-} from './scoring.js?v=28';
+} from './scoring.js?v=29';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -233,12 +234,28 @@ async function goTo(status, index) {
       const { data } = await sb.storage.from('fotos').createSignedUrl(path, SIGNED_URL_SECONDS);
       photoUrl = data?.signedUrl || null;
     }
+    // Schrikbeeld: tijdelijke link klaarzetten voor de telefoons (vóór de vraag start)
+    if (status === 'question' && q.scare_after && q.scare_path) {
+      const url = await scareUrlFor(q);
+      if (url && url !== state.game.scare_url) await sb.from('games').update({ scare_url: url }).eq('id', state.game.id);
+    }
     await setState(status, q.id, photoUrl);
   } finally {
     state.busy = false;
   }
 }
 const goToQuestion = (index) => goTo('question', index);
+
+/** Tijdelijke link naar het schrikbeeld van een vraag (onthouden). */
+const scareUrls = new Map();
+async function scareUrlFor(q) {
+  if (!q?.scare_path) return null;
+  if (!scareUrls.has(q.scare_path)) {
+    const { data } = await sb.storage.from('fotos').createSignedUrl(q.scare_path, SIGNED_URL_SECONDS);
+    if (data?.signedUrl) scareUrls.set(q.scare_path, data.signedUrl);
+  }
+  return scareUrls.get(q.scare_path) || null;
+}
 
 async function setState(status, questionId = null, photoUrl = null) {
   if (status !== 'question' && status !== 'answers') stopMedia();
@@ -486,6 +503,12 @@ function renderQuestion() {
   updateTimer();
 
   const startedAt = state.game.question_started_at;
+  if (q.scare_after) {
+    const still = () => state.game.status === 'question'
+      && state.game.current_question_id === q.id && state.game.question_started_at === startedAt;
+    if (q.scare_path) scareUrlFor(q).then((url) => scheduleScare(state.game, q, still, url));
+    else scheduleScare(state.game, q, still);
+  } else scheduleScare(state.game, q);
   answerAsTestPlayers(state.game, q, () => state.game.status === 'question'
     && state.game.current_question_id === q.id && state.game.question_started_at === startedAt
     && secondsLeft(state.game, q) > 0);

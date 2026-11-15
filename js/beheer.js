@@ -2,9 +2,9 @@
 // spelinstellingen en een spel starten. Licht thema; werkt op iPad en iPhone.
 import {
   sb, h, mount, toast, LETTERS, errorText, loginForm, parseSpotify, cleanSpotifyLink, spotifyPlayer,
-} from './common.js?v=28';
-import { parseNumber, formatNumber } from './scoring.js?v=28';
-import { addTestPlayers } from './proef.js?v=28';
+} from './common.js?v=29';
+import { parseNumber, formatNumber } from './scoring.js?v=29';
+import { addTestPlayers } from './proef.js?v=29';
 
 const TREE_CATEGORY = 'Van wie is deze kerstboom?';
 // Drie soorten muziekvragen (zie renderMusicForm)
@@ -84,6 +84,7 @@ async function loadThumbs() {
   const paths = [
     ...state.questions.map((q) => q.photo_path),
     ...[...state.answers.values()].map((a) => a.answer_photo_path),
+    ...state.questions.map((q) => q.scare_path),
   ].filter((p) => p && !state.thumbs.has(p));
   if (!paths.length) return;
   const { data } = await sb.storage.from('fotos').createSignedUrls(paths, 60 * 60);
@@ -255,6 +256,7 @@ function questionItem(q, i) {
         h('span', { class: 'muted' }, `${q.time_limit} s`),
         q.rate_tree && h('span', { class: 'muted' }, '★ cijfer'),
         q.tiebreak && h('span', { class: 'b-tiebreak' }, '⚖️ Schifting'),
+        q.scare_after && h('span', { class: 'b-tiebreak' }, `${q.scare_path ? '🤡' : '👻'} Schrik na ${q.scare_after} s`),
         ans?.answer_photo_path && h('span', { class: 'muted' }, '📷 antwoordfoto'),
         ans?.answer_media_url && h('span', { class: 'muted' }, '♪ antwoordnummer'),
         q.media_url && h('span', { class: 'b-music' }, q.media_mode === 'verbergen' ? '♪ Spotify (afgedekt)' : q.media_mode === 'alleen_tv' ? '♪ Spotify (alleen tv)' : '♪ Spotify'),
@@ -309,6 +311,7 @@ async function removeQuestion(q) {
   if (error) return toast(errorText(error));
   await removePhoto(q.photo_path);
   await removePhoto(state.answers.get(q.id)?.answer_photo_path);
+  await removePhoto(q.scare_path);
   state.questions = state.questions.filter((x) => x.id !== q.id);
   state.answers.delete(q.id);
   toast('Vraag verwijderd');
@@ -422,6 +425,7 @@ function renderEdit(q) {
   text.value = q?.text || '';
   const time = h('input', { type: 'number', inputmode: 'numeric', min: '5', max: '600', step: '1', value: String(q?.time_limit ?? 20), class: 'input-short' });
   const rate = h('input', { type: 'checkbox', checked: Boolean(q?.rate_tree) });
+  const scare = h('input', { type: 'number', inputmode: 'numeric', min: '1', max: '600', step: '1', value: q?.scare_after ? String(q.scare_after) : '', placeholder: 'geen', class: 'input-short' });
 
   let kind = q?.kind || 'meerkeuze';
   const kindButtons = KINDS.map((k) => h('button', {
@@ -475,6 +479,7 @@ function renderEdit(q) {
 
   const photo = photoPicker(q?.photo_path ? state.thumbs.get(q.photo_path) : null);
   const answerPhoto = photoPicker(ans?.answer_photo_path ? state.thumbs.get(ans.answer_photo_path) : null);
+  const scarePhoto = photoPicker(q?.scare_path ? state.thumbs.get(q.scare_path) : null);
   const music = spotifyField(q?.media_url || '');
   const answerMusic = spotifyField(ans?.answer_media_url || '', { label: 'Spotify-link bij het antwoord (optioneel)' });
   // Standaard afdekken: de speler toont titel en artiest en zou het antwoord kunnen verraden.
@@ -512,6 +517,10 @@ function renderEdit(q) {
 
       if (!row.text) return (err.textContent = 'Vul de vraag in.');
       if (!(row.time_limit >= 5 && row.time_limit <= 600)) return (err.textContent = 'De tijd moet tussen 5 en 600 seconden liggen.');
+      const scareVal = scare.value.trim() ? parseInt(scare.value, 10) : null;
+      if (scareVal != null && !(scareVal >= 1 && scareVal < row.time_limit)) return (err.textContent = 'De schrik moet komen voordat de tijd om is (minimaal 1 seconde).');
+      // Alleen meesturen als het is of was ingesteld (dan werkt het ook zonder 009_schrik.sql).
+      if (scareVal != null || q?.scare_after) row.scare_after = scareVal;
       if (kind === 'meerkeuze') {
         row.options = optionInputs.map((i) => i.value.trim());
         if (row.options.some((o) => !o)) return (err.textContent = 'Vul alle vier de opties in.');
@@ -534,7 +543,17 @@ function renderEdit(q) {
       try {
         // Alleen meesturen als er een link is of was (dan werkt het ook zonder 008_antwoordnummer.sql).
         if (answerLink || ans?.answer_media_url) answerRow.answer_media_url = answerLink;
-        await saveQuestion(q, row, answerRow, photo.get(), answerPhoto.get());
+        const sc = scarePhoto.get();
+        const oldScare = q?.scare_path || null;
+        if (sc.blob) row.scare_path = await uploadPhoto(sc.blob);
+        else if (sc.removed && oldScare) row.scare_path = null;
+        try {
+          await saveQuestion(q, row, answerRow, photo.get(), answerPhoto.get());
+        } catch (ex2) {
+          if (sc.blob && row.scare_path) await removePhoto(row.scare_path);
+          throw ex2;
+        }
+        if (oldScare && 'scare_path' in row) await removePhoto(oldScare);
         toast('Vraag opgeslagen');
         renderList();
       } catch (ex) {
@@ -559,6 +578,13 @@ function renderEdit(q) {
       h('span', { class: 'hint' }, 'De tv toont deze speler in de antwoordenronde, bijvoorbeeld het nummer van het antwoord. Spelers zien hem pas dan.')),
     mcBlock, openBlock, estBlock,
     h('label', {}, 'Tijd in seconden', time),
+    h('fieldset', { class: 'b-fieldset' },
+      h('legend', {}, '👻 Schrikeffect (optioneel)'),
+      h('label', {}, 'Na … seconden', scare),
+      h('span', { class: 'hint' }, 'Na zoveel seconden verschijnt op de tv en op de telefoons plotseling het schrikbeeld met een gil. Leeg = geen schrik. Tip: een vraag als "Kijk goed…" met een rustige foto.'),
+      h('span', { class: 'field-label' }, 'Schrikbeeld (foto of bewegende GIF)'),
+      h('span', { class: 'hint' }, 'Zonder schrikbeeld komt er een getekende geest.'),
+      scarePhoto.el),
     h('label', { class: 'check' }, rate, 'Spelers geven deze boom een cijfer'),
     err,
     h('div', { class: 'row' },
