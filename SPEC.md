@@ -1,4 +1,4 @@
-# Kerstquiz – specificatie
+# Kerstquiz B&S – specificatie
 
 Eigen pubquiz-app voor 15–40 spelers. De quizmaster (Rutger) toont de quiz op een groot scherm via zijn iPad. Spelers doen mee via hun telefoon. Duur maximaal ongeveer 45 minuten. Alle tekst in de app is Nederlands.
 
@@ -168,7 +168,9 @@ Voorstel; de precieze opzet mag Claude Code bepalen, binnen deze eisen:
 
   Bij meerkeuze en goed/fout altijd de letter of het ✓/✗-teken tonen, niet alleen de kleur.
 - **Beheer:** een licht thema met een lichte crèmekleurige achtergrond (`#F6F3EA`), witte vlakken en donkergroene knoppen.
-- **Lettertypes:** Playfair Display (600/700) voor titels, Inter voor de rest (Google Fonts).
+- **Naam:** "Kerstquiz B&S". "Kerstquiz" in sierschrift Great Vibes, "B&S" in Playfair Display schuin in goud eronder, met een gouden sierlijn met sterretje.
+- **Lettertypes:** Great Vibes voor de naam, Playfair Display (600/700, schuin 600) voor titels, Inter voor de rest (Google Fonts). Kamercodes met strakke cijfers.
+- **Beginscherm en inloggen:** naam, sierlijn en knoppen gecentreerd in de linkerhelft; de sneeuwbol blijft rechts zichtbaar.
 - **Achtergronden bij de vragen:** `assets/achtergronden/` (kerstbal, slee, lantaarns, ski, woonkamer, bergen; door Rutger aangeleverd, AI-gegenereerd). Per vraag om en om, in de vragen- en antwoordenronde, met een donkergroene laag (links sterk, rechts lichter). Bij een vraag met foto extra gedempt.
 - **Sfeerfoto:** `assets/hero.jpg` (de sneeuwbol, door Rutger aangeleverd) staat op het welkomstscherm, met een donkergroene overlay links zodat de tekst leesbaar blijft.
 - **Tv-scherm:** ontworpen voor 16:9. Grote letters: vragen minstens 44 px, opties minstens 30 px. Het moet ook netjes werken met de beeldverhouding van een iPad (zwarte randen zijn prima).

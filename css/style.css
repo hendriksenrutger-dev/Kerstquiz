@@ -854,3 +854,46 @@ body.pv-with-phone .stage { width: min(calc(100vw - 340px), calc((100dvh - 64px)
 
 /* Antwoordenronde met foto bij open vraag of schatting: foto kleiner, ruimte voor de groepen/getallenlijn */
 .reveal.has-photo:not(.reveal-meerkeuze) .photo { flex-basis: 38%; }
+
+/* =====================================================================
+   Naam "Kerstquiz B&S": sierlijk schrift + gouden B&S
+   ===================================================================== */
+.brand { display: flex; flex-direction: column; align-items: center; margin: 0; line-height: .85; text-align: center; }
+.brand-script {
+  font-family: 'Great Vibes', 'Snell Roundhand', 'Brush Script MT', cursive; font-weight: 400;
+  font-size: clamp(72px, 10.5vw, 168px); color: var(--text);
+  text-shadow: 0 2px 24px rgba(0, 0, 0, .45);
+  padding: 0 .1em;
+}
+.brand-bs {
+  font-family: var(--serif); font-style: italic; font-weight: 600; color: var(--gold);
+  font-size: clamp(30px, 3.6vw, 58px); letter-spacing: .12em; margin-top: .02em;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, .5);
+}
+.ornament { display: flex; align-items: center; gap: 14px; color: var(--gold); font-size: 18px; width: min(360px, 80%); }
+.ornament span { flex: 1; height: 1px; background: linear-gradient(90deg, transparent, var(--gold), transparent); }
+
+/* Beginscherm en inloggen: alles gecentreerd in de linkerhelft */
+.home-center { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 26px; width: 100%; }
+.screen-free .hero-content { width: min(100%, 54vw); align-items: center; padding-left: max(24px, 3vw); padding-right: 24px; }
+.home-center .home-buttons { justify-content: center; }
+.home-center .home-buttons .btn { min-height: 66px; padding: 0 36px; font-size: 21px; letter-spacing: .01em; }
+.home-center .home-links { justify-content: center; }
+.home-center .login-card { width: min(100%, 440px); text-align: left; }
+@media (max-width: 760px) {
+  .screen-free .hero-content { width: 100%; padding: 32px 20px; }
+}
+
+/* Wachtruimte (tv): naam in de linkerkolom */
+.brand-lobby { align-items: flex-start; text-align: left; }
+.brand-lobby .brand-script { font-size: max(64px, 6.6cqw); }
+.brand-lobby .brand-bs { font-size: max(26px, 2.3cqw); margin-left: .35em; }
+.lobby-head { display: flex; flex-direction: column; gap: 1cqh; }
+
+/* Telefoon */
+.brand-phone { align-items: flex-start; text-align: left; }
+.brand-phone .brand-script { font-size: 58px; }
+.brand-phone .brand-bs { font-size: 24px; margin-left: .3em; }
+
+/* Kamercode: strakke cijfers (geen zakkende 7) */
+.room-code, .code-input, .gold { font-variant-numeric: lining-nums; font-feature-settings: 'lnum' 1; }

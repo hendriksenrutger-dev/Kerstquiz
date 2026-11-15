@@ -3,11 +3,12 @@ import {
   sb, h, mount, toast, load, save, LETTERS, syncClock, secondsLeft,
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
-} from './common.js?v=21';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=21';
+  brandTitle, ornament,
+} from './common.js?v=22';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=22';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking,
-} from './scoring.js?v=21';
+} from './scoring.js?v=22';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -49,7 +50,7 @@ export async function startTv(params) {
 /** Het laden duurt te lang: uitleg en knoppen in plaats van een zwart scherm. */
 function slowLoading() {
   mount(stage('screen-free', heroLayout(h('div', { class: 'stack' },
-    h('h1', { class: 'title' }, 'Kerstquiz'),
+    brandTitle(),
     h('p', { class: 'lead' }, 'Het laden duurt langer dan normaal. Controleer de internetverbinding.'),
     h('div', { class: 'home-buttons' },
       h('button', { class: 'btn btn-gold btn-lg', onclick: () => location.reload() }, '↻ Opnieuw proberen'),
@@ -61,7 +62,7 @@ function slowLoading() {
 // ---------------------------------------------------------------- inloggen
 
 function renderLogin(message) {
-  mount(stage('screen-free', heroLayout(h('h1', { class: 'title' }, 'Kerstquiz'), loginForm(afterLogin, message))));
+  mount(stage('screen-free', heroLayout(h('div', { class: 'home-center' }, brandTitle(), ornament(), loginForm(afterLogin, message)))));
 }
 
 async function afterLogin() {
@@ -100,8 +101,9 @@ function renderHome(savedGame) {
   bgMusic(null);
   const n = state.questions.length;
   const running = savedGame && savedGame.status !== 'tree' ? savedGame : null;
-  const content = h('div', { class: 'stack home' },
-    h('h1', { class: 'title' }, 'Kerstquiz'),
+  const content = h('div', { class: 'home-center home' },
+    brandTitle(),
+    ornament(),
     n === 0 && h('p', { class: 'lead' }, 'Er staan nog geen vragen klaar. Voeg ze toe via Beheer.'),
     h('div', { class: 'home-buttons' },
       h('button', { class: 'btn btn-gold btn-lg', onclick: newGame, disabled: n === 0 }, '▶ Start quiz'),
@@ -339,7 +341,7 @@ function renderLobby() {
 
   const content = h('div', { class: 'lobby' },
     h('div', { class: 'lobby-head' },
-      h('h1', { class: 'title' }, 'Kerstquiz'),
+      brandTitle('brand-lobby'),
       h('p', { class: 'lead' }, 'Pak je telefoon en doe mee!'),
     ),
     h('div', { class: 'join' },

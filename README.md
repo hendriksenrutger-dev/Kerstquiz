@@ -1,4 +1,4 @@
-# Kerstquiz
+# Kerstquiz B&S
 
 Eigen pubquiz-app voor de kerst. Zie [SPEC.md](SPEC.md) voor de volledige specificatie.
 
