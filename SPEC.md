@@ -190,3 +190,29 @@ Elke PR moet zelfstandig te testen zijn op GitHub Pages.
 5. **Afwerking:** Wake Lock, volledig scherm, opnieuw verbinden, de proefmodus en kleine ontwerpcorrecties.
 
 Elke PR bevat in de beschrijving: wat er nieuw is, hoe Rutger het kan testen (stap voor stap, vanaf iPad en telefoon) en of er een nieuw SQL-bestand in Supabase moet worden uitgevoerd.
+
+## 12. Wensen voor later
+
+Nog niet gebouwd. Eerst overleggen voordat dit wordt opgepakt.
+
+### 12.1 Tussenstand om de tien vragen
+- Na vraag 10, 20, 30 enzovoort toont de tv een scherm **"Tussenstand"** met alleen de **scores van de top 5, zonder namen** (bijvoorbeeld "1e – 9 punten, 2e – 8 punten").
+- Spelers met evenveel punten delen de plaats, net als in de eindstand.
+- Dit vervangt voor deze momenten de regel "geen tussenstand" uit hoofdstuk 4.
+- Beperking: open vragen worden pas in de antwoordenronde handmatig goed of fout gezet. De tussenstand rekent daarom met het **automatische oordeel** (exact, schrijfwijze, tikfout) en kan een punt afwijken van de eindstand.
+
+### 12.2 Schiftingsvraag bij gelijke stand
+- Doel: na de eindstand blijft er precies **één nummer 1, één nummer 2 en één nummer 3** over.
+- Staan spelers gelijk op een plek die ertoe doet, dan volgt een extra **schattingsvraag** (de schiftingsvraag). Alleen die spelers doen mee; de rest kijkt mee op de tv.
+  - 9, 9, 9, 8 punten: de drie spelers met 9 strijden om plek 1, 2 en 3; wie 8 heeft, wordt 4e.
+  - 10, 8, 8, 8 punten: plek 1 staat vast; de drie spelers met 8 strijden om plek 2 en 3.
+  - 10, 9, 7, 7 punten: alleen de twee spelers met 7 strijden om plek 3.
+- Wie het dichtst bij de juiste waarde zit, krijgt de hoogste plek in die groep.
+- Zitten spelers precies even ver ernaast, dan volgt de volgende schiftingsvraag, tot elke plek één naam heeft.
+- Rutger zet in beheer 2 à 3 schiftingsvragen klaar (schattingen, als reserve). Ze tellen niet mee als gewone vraag en staan niet in "Dit komt er".
+
+### 12.3 Winnaars in de spotlight
+- Bij de (definitieve) eindstand gaat het scherm van de telefoons van de **top 3** **groen knipperen**, met bijvoorbeeld "🏆 Jij staat 1e!".
+- De tv toont de namen van de top 3 groot in beeld.
+- Zonder schiftingsvraag horen bij de top 3 alle spelers met een van de **drie hoogste scores**, hoeveel spelers dat ook zijn. Met de schiftingsvraag (12.2) zijn het precies drie spelers.
+- Hiervoor moet de tv aan de telefoons doorgeven wie er gewonnen heeft (een nieuwe kolom in `games` en een nieuw SQL-bestand in `supabase/`).
