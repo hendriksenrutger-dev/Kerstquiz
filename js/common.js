@@ -92,7 +92,7 @@ export function secondsLeft(game, question) {
 export async function fetchQuestions() {
   const { data, error } = await sb
     .from('questions')
-    .select('id, position, category, kind, text, photo_path, options, unit, time_limit, rate_tree')
+    .select('*')
     .order('position', { ascending: true })
     .order('created_at', { ascending: true });
   if (error) throw error;
@@ -116,6 +116,7 @@ export function errorText(err) {
     speler_onbekend: 'Je aanmelding is niet meer geldig. Meld je opnieuw aan.',
     keuze_ongeldig: 'Deze keuze kan niet.',
     geen_toegang: 'Je bent niet ingelogd als beheerder.',
+    media_url: 'Voer eerst supabase/003_muziek.sql uit in Supabase om Spotify-links op te slaan.',
     'Invalid login credentials': 'E-mailadres of wachtwoord klopt niet.',
     'Failed to fetch': 'Geen verbinding. Controleer het internet en probeer opnieuw.',
   };
@@ -311,4 +312,39 @@ export function loginForm(onSuccess, message) {
     err,
     btn,
   );
+}
+
+// ---------- Spotify ----------
+
+const SPOTIFY_RE = /(?:open\.spotify\.com\/(?:intl-[a-z-]+\/)?(?:embed\/)?|spotify:)(track|album|playlist|episode|show)[/:]([A-Za-z0-9]{22})/;
+
+/** Spotify-link → { type, id } of null. Werkt met "Link kopiëren" uit de Spotify-app. */
+export function parseSpotify(link) {
+  const m = SPOTIFY_RE.exec(String(link || '').trim());
+  return m ? { type: m[1], id: m[2] } : null;
+}
+
+/** Nette, opgeschoonde link om op te slaan. */
+export function cleanSpotifyLink(link) {
+  const s = parseSpotify(link);
+  return s ? `https://open.spotify.com/${s.type}/${s.id}` : null;
+}
+
+/**
+ * Spotify-speler (iframe). Spotify speelt zonder ingelogde Spotify-account in
+ * die browser alleen een fragment van 30 seconden.
+ * @param compact  kleine speler (80 px hoog) voor de telefoon
+ */
+export function spotifyPlayer(link, { compact = false } = {}) {
+  const s = parseSpotify(link);
+  if (!s) return null;
+  return h('iframe', {
+    class: `spotify ${compact ? 'spotify-compact' : ''}`,
+    src: `https://open.spotify.com/embed/${s.type}/${s.id}?utm_source=generator&theme=0`,
+    height: compact ? '80' : '152',
+    width: '100%',
+    title: 'Spotify-speler',
+    allow: 'autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture',
+    loading: 'lazy',
+  });
 }

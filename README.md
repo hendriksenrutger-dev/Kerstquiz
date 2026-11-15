@@ -6,10 +6,11 @@ Eigen pubquiz-app voor de kerst. Zie [SPEC.md](SPEC.md) voor de volledige specif
 - `#speler` – telefoon van de spelers (standaard)
 - `#beheer` – vragen beheren, spel starten (iPad of iPhone)
 - `#beheer?scherm=boom` – snel een kerstboom toevoegen (iPhone)
+- `#beheer?scherm=nummer` – snel een nummer (Spotify-link) toevoegen
 
 ## Opzet
 
-1. Supabase → SQL Editor: voer `supabase/schema.sql` uit, daarna `supabase/002_beheer.sql`.
+1. Supabase → SQL Editor: voer `supabase/schema.sql` uit, daarna `supabase/002_beheer.sql` en `supabase/003_muziek.sql`.
 2. Voor testen: voer `supabase/test_vragen.sql` uit (5 meerkeuzevragen) en eventueel
    `supabase/test_vragen_open_schatting.sql` (een open vraag en een schatting).
 3. Supabase → Authentication → Users → *Add user*: maak het beheerdersaccount aan

@@ -1,11 +1,14 @@
 // Beheer (#beheer): vragen beheren, foto's uploaden, kerstbomen toevoegen,
 // spelinstellingen en een spel starten. Licht thema; werkt op iPad en iPhone.
-import { sb, h, mount, toast, LETTERS, errorText, loginForm } from './common.js';
+import {
+  sb, h, mount, toast, LETTERS, errorText, loginForm, parseSpotify, cleanSpotifyLink, spotifyPlayer,
+} from './common.js';
 import { parseNumber, formatNumber } from './scoring.js';
 import { addTestPlayers } from './proef.js';
 
 const TREE_CATEGORY = 'Van wie is deze kerstboom?';
-const DEFAULT_CATEGORIES = [TREE_CATEGORY, 'In welke stad staat deze kerstboom?', 'Kerstfeitje'];
+const MUSIC_CATEGORY = 'Van wie is dit nummer?';
+const DEFAULT_CATEGORIES = [TREE_CATEGORY, MUSIC_CATEGORY, 'In welke stad staat deze kerstboom?', 'Kerstfeitje'];
 const KINDS = [
   { value: 'meerkeuze', label: 'Meerkeuze' },
   { value: 'open', label: 'Open' },
@@ -44,6 +47,7 @@ async function afterLogin(params) {
     return renderLogin(params, errorText(e));
   }
   if (params?.get('scherm') === 'boom') return renderTreeForm();
+  if (params?.get('scherm') === 'nummer') return renderMusicForm();
   renderList();
 }
 
@@ -79,12 +83,13 @@ function categorySuggestions() {
 
 function treeNameSuggestions() {
   const names = state.questions
-    .filter((q) => q.category === TREE_CATEGORY && Array.isArray(q.options))
+    .filter((q) => (q.category === TREE_CATEGORY || q.category === MUSIC_CATEGORY) && Array.isArray(q.options))
     .flatMap((q) => q.options);
   return [...new Set(names.filter(Boolean))].sort((a, b) => a.localeCompare(b, 'nl'));
 }
 
 const treeCount = () => state.questions.filter((q) => q.category === TREE_CATEGORY).length;
+const musicCount = () => state.questions.filter((q) => q.category === MUSIC_CATEGORY).length;
 
 function setScreen(scherm) {
   history.replaceState(null, '', scherm ? `#beheer?scherm=${scherm}` : '#beheer');
@@ -186,6 +191,7 @@ function renderList() {
     h('section', { class: 'b-card b-actions' },
       h('button', { class: 'btn btn-green btn-lg', onclick: startGame, disabled: state.questions.length === 0 }, 'Start quiz op dit scherm'),
       h('button', { class: 'btn btn-light btn-lg', onclick: renderTreeForm }, '🎄 Kerstboom toevoegen'),
+      h('button', { class: 'btn btn-light btn-lg', onclick: renderMusicForm }, '🎵 Nummer toevoegen'),
       h('button', {
         class: 'btn btn-light btn-lg btn-test', onclick: startTestGame, disabled: state.questions.length === 0,
         title: 'Testquiz met 30 testspelers die zelf antwoorden',
@@ -226,6 +232,7 @@ function questionItem(q, i) {
         h('span', { class: 'b-kind' }, KIND_LABEL[q.kind] || q.kind),
         h('span', { class: 'muted' }, `${q.time_limit} s`),
         q.rate_tree && h('span', { class: 'muted' }, '★ cijfer'),
+        q.media_url && h('span', { class: 'b-music' }, '♪ Spotify'),
       ),
       h('div', { class: 'q-title' }, q.text),
       h('div', { class: 'muted q-answer' }, answerSummary(q, ans)),
@@ -409,6 +416,7 @@ function renderEdit(q) {
   };
 
   const photo = photoPicker(q?.photo_path ? state.thumbs.get(q.photo_path) : null);
+  const music = spotifyField(q?.media_url || '');
   const err = h('p', { class: 'form-error', role: 'alert' });
   const saveBtn = h('button', { class: 'btn btn-green btn-lg', type: 'submit' }, 'Opslaan');
 
@@ -429,6 +437,10 @@ function renderEdit(q) {
         options: null,
         unit: null,
       };
+      const link = music.value();
+      if (link === false) return (err.textContent = 'Deze Spotify-link wordt niet herkend. Gebruik in Spotify: Delen → Link kopiëren.');
+      // Alleen meesturen als er een link is of was (dan werkt het ook zonder 003_muziek.sql).
+      if (link || q?.media_url) row.media_url = link;
       const answerRow = { correct_option: null, correct_texts: null, correct_value: null };
 
       if (!row.text) return (err.textContent = 'Vul de vraag in.');
@@ -466,6 +478,7 @@ function renderEdit(q) {
     h('div', { class: 'stack-tight' }, h('span', { class: 'field-label' }, 'Soort'), h('div', { class: 'segmented' }, kindButtons)),
     h('label', {}, 'Vraag', text),
     h('div', { class: 'stack-tight' }, h('span', { class: 'field-label' }, 'Foto (optioneel)'), photo.el),
+    music.el,
     mcBlock, openBlock, estBlock,
     h('label', {}, 'Tijd in seconden', time),
     h('label', { class: 'check' }, rate, 'Spelers geven deze boom een cijfer'),
@@ -600,6 +613,115 @@ function renderTreeForm() {
     h('h1', { class: 'serif' }, 'Kerstboom toevoegen'),
     form,
   ));
+}
+
+// ---------------------------------------------------------------- Spotify
+
+/**
+ * Invoerveld voor een Spotify-link met voorbeeldspeler.
+ * value() → nette link, null (leeg) of false (niet herkend).
+ */
+function spotifyField(initial, { label = 'Spotify-link (optioneel)', required = false } = {}) {
+  const input = h('input', {
+    type: 'url', inputmode: 'url', value: initial, autocomplete: 'off', autocapitalize: 'off', spellcheck: false,
+    placeholder: 'https://open.spotify.com/track/…',
+  });
+  const preview = h('div', { class: 'spotify-preview' });
+  const hint = h('span', { class: 'hint' }, 'In Spotify: Delen → Link kopiëren, en hier plakken. Het nummer klinkt op de tv en op de telefoons.');
+  const show = () => {
+    const v = input.value.trim();
+    const player = v ? spotifyPlayer(v) : null;
+    preview.replaceChildren(...(player ? [player] : v ? [h('p', { class: 'form-error' }, 'Deze link wordt niet herkend.')] : []));
+  };
+  let t;
+  input.addEventListener('input', () => { clearTimeout(t); t = setTimeout(show, 400); });
+  show();
+  return {
+    el: h('div', { class: 'stack-tight' }, h('label', {}, label, input, hint), preview),
+    value: () => {
+      const v = input.value.trim();
+      if (!v) return required ? false : null;
+      return parseSpotify(v) ? cleanSpotifyLink(v) : false;
+    },
+    reset: () => { input.value = ''; show(); },
+    input,
+  };
+}
+
+// ---------------------------------------------------------------- snel een nummer toevoegen
+
+function renderMusicForm() {
+  setScreen('nummer');
+  const listId = 'nummernamen';
+  const names = h('datalist', { id: listId }, treeNameSuggestions().map((n) => h('option', { value: n })));
+  const music = spotifyField('', { label: 'Spotify-link van het nummer', required: true });
+  const owner = h('input', { type: 'text', list: listId, maxlength: '80', autocapitalize: 'words', placeholder: 'Naam van wie dit nummer koos' });
+  const others = [1, 2, 3].map((n) => h('input', { type: 'text', list: listId, maxlength: '80', autocapitalize: 'words', placeholder: `Andere naam ${n}` }));
+  const time = h('input', { type: 'number', inputmode: 'numeric', min: '5', max: '600', value: '30', class: 'input-short' });
+  const err = h('p', { class: 'form-error', role: 'alert' });
+  const count = h('span', { class: 'tree-count' }, musicCountText());
+  const saveBtn = h('button', { class: 'btn btn-green btn-lg btn-block', type: 'submit' }, 'Opslaan en volgend nummer');
+
+  const form = h('form', {
+    class: 'stack',
+    oninput: () => { err.textContent = ''; },
+    onsubmit: async (e) => {
+      e.preventDefault();
+      const link = music.value();
+      const ownerName = owner.value.trim();
+      const otherNames = others.map((i) => i.value.trim());
+      if (!link) return (err.textContent = 'Plak een Spotify-link (Delen → Link kopiëren).');
+      if (!ownerName) return (err.textContent = 'Vul in wie dit nummer koos.');
+      if (otherNames.some((n) => !n)) return (err.textContent = 'Vul drie andere namen in.');
+      const all = [ownerName, ...otherNames];
+      if (new Set(all.map((n) => n.toLowerCase())).size < 4) return (err.textContent = 'Gebruik vier verschillende namen.');
+      const seconds = parseInt(time.value, 10);
+      if (!(seconds >= 5 && seconds <= 600)) return (err.textContent = 'De tijd moet tussen 5 en 600 seconden liggen.');
+
+      const options = shuffle(all);
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Bezig met opslaan…';
+      try {
+        await saveQuestion(null, {
+          category: MUSIC_CATEGORY, kind: 'meerkeuze', text: MUSIC_CATEGORY,
+          time_limit: seconds, rate_tree: false, options, unit: null, media_url: link,
+        }, { correct_option: options.indexOf(ownerName), correct_texts: null, correct_value: null }, { blob: null, removed: false });
+        toast(`Nummer van ${ownerName} opgeslagen`);
+        music.reset();
+        owner.value = '';
+        others.forEach((i) => { i.value = ''; });
+        count.textContent = musicCountText();
+        names.replaceChildren(...treeNameSuggestions().map((n) => h('option', { value: n })));
+        window.scrollTo(0, 0);
+      } catch (ex) {
+        err.textContent = errorText(ex);
+      }
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Opslaan en volgend nummer';
+    },
+  },
+    music.el,
+    h('label', {}, 'Van wie is dit nummer?', owner, h('span', { class: 'hint' }, 'Dit is het goede antwoord.')),
+    h('fieldset', { class: 'b-fieldset' }, h('legend', {}, 'Drie andere namen'), others),
+    names,
+    h('label', {}, 'Tijd in seconden', time, h('span', { class: 'hint' }, 'Tijd om te luisteren en te kiezen.')),
+    err,
+    saveBtn,
+  );
+
+  mount(h('div', { class: 'beheer-page tree-page' },
+    h('header', { class: 'b-header' },
+      h('button', { class: 'link', onclick: renderList }, '← Beheer'),
+      count,
+    ),
+    h('h1', { class: 'serif' }, 'Nummer toevoegen'),
+    form,
+  ));
+}
+
+function musicCountText() {
+  const n = musicCount();
+  return `${n} ${n === 1 ? 'nummer' : 'nummers'}`;
 }
 
 function treeCountText() {

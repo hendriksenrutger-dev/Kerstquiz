@@ -32,6 +32,9 @@ Elke vraag heeft een **rubriek**: vrije tekst, met suggesties uit eerder gebruik
 
 Elke vraag kan een **foto** hebben. Bij een foto vult die het grootste deel van het tv-scherm.
 
+Elke vraag kan een **Spotify-link** hebben (muziek). Op de tv en op de telefoons staat dan een Spotify-speler; je tikt op ▶ om af te spelen. Zonder ingelogd Spotify-account in die browser speelt Spotify een fragment van 30 seconden.
+- "Van wie is dit nummer?" is net als de kerstboom een meerkeuzevraag: gasten geven vooraf hun favoriete nummer door aan Rutger; de eigenaar is het goede antwoord en er zijn drie andere namen.
+
 1. **Meerkeuze:** 4 opties (A–D), één goed.
    - "Van wie is deze kerstboom?" is gewoon een meerkeuzevraag met foto. De eigenaar is het goede antwoord en er zijn drie andere namen. Rutger vult de namen zelf in; ze komen niet uit de spelerslijst.
 2. **Open:** de speler typt een antwoord. Rutger legt één of meer goede antwoorden vast.
@@ -111,6 +114,8 @@ Het goede antwoord geeft 1 punt.
   - "Opslaan en volgende boom".
   - Rubriek automatisch "Van wie is deze kerstboom?".
   - Bovenin staat het aantal bomen.
+- **Snel een nummer toevoegen:** net als de kerstboom, maar met een Spotify-link in plaats van een foto. Rubriek automatisch "Van wie is dit nummer?", geen cijfer, standaard 30 seconden.
+- **Test:** start een apart spel met 30 testspelers die zelf willekeurig antwoorden (de proefmodus uit 10).
 - **Foto's:** in de browser verkleinen tot maximaal 1600 px, JPEG kwaliteit 0,8, en daarna uploaden.
 - **Spelinstellingen:** het minimum aantal stemmen voor de mooiste boom.
 - **Spel starten:** "Start quiz op dit scherm" maakt een nieuw spel met een nieuwe kamercode en opent `#tv`.
@@ -119,7 +124,7 @@ Het goede antwoord geeft 1 punt.
 
 Voorstel; de precieze opzet mag Claude Code bepalen, binnen deze eisen:
 
-- **`questions`:** alles wat spelers mogen zien (rubriek, soort, tekst, foto-pad, opties, tijd, cijfer-vinkje, volgorde).
+- **`questions`:** alles wat spelers mogen zien (rubriek, soort, tekst, foto-pad, Spotify-link, opties, tijd, cijfer-vinkje, volgorde).
 - **`question_answers`:** de juiste antwoorden (goede optie, goede teksten, waarde). **Alleen leesbaar voor de beheerder.** Spelers mogen de antwoorden niet via de API kunnen opvragen.
 - **`games`:** kamercode, status, huidige vraag, starttijd van de vraag, minimum aantal stemmen.
 - **`players`:** spel, naam.
@@ -167,7 +172,7 @@ Voorstel; de precieze opzet mag Claude Code bepalen, binnen deze eisen:
 - **Tv:** het scherm aan houden via de Wake Lock API, als de browser dat ondersteunt, en een knop voor volledig scherm.
 - **Verbinding:** bij een weggevallen verbinding automatisch opnieuw verbinden en de actuele status ophalen (tv én telefoon).
 - **Timer:** de starttijd van een vraag komt uit de database. De timer op tv en telefoon wordt daaruit berekend, niet uit lokale tellers.
-- **Proefmodus:** in `#tv` een verborgen knop om 30 testspelers met willekeurige antwoorden toe te voegen, om de app vooraf te testen.
+- **Proefmodus:** de knop "Test" in beheer start een spel met 30 testspelers met willekeurige antwoorden, om de app vooraf te testen.
 
 ## 11. Bouwvolgorde (pull requests)
 

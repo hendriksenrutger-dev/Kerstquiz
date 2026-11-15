@@ -2,7 +2,7 @@
 import {
   sb, h, mount, toast, load, save, LETTERS, syncClock, secondsLeft,
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
-  keepScreenOn, fullscreenButton,
+  keepScreenOn, fullscreenButton, spotifyPlayer,
 } from './common.js';
 import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js';
 import {
@@ -339,6 +339,7 @@ function renderQuestion() {
       photo && h('div', { class: 'photo' }, h('img', { src: photo, alt: '' })),
       h('div', { class: 'q-main' },
         h('h2', { class: 'q-text' }, q.text),
+        q.media_url && spotifyPlayer(q.media_url),
         q.kind === 'meerkeuze'
           ? h('div', { class: 'options' }, options)
           : h('p', { class: 'q-hint' }, q.kind === 'open'
@@ -566,6 +567,7 @@ async function renderReveal() {
       photo && q.kind === 'meerkeuze' && h('div', { class: 'photo' }, h('img', { src: photo, alt: '' })),
       h('div', { class: 'q-main' },
         h('h2', { class: 'q-text q-text-small' }, q.text),
+        q.media_url && spotifyPlayer(q.media_url),
         body,
       ),
     ),

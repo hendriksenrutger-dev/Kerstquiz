@@ -1,7 +1,7 @@
 // Spelersscherm (#speler): telefoon, zonder login.
 import {
   sb, h, mount, toast, load, save, LETTERS, syncClock, secondsLeft,
-  fetchQuestions, fetchGame, errorText, liveSync,
+  fetchQuestions, fetchGame, errorText, liveSync, spotifyPlayer,
 } from './common.js';
 import { parseNumber, formatNumber } from './scoring.js';
 
@@ -209,6 +209,7 @@ function renderQuestion(q) {
       q.category && h('span', { class: 'label' }, q.category),
       h('h2', { class: 'p-question' }, q.text),
       photo && h('img', { class: 'p-photo', src: photo, alt: '' }),
+      q.media_url && spotifyPlayer(q.media_url, { compact: true }),
       answerArea,
       q.rate_tree && ratingArea(q),
     ),
