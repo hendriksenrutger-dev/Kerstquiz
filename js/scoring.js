@@ -183,3 +183,33 @@ export function formatNumber(n) {
   const v = Number(n);
   return v.toLocaleString('nl-NL', { maximumFractionDigits: 4, useGrouping: Math.abs(v) >= 10000 });
 }
+
+// ---------------------------------------------------------------- mooiste kerstboom
+
+/** Naam van de eigenaar = het goede antwoord van de vraag. */
+export function ownerOf(question, key) {
+  if (!key) return '';
+  if (question.kind === 'meerkeuze') return (question.options || [])[key.correct_option] ?? '';
+  if (question.kind === 'open') return (key.correct_texts || [])[0] ?? '';
+  return '';
+}
+
+/**
+ * Ranglijst van de bomen (vragen met het cijfer-vinkje). Telt niet mee voor de score.
+ * Een boom kan alleen winnen met minimaal `minVotes` stemmen.
+ * @returns { ranked: [{ question, owner, average, votes }], tooFew: [...] }
+ *   ranked: hoogste gemiddelde eerst (bij gelijk gemiddelde: meeste stemmen)
+ */
+export function treeRanking(questions, keys, answers, minVotes) {
+  const all = questions.filter((q) => q.rate_tree).map((q) => {
+    const ratings = answers.filter((a) => a.question_id === q.id && a.rating != null).map((a) => Number(a.rating));
+    const votes = ratings.length;
+    const average = votes ? ratings.reduce((s, r) => s + r, 0) / votes : 0;
+    return { question: q, owner: ownerOf(q, keys.get(q.id)), average, votes };
+  });
+  const byScore = (a, b) => b.average - a.average || b.votes - a.votes;
+  return {
+    ranked: all.filter((t) => t.votes >= minVotes).sort(byScore),
+    tooFew: all.filter((t) => t.votes < minVotes).sort(byScore),
+  };
+}

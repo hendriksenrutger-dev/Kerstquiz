@@ -3,7 +3,9 @@ import {
   sb, h, mount, toast, load, save, LETTERS, syncClock, secondsLeft,
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
 } from './common.js';
-import { judgeOpen, estimateWinners, choiceWinners, formatNumber } from './scoring.js';
+import {
+  judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking,
+} from './scoring.js';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -151,9 +153,10 @@ async function loadPlayers() {
 async function loadAnswered() {
   const g = state.game;
   if (g.status !== 'question' || !g.current_question_id) { state.answered = 0; return; }
-  const { count } = await sb.from('answers').select('id', { count: 'exact', head: true })
+  // Alleen echte antwoorden tellen; alleen een cijfer voor de boom telt niet als "geantwoord".
+  const { data } = await sb.from('answers').select('choice, text_answer, number_answer')
     .eq('game_id', g.id).eq('question_id', g.current_question_id);
-  state.answered = count || 0;
+  if (data) state.answered = data.filter((a) => a.choice != null || a.text_answer || a.number_answer != null).length;
 }
 
 const screenKey = (g) => `${g?.status}|${g?.current_question_id}|${g?.question_started_at}`;
@@ -200,12 +203,16 @@ async function next() {
     if (!g.current_question_id) return goTo('answers', 0);
     return i < last ? goTo('answers', i + 1) : setState('final');
   }
+  if (g.status === 'final' && hasTrees()) return setState('tree');
 }
+
+const hasTrees = () => state.questions.some((q) => q.rate_tree);
 
 async function previous() {
   const g = state.game;
   const i = currentIndex();
   const last = state.questions.length - 1;
+  if (g.status === 'tree') return setState('final');
   if (g.status === 'final') return goTo('answers', last);
   if (g.status === 'answers') {
     if (!g.current_question_id) return goTo('question', last);
@@ -224,7 +231,8 @@ function render() {
   if (g.status !== 'answers') state.reveal = null; // bij terugkomen opnieuw laden
   if (g.status === 'question') return renderQuestion();
   if (g.status === 'answers') return g.current_question_id ? renderReveal() : renderAnswersIntro();
-  return renderEnd();
+  if (g.status === 'tree') return renderTree();
+  return renderScoreboard();
 }
 
 function renderLobby() {
@@ -316,6 +324,7 @@ function renderQuestion() {
     ),
     h('footer', { class: 'q-foot' },
       h('button', { class: 'btn btn-ghost', onclick: previous }, '◀ Vorige'),
+      q.rate_tree && h('p', { class: 'rate-hint' }, '★ Geef deze boom ook een cijfer op je telefoon'),
       h('button', { class: 'btn btn-gold btn-lg', id: 'next-btn', onclick: next },
         isLast ? 'Einde vragenronde ▶' : 'Volgende vraag ▶'),
     ),
@@ -337,16 +346,130 @@ function renderAnswersIntro() {
   mount(stage('screen-hero', heroLayout(content), cornerMenu()));
 }
 
-function renderEnd() {
-  const content = h('div', { class: 'stack' },
-    h('h1', { class: 'title' }, 'Einde van de antwoordenronde'),
-    h('p', { class: 'lead' }, 'De eindstand volgt in een volgende versie van de app.'),
-    h('div', { class: 'row' },
-      h('button', { class: 'btn btn-ghost btn-lg', onclick: previous }, '◀ Terug naar het laatste antwoord'),
-      h('button', { class: 'btn btn-gold btn-lg', onclick: newGame }, 'Nieuw spel'),
+// ---------------------------------------------------------------- eindstand en mooiste boom
+
+/** Alle rijen ophalen (Supabase geeft er standaard maximaal 1000 per keer). */
+async function fetchAll(build) {
+  const rows = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await build().range(from, from + 999);
+    if (error) throw error;
+    rows.push(...(data || []));
+    if (!data || data.length < 1000) return rows;
+  }
+}
+
+async function loadResults() {
+  const g = state.game;
+  const [answers, keys, overrides] = await Promise.all([
+    fetchAll(() => sb.from('answers').select('player_id, question_id, choice, text_answer, number_answer, rating')
+      .eq('game_id', g.id).order('id')),
+    fetchAll(() => sb.from('question_answers').select('*').order('question_id')),
+    fetchAll(() => sb.from('overrides').select('question_id, normalized, correct').eq('game_id', g.id).order('normalized')),
+  ]);
+  await loadPlayers();
+  return { answers, keys: new Map(keys.map((k) => [k.question_id, k])), overrides };
+}
+
+function loadingScreen(text) {
+  mount(stage('screen-plain', h('div', { class: 'center stack', style: { height: '100%', display: 'flex' } }, h('p', { class: 'lead muted' }, text))));
+}
+
+async function renderScoreboard() {
+  const status = state.game.status;
+  loadingScreen('Eindstand berekenen…');
+  let board;
+  try {
+    const r = await loadResults();
+    board = scoreboard(state.players, state.questions, r.keys, r.answers, r.overrides);
+  } catch (e) {
+    toast(errorText(e));
+    board = [];
+  }
+  if (state.game.status !== status) return;
+
+  const top = board.filter((row) => row.place <= 10).slice(0, 12);
+  const rows = top.map((row) => h('li', { class: `rank rank-${row.place <= 3 ? row.place : 'x'}` },
+    h('span', { class: 'rank-place' }, `${row.place}`),
+    h('span', { class: 'rank-name' }, row.name),
+    h('span', { class: 'rank-points' }, `${row.points} ${row.points === 1 ? 'punt' : 'punten'}`),
+  ));
+
+  const view = h('div', { class: 'scoreboard' },
+    h('header', { class: 'sb-head' },
+      h('h1', { class: 'title' }, 'Eindstand'),
+      h('span', { class: 'muted' }, `${state.questions.length} vragen · ${state.players.length} spelers`),
+    ),
+    top.length
+      ? h('ol', {
+        class: `ranks ${top.length > 5 ? 'ranks-two' : ''}`,
+        style: top.length > 5 ? { gridTemplateRows: `repeat(${Math.ceil(top.length / 2)}, minmax(0, auto))` } : null,
+      }, rows)
+      : h('p', { class: 'lead muted' }, 'Er hebben geen spelers meegedaan.'),
+    h('footer', { class: 'q-foot' },
+      h('button', { class: 'btn btn-ghost', onclick: previous }, '◀ Vorige'),
+      hasTrees()
+        ? h('button', { class: 'btn btn-gold btn-lg', onclick: next }, 'Mooiste kerstboom ▶')
+        : h('button', { class: 'btn btn-ghost', onclick: () => { stopLive(); renderHome(state.game); } }, 'Menu'),
     ),
   );
-  mount(stage('screen-hero', heroLayout(content), cornerMenu()));
+  mount(stage('screen-plain', view));
+}
+
+async function renderTree() {
+  loadingScreen('Stemmen tellen…');
+  let ranking = { ranked: [], tooFew: [] };
+  const photos = new Map();
+  try {
+    const r = await loadResults();
+    ranking = treeRanking(state.questions, r.keys, r.answers, state.game.min_votes);
+    const paths = ranking.ranked.slice(0, 3).map((t) => t.question.photo_path).filter(Boolean);
+    if (paths.length) {
+      const { data } = await sb.storage.from('fotos').createSignedUrls(paths, SIGNED_URL_SECONDS);
+      for (const row of data || []) if (row.signedUrl) photos.set(row.path, row.signedUrl);
+    }
+  } catch (e) {
+    toast(errorText(e));
+  }
+  if (state.game.status !== 'tree') return;
+
+  const [first, ...rest] = ranking.ranked;
+  const stats = (t) => `gemiddeld ${formatNumber(Math.round(t.average * 10) / 10)} · ${t.votes} ${t.votes === 1 ? 'stem' : 'stemmen'}`;
+  const photoOf = (t) => (t.question.photo_path ? photos.get(t.question.photo_path) : null);
+
+  const footer = h('footer', { class: 'q-foot' },
+    h('button', { class: 'btn btn-ghost', onclick: previous }, '◀ Vorige'),
+    h('button', { class: 'btn btn-ghost', onclick: () => { stopLive(); renderHome(state.game); } }, 'Menu'),
+  );
+
+  if (!first) {
+    mount(stage('screen-plain', h('div', { class: 'tree-final tree-empty' },
+      h('div', { class: 'center stack', style: { display: 'flex', flex: '1' } },
+        h('h1', { class: 'title' }, 'Mooiste kerstboom'),
+        h('p', { class: 'lead' }, `Geen enkele boom heeft genoeg stemmen (minimaal ${state.game.min_votes}).`),
+      ),
+      footer,
+    )));
+    return;
+  }
+
+  const view = h('div', { class: 'tree-final' },
+    h('div', { class: 'tree-main' },
+      photoOf(first) && h('div', { class: 'tree-photo' }, h('img', { src: photoOf(first), alt: `Kerstboom van ${first.owner}` })),
+      h('div', { class: 'tree-text' },
+        h('p', { class: 'small-caps gold' }, '★ Mooiste kerstboom'),
+        h('h1', { class: 'tree-owner' }, first.owner || 'Onbekend'),
+        h('p', { class: 'tree-stats' }, stats(first)),
+        rest.length > 0 && h('ol', { class: 'tree-runners', start: '2' }, rest.slice(0, 2).map((t, k) => h('li', { class: 'tree-runner' },
+          h('span', { class: 'runner-place' }, `${k + 2}`),
+          photoOf(t) ? h('img', { src: photoOf(t), alt: '' }) : h('span', { class: 'runner-noimg' }),
+          h('span', { class: 'runner-text' }, h('strong', {}, t.owner || 'Onbekend'), h('span', { class: 'muted' }, stats(t))),
+        ))),
+      ),
+    ),
+    footer,
+  );
+  mount(stage('screen-plain', view));
 }
 
 // ---------------------------------------------------------------- antwoordenronde
@@ -377,7 +500,7 @@ async function renderReveal() {
   }
   const i = currentIndex();
   const q = state.questions[i];
-  if (!q) return renderEnd();
+  if (!q) return renderAnswersIntro();
   const r = state.reveal;
   const photo = state.game.photo_url;
   const isLast = i === state.questions.length - 1;

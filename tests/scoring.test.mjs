@@ -128,3 +128,22 @@ assert.equal(formatNumber(1818), '1818');
 assert.equal(formatNumber(1818.5), '1818,5');
 assert.equal(formatNumber(25000), '25.000');
 console.log('✓ getallen tonen');
+
+import { treeRanking, ownerOf } from '../js/scoring.js';
+{
+  const qs = [
+    { id: 't1', kind: 'meerkeuze', rate_tree: true, options: ['Anna', 'Bob', 'Cas', 'Dirk'] },
+    { id: 't2', kind: 'meerkeuze', rate_tree: true, options: ['Eva', 'Fien', 'Gijs', 'Hans'] },
+    { id: 't3', kind: 'meerkeuze', rate_tree: true, options: ['Ivo', 'Jan', 'Kim', 'Lot'] },
+    { id: 'q4', kind: 'meerkeuze', rate_tree: false, options: ['a', 'b', 'c', 'd'] },
+  ];
+  const keys = new Map([['t1', { correct_option: 2 }], ['t2', { correct_option: 0 }], ['t3', { correct_option: 3 }]]);
+  const r = (q, ...vals) => vals.map((v, i) => ({ question_id: q, player_id: `p${i}`, rating: v }));
+  const answers = [...r('t1', 8, 9, 10), ...r('t2', 9, 9, 9), ...r('t3', 10, 10), { question_id: 't1', player_id: 'x', rating: null }];
+  const { ranked, tooFew } = treeRanking(qs, keys, answers, 3);
+  assert.deepEqual(ranked.map((t) => [t.owner, t.average, t.votes]), [['Cas', 9, 3], ['Eva', 9, 3]]); // gelijk: volgorde blijft
+  assert.deepEqual(tooFew.map((t) => t.owner), ['Lot']); // 10 gemiddeld, maar maar 2 stemmen
+  assert.equal(ownerOf(qs[0], keys.get('t1')), 'Cas');
+  assert.equal(ownerOf({ kind: 'open' }, { correct_texts: ['Oma'] }), 'Oma');
+  console.log('✓ mooiste kerstboom');
+}
