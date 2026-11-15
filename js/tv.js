@@ -50,6 +50,9 @@ async function afterLogin() {
     const all = await fetchQuestions();
     state.questions = all.filter((q) => !q.tiebreak);
     state.tiebreaks = all.filter((q) => q.tiebreak);
+    // Muziek bij de start en het einde (Beheer → Spelinstellingen); ontbreekt de tabel/kolom, dan geen muziek.
+    const { data: settings } = await sb.from('settings').select('*').eq('id', 1).maybeSingle();
+    state.music = { start: settings?.start_music || null, end: settings?.end_music || null };
   } catch (e) {
     return renderLogin(errorText(e));
   }
@@ -70,6 +73,7 @@ async function afterLogin() {
 /** Beginscherm van de quizmaster: werkt op iPad én telefoon. */
 function renderHome(savedGame) {
   stopLive();
+  bgMusic(null);
   const n = state.questions.length;
   const trees = state.questions.filter((q) => q.rate_tree).length;
   const running = savedGame && savedGame.status !== 'tree' ? savedGame : null;
@@ -286,6 +290,10 @@ async function startSchifting() {
 function render() {
   const g = state.game;
   if (!g) return;
+  // Achtergrondmuziek: start in de wachtruimte en bij "Zo werkt het", einde vanaf de definitieve eindstand.
+  if (g.status === 'lobby' || (g.status === 'question' && !g.current_question_id)) bgMusic(state.music?.start);
+  else if (g.status === 'tree') bgMusic(state.music?.end);
+  else if (g.status !== 'final') bgMusic(null); // bij de eindstand beslist renderScoreboard
   if (g.status === 'lobby') return renderLobby();
   if (g.status !== 'answers') state.reveal = null; // bij terugkomen opnieuw laden
   if (g.status === 'question') return g.current_question_id ? renderQuestion() : renderRules();
@@ -543,6 +551,7 @@ async function renderScoreboard() {
 
   const tb = nextTiebreak();
   const needsSchifting = info.pending.length > 0 && tb;
+  bgMusic(needsSchifting ? null : state.music?.end);
   // Definitief? Dan de winnaars doorgeven aan de telefoons (die gaan groen knipperen).
   const winners = needsSchifting ? null : info.winners;
   if (JSON.stringify(winners) !== JSON.stringify(state.game.winners ?? null)) {
@@ -1018,6 +1027,21 @@ function stage(kind, ...children) {
 
 function heroLayout(...children) {
   return [h('div', { class: 'hero-bg', 'aria-hidden': 'true' }), h('div', { class: 'hero-content' }, children)];
+}
+
+/**
+ * Muziek die doorspeelt terwijl de schermen wisselen: een kleine Spotify-speler
+ * buiten het podium. Zelfde link = speler blijft staan (muziek loopt door).
+ */
+function bgMusic(link) {
+  let el = document.getElementById('bg-music');
+  if (el && el.dataset.link === (link || '')) return;
+  if (el) el.remove();
+  const player = link ? spotifyPlayer(link, { compact: true }) : null;
+  if (!player) return;
+  el = h('div', { id: 'bg-music', class: 'bg-music', 'data-link': link },
+    h('span', { class: 'bg-music-label' }, '♪'), player);
+  document.body.append(el);
 }
 
 function cornerMenu() {

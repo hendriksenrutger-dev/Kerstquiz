@@ -307,11 +307,16 @@ function settingsCard() {
     value: String(state.settings.min_votes), class: 'input-short',
   });
   const btn = h('button', { class: 'btn btn-green', type: 'submit' }, 'Opslaan');
+  const hasMusic = 'start_music' in state.settings;
+  const startMusic = spotifyField(state.settings.start_music || '', { label: 'Muziek bij de start (wachtruimte en "Zo werkt het")' });
+  const endMusic = spotifyField(state.settings.end_music || '', { label: 'Muziek bij het einde (eindstand en mooiste kerstboom)' });
+  const musicBtn = h('button', { class: 'btn btn-green', type: 'submit' }, 'Muziek opslaan');
+
   return h('section', { class: 'b-section' },
     h('h2', { class: 'serif' }, 'Spelinstellingen'),
     state.settingsMissing
       ? h('p', { class: 'b-card b-warning' }, 'Voer eerst supabase/002_beheer.sql uit in Supabase om de spelinstellingen te kunnen opslaan.')
-      : h('form', {
+      : [h('form', {
         class: 'b-card stack',
         onsubmit: async (e) => {
           e.preventDefault();
@@ -331,6 +336,29 @@ function settingsCard() {
           h('div', { class: 'row' }, input, btn)),
         h('p', { class: 'hint' }, 'Een boom met minder stemmen kan niet winnen.'),
       ),
+      hasMusic
+        ? h('form', {
+          class: 'b-card stack',
+          onsubmit: async (e) => {
+            e.preventDefault();
+            const start = startMusic.value();
+            const end = endMusic.value();
+            if (start === false || end === false) return toast('Een Spotify-link wordt niet herkend.');
+            musicBtn.disabled = true;
+            const { error } = await sb.from('settings').update({ start_music: start, end_music: end }).eq('id', 1);
+            musicBtn.disabled = false;
+            if (error) return toast(errorText(error));
+            Object.assign(state.settings, { start_music: start, end_music: end });
+            toast('Muziek opgeslagen');
+          },
+        },
+          startMusic.el,
+          endMusic.el,
+          h('p', { class: 'hint' }, 'Op de tv verschijnt onderin een kleine speler; tik op ▶ om te starten. Laat een veld leeg voor geen muziek.'),
+          musicBtn,
+        )
+        : h('p', { class: 'b-card b-warning' }, 'Voer supabase/005_muziek_start_einde.sql uit in Supabase om muziek bij de start en het einde in te stellen.'),
+      ],
   );
 }
 
