@@ -169,7 +169,7 @@ Voorstel; de precieze opzet mag Claude Code bepalen, binnen deze eisen:
   Bij meerkeuze en goed/fout altijd de letter of het ✓/✗-teken tonen, niet alleen de kleur.
 - **Beheer:** een licht thema met een lichte crèmekleurige achtergrond (`#F6F3EA`), witte vlakken en donkergroene knoppen.
 - **Lettertypes:** Playfair Display (600/700) voor titels, Inter voor de rest (Google Fonts).
-- **Achtergronden bij de vragen:** `assets/achtergronden/` (kerstbal, slee, lantaarns, ski; door Rutger aangeleverd, AI-gegenereerd). Per vraag om en om, in de vragen- en antwoordenronde, met een donkergroene laag (links sterk, rechts lichter). Bij een vraag met foto extra gedempt.
+- **Achtergronden bij de vragen:** `assets/achtergronden/` (kerstbal, slee, lantaarns, ski, woonkamer, bergen; door Rutger aangeleverd, AI-gegenereerd). Per vraag om en om, in de vragen- en antwoordenronde, met een donkergroene laag (links sterk, rechts lichter). Bij een vraag met foto extra gedempt.
 - **Sfeerfoto:** `assets/hero.jpg` (de sneeuwbol, door Rutger aangeleverd) staat op het welkomstscherm, met een donkergroene overlay links zodat de tekst leesbaar blijft.
 - **Tv-scherm:** ontworpen voor 16:9. Grote letters: vragen minstens 44 px, opties minstens 30 px. Het moet ook netjes werken met de beeldverhouding van een iPad (zwarte randen zijn prima).
 - **Telefoon:** knoppen minstens 44 px hoog. Werkt vanaf 360 px breed.
