@@ -3,11 +3,11 @@ import {
   sb, h, mount, toast, load, save, LETTERS, syncClock, secondsLeft,
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
-} from './common.js?v=16';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=16';
+} from './common.js?v=17';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=17';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking,
-} from './scoring.js?v=16';
+} from './scoring.js?v=17';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -27,10 +27,12 @@ const state = {
 };
 
 let requestedGameId = null;
+let previewId = null;
 
 export async function startTv(params) {
   document.body.className = 'tv';
   requestedGameId = params?.get('spel') || null;
+  previewId = params?.get('voorbeeld') || null;
   keepScreenOn();
   const { data } = await sb.auth.getSession();
   if (!data.session) return renderLogin();
@@ -57,6 +59,8 @@ async function afterLogin() {
   } catch (e) {
     return renderLogin(errorText(e));
   }
+  // Vanuit beheer: voorbeeld van één vraag (zonder spel).
+  if (previewId) return startPreview(previewId);
   // Vanuit beheer ("Start quiz op dit scherm") komt een spel-id mee.
   if (requestedGameId) {
     const requested = await fetchGame(requestedGameId).catch(() => null);
@@ -1073,6 +1077,98 @@ function preloadMusic() {
   musicPlayer(state.music?.start);
   musicPlayer(state.music?.end);
 }
+
+// ---------------------------------------------------------------- voorbeeld (vanuit beheer)
+
+/**
+ * Voorbeeld van een vraag zoals de tv hem toont, zonder spel en zonder spelers:
+ * er wordt niets opgeslagen. Met een balk bovenin om te bladeren, het antwoord
+ * te bekijken en de telefoonweergave ernaast te zetten.
+ */
+const preview = { list: [], index: 0, mode: 'vraag', phone: false, keys: new Map() };
+
+async function startPreview(id) {
+  preview.list = [...state.questions, ...state.tiebreaks];
+  preview.index = Math.max(0, preview.list.findIndex((q) => q.id === id));
+  const { data } = await sb.from('question_answers').select('*');
+  preview.keys = new Map((data || []).map((k) => [k.question_id, k]));
+  state.players = [];
+  clearInterval(state.tick);
+  state.tick = setInterval(updateTimer, 250);
+  await showPreview();
+}
+
+async function showPreview() {
+  const q = preview.list[preview.index];
+  if (!q) return;
+  history.replaceState(null, '', `#tv?voorbeeld=${q.id}`);
+  let photoUrl = null;
+  if (q.photo_path) {
+    const { data } = await sb.storage.from('fotos').createSignedUrl(q.photo_path, 60 * 60);
+    photoUrl = data?.signedUrl || null;
+  }
+  const answers = preview.mode === 'antwoord' && !q.tiebreak;
+  state.game = {
+    id: 'voorbeeld',
+    status: q.tiebreak ? 'schifting' : answers ? 'answers' : 'question',
+    current_question_id: q.id,
+    question_started_at: new Date(Date.now()).toISOString(),
+    photo_url: photoUrl,
+    tiebreak_names: q.tiebreak ? ['Speler 1', 'Speler 2'] : null,
+    tiebreak_done: [],
+    winners: null,
+  };
+  state.answered = 0;
+  state.schiftingResult = false;
+  if (answers) {
+    state.reveal = { qid: q.id, answers: [], key: preview.keys.get(q.id) || null, overrides: new Map() };
+    await renderReveal();
+  } else if (q.tiebreak) {
+    renderSchifting();
+  } else {
+    renderQuestion();
+  }
+  previewChrome(q);
+}
+
+/** Knoppen van het spel vervangen door de voorbeeldbalk (niets mag het spel aansturen). */
+function previewChrome(q) {
+  const foot = document.querySelector('.q-foot');
+  if (foot) foot.replaceChildren();
+  document.querySelectorAll('#answered, .score-pill').forEach((el) => el.remove());
+  const showPhone = preview.phone && !q.tiebreak && preview.mode === 'vraag';
+  document.body.classList.add('pv-on');
+  document.body.classList.toggle('pv-with-phone', showPhone);
+  document.getElementById('preview-bar')?.remove();
+  const n = preview.list.length;
+  const go = (d) => { preview.index = (preview.index + d + n) % n; showPreview(); };
+  const normal = state.questions.length;
+  const count = q.tiebreak ? `Schifting ${preview.index - normal + 1}/${state.tiebreaks.length}` : `Vraag ${preview.index + 1}/${normal}`;
+  const setMode = (m) => { preview.mode = m; showPreview(); };
+  const bar = h('div', { id: 'preview-bar', class: 'preview-bar' },
+    h('strong', { title: 'Er wordt niets opgeslagen' }, '👁 Voorbeeld'),
+    h('button', { class: 'pv-btn', onclick: () => go(-1), 'aria-label': 'Vorige vraag' }, '◀'),
+    h('span', { class: 'pv-count' }, count),
+    h('button', { class: 'pv-btn', onclick: () => go(1), 'aria-label': 'Volgende vraag' }, '▶'),
+    !q.tiebreak && h('span', { class: 'pv-seg' },
+      h('button', { class: 'pv-btn', 'aria-pressed': String(preview.mode === 'vraag'), onclick: () => setMode('vraag') }, 'Vraag'),
+      h('button', { class: 'pv-btn', 'aria-pressed': String(preview.mode === 'antwoord'), onclick: () => setMode('antwoord') }, 'Antwoord'),
+    ),
+    h('button', { class: 'pv-btn', 'aria-pressed': String(preview.phone), onclick: () => { preview.phone = !preview.phone; showPreview(); } }, '📱 Telefoon'),
+    h('button', { class: 'pv-btn', onclick: () => { preview.phone = false; startQuestion(q); } }, '↻ Timer'),
+    h('a', { class: 'pv-btn pv-close', href: '#beheer' }, '✕ Sluiten'),
+  );
+  document.body.append(bar);
+
+  document.getElementById('preview-phone')?.remove();
+  if (showPhone) {
+    document.body.append(h('div', { id: 'preview-phone', class: 'preview-phone' },
+      h('iframe', { src: `${location.pathname}#speler?voorbeeld=${q.id}`, title: 'Telefoon-voorbeeld' })));
+  }
+}
+
+/** Timer (en telefoon) opnieuw laten beginnen. */
+function startQuestion() { showPreview(); }
 
 // ---------------------------------------------------------------- achtergronden
 

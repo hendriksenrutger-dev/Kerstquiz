@@ -110,6 +110,7 @@ Het goede antwoord geeft 1 punt.
 
 - **Inloggen** met e-mail en wachtwoord.
 - **Vragenlijst:** volgorde aanpassen (omhoog/omlaag), toevoegen, bewerken, verwijderen.
+- **Voorbeeld:** per vraag een knop "👁 Voorbeeld" die de vraag toont zoals de tv hem laat zien (achtergrond, foto, timer, opties), zonder spel en zonder dat er iets wordt opgeslagen. Met een balk onderin: bladeren door alle vragen, wisselen tussen vraag en antwoord, de telefoonweergave ernaast (klikbaar), de timer opnieuw starten en sluiten.
 - **Vraag bewerken:** rubriek, soort, vraagtekst, foto, tijd, cijfer-vinkje, en per soort:
   - meerkeuze: 4 opties en het goede antwoord;
   - open: goede antwoorden, één per regel;
