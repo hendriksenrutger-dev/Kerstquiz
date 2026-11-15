@@ -765,9 +765,20 @@ body.beheer {
 /* Achtergrondmuziek op de tv (start en einde) */
 .bg-music {
   position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 40;
+  visibility: hidden; pointer-events: none;
   width: min(420px, 44vw); display: flex; align-items: center; gap: 8px;
   padding: 6px 8px 6px 12px; border-radius: 14px; background: rgba(15, 42, 29, .85);
   border: 1px solid var(--gold); box-shadow: 0 8px 24px rgba(0, 0, 0, .4);
 }
 .bg-music-label { color: var(--gold); font-size: 22px; font-weight: 700; }
 .bg-music .spotify { flex: 1; }
+.bg-music.bg-music-on { visibility: visible; pointer-events: auto; }
+.bg-music-frame { flex: 1; height: 80px; position: relative; }
+.bg-music-frame iframe, .bg-music-frame .spotify-holder { width: 100%; height: 80px; border: 0; border-radius: 12px; display: block; }
+
+/* Kerstboom: cijfer als tweede stap */
+.p-chosen { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; border-radius: 12px; background: var(--surface); border: 2px solid var(--good); color: var(--good); font-weight: 600; }
+.p-chosen .link { color: var(--text); min-height: 36px; padding: 0; }
+.p-rating-big { border-top: 0; padding-top: 0; }
+.p-rating-big .p-rating-title { font-size: 22px; font-family: var(--serif); }
+.p-rating-big .p-rate { min-height: 60px; font-size: 22px; }

@@ -157,6 +157,7 @@ async function render() {
     if (state.mineFor !== q.id) {
       state.mineFor = q.id;
       state.mine = {};
+      editingChoice = false;
       // eerder gegeven antwoord terughalen (na herladen of bij "vorige vraag")
       sb.rpc('get_my_answer', { p_player_id: state.player.id, p_question_id: q.id }).then(({ data }) => {
         const row = data?.[0];
@@ -219,11 +220,26 @@ function renderQuestion(q) {
       h('h2', { class: 'p-question' }, q.text),
       photo && h('img', { class: 'p-photo', src: photo, alt: '' }),
       q.media_url && phonePlayer(q),
-      answerArea,
-      q.rate_tree && ratingArea(q),
+      twoStep(q)
+        ? [h('div', { id: 'p-step1' }, answerArea), ratingStep(q)]
+        : [answerArea, q.rate_tree && ratingArea(q)],
     ),
   ));
   showMine(q);
+}
+
+/** Kerstboom met meerkeuze: eerst "van wie", daarna een eigen scherm voor het cijfer. */
+const twoStep = (q) => q.rate_tree && q.kind === 'meerkeuze';
+let editingChoice = false;
+
+function ratingStep(q) {
+  return h('div', { id: 'p-step2', class: 'stack', hidden: true },
+    h('p', { class: 'p-chosen' },
+      h('span', { id: 'p-chosen-text' }),
+      h('button', { type: 'button', class: 'link', onclick: () => { editingChoice = true; showMine(q); } }, 'Wijzigen'),
+    ),
+    ratingArea(q, { big: true }),
+  );
 }
 
 function choiceArea(q) {
@@ -232,7 +248,7 @@ function choiceArea(q) {
       class: `p-option opt-${LETTERS[k].toLowerCase()}`,
       'data-choice': k,
       'aria-pressed': 'false',
-      onclick: () => submit(q, { choice: k }),
+      onclick: () => { editingChoice = false; submit(q, { choice: k }); },
     },
       h('span', { class: 'letter', 'aria-hidden': 'true' }, LETTERS[k]),
       h('span', { class: 'option-text' }, h('span', { class: 'sr-only' }, `${LETTERS[k]}: `), text),
@@ -252,8 +268,8 @@ function phonePlayer(q) {
 }
 
 /** Cijfer 1–10 voor de boom (telt niet voor de score). */
-function ratingArea(q) {
-  return h('section', { class: 'p-rating', 'aria-label': 'Cijfer voor deze boom' },
+function ratingArea(q, { big = false } = {}) {
+  return h('section', { class: `p-rating ${big ? 'p-rating-big' : ''}`, 'aria-label': 'Cijfer voor deze boom' },
     h('p', { class: 'p-rating-title' }, 'Welk cijfer geef je deze boom?'),
     h('div', { class: 'p-rating-grid' }, Array.from({ length: 10 }, (_, k) => h('button', {
       type: 'button', class: 'p-rate', 'data-rating': k + 1, 'aria-pressed': 'false',
@@ -311,6 +327,17 @@ const hasAnswer = () => state.mine.choice != null || Boolean(state.mine.text) ||
 
 /** Toon het eigen (verstuurde) antwoord in het huidige scherm. */
 function showMine(q) {
+  if (twoStep(q)) {
+    const step1 = document.getElementById('p-step1');
+    const step2 = document.getElementById('p-step2');
+    const toRating = state.mine.choice != null && !editingChoice;
+    if (step1) step1.hidden = toRating;
+    if (step2) step2.hidden = !toRating;
+    const chosen = document.getElementById('p-chosen-text');
+    if (chosen && state.mine.choice != null) {
+      chosen.textContent = `✓ Jouw antwoord: ${LETTERS[state.mine.choice]} · ${(q.options || [])[state.mine.choice] ?? ''}`;
+    }
+  }
   document.querySelectorAll('.p-rate').forEach((b) => {
     const on = Number(b.dataset.rating) === state.mine.rating;
     b.classList.toggle('selected', on);

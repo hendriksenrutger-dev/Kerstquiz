@@ -433,3 +433,65 @@ export function hiddenSpotifyPlayer(link, { compact = false, allowReveal = false
   start();
   return wrap;
 }
+
+// ---------- Achtergrondmuziek met herhalen (tv) ----------
+
+/**
+ * Zichtbare Spotify-speler die je vanuit de app kunt starten (play()) en die
+ * opnieuw begint als het nummer of fragment is afgelopen (herhalen).
+ * Browsers starten geluid alleen na een tik: roep play() aan ín een klik.
+ * @returns {{ el: HTMLElement, play(): void, pause(): void }}
+ */
+export function loopingSpotifyPlayer(link) {
+  const s = parseSpotify(link);
+  if (!s) return null;
+  const holder = h('div', { class: 'spotify-holder' });
+  const el = h('div', { class: 'bg-music', 'data-link': link },
+    h('span', { class: 'bg-music-label', 'aria-hidden': 'true' }, '♪'),
+    h('div', { class: 'bg-music-frame' }, holder));
+
+  let ctrl = null;
+  let wanted = false;   // moet er muziek klinken?
+  let restarting = false;
+  let last = { position: 0, duration: 0, isPaused: true };
+
+  const startPlayback = () => {
+    if (!ctrl) return;
+    if (typeof ctrl.play === 'function') ctrl.play(); else ctrl.togglePlay();
+  };
+
+  const init = () => {
+    if (!holder.isConnected) { requestAnimationFrame(init); return; }
+    loadSpotifyApi().then((api) => {
+      api.createController(holder, { uri: `spotify:${s.type}:${s.id}`, width: '100%', height: 80 }, (c) => {
+        ctrl = c;
+        c.addListener('playback_update', (e) => {
+          const d = e.data || {};
+          const ended = d.isPaused && wanted && !restarting
+            && ((d.duration > 0 && d.position >= d.duration - 1500) || (d.position === 0 && last.position > 0 && !last.isPaused));
+          last = { position: d.position || 0, duration: d.duration || 0, isPaused: d.isPaused };
+          if (!d.isPaused) restarting = false;
+          if (ended) {
+            restarting = true; // klaar: opnieuw vanaf het begin (herhalen)
+            if (typeof c.seek === 'function') c.seek(0);
+            startPlayback();
+          }
+        });
+        if (wanted) startPlayback();
+      });
+    }).catch(() => {
+      // Zonder de API: gewone speler, dan tik je zelf op ▶ (geen herhalen).
+      holder.replaceWith(spotifyPlayer(link, { compact: true }));
+    });
+  };
+  init();
+
+  return {
+    el,
+    play() { wanted = true; startPlayback(); },
+    pause() {
+      wanted = false;
+      if (ctrl && !last.isPaused) { if (typeof ctrl.pause === 'function') ctrl.pause(); else ctrl.togglePlay(); }
+    },
+  };
+}
