@@ -840,3 +840,6 @@ body.pv-with-phone .stage { width: min(calc(100vw - 340px), calc((100dvh - 64px)
   body.pv-with-phone .tv-frame { width: 100vw; }
   body.pv-with-phone .stage { width: min(100vw, calc((100dvh - 64px) * 16 / 9)); }
 }
+
+/* Antwoordenronde met foto bij open vraag of schatting: foto kleiner, ruimte voor de groepen/getallenlijn */
+.reveal.has-photo:not(.reveal-meerkeuze) .photo { flex-basis: 38%; }

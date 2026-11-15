@@ -30,7 +30,7 @@ Dit bestand is de bron van waarheid. Wijkt iets in de code hiervan af, vraag het
 
 Elke vraag heeft een **rubriek**: vrije tekst, met suggesties uit eerder gebruikte rubrieken. Voorbeelden: "Van wie is deze kerstboom?", "In welke stad staat deze kerstboom?", "Kerstfeitje". De rubriek staat als label boven de vraag.
 
-Elke vraag kan een **foto** hebben. Bij een foto vult die het grootste deel van het tv-scherm.
+Elke vraag kan een **foto** hebben. Bij een foto vult die het grootste deel van het tv-scherm. Optioneel kan een vraag ook een **foto bij het antwoord** hebben: die toont de tv in de antwoordenronde in plaats van de vraagfoto (bijv. de eigenaar bij zijn kerstboom). Die staat bij de juiste antwoorden en is alleen leesbaar voor de beheerder.
 
 Elke vraag kan een **Spotify-link** hebben (muziek). Op de tv en op de telefoons staat dan een Spotify-speler; je tikt op ▶ om af te spelen. Zonder ingelogd Spotify-account in die browser speelt Spotify een fragment van 30 seconden.
 - Gasten geven vooraf hun favoriete nummer door aan Rutger. Er zijn drie soorten muziekvragen:

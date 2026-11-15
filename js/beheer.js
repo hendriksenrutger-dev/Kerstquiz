@@ -2,9 +2,9 @@
 // spelinstellingen en een spel starten. Licht thema; werkt op iPad en iPhone.
 import {
   sb, h, mount, toast, LETTERS, errorText, loginForm, parseSpotify, cleanSpotifyLink, spotifyPlayer,
-} from './common.js?v=18';
-import { parseNumber, formatNumber } from './scoring.js?v=18';
-import { addTestPlayers } from './proef.js?v=18';
+} from './common.js?v=20';
+import { parseNumber, formatNumber } from './scoring.js?v=20';
+import { addTestPlayers } from './proef.js?v=20';
 
 const TREE_CATEGORY = 'Van wie is deze kerstboom?';
 // Drie soorten muziekvragen (zie renderMusicForm)
@@ -80,7 +80,10 @@ async function loadAll() {
 }
 
 async function loadThumbs() {
-  const paths = state.questions.map((q) => q.photo_path).filter((p) => p && !state.thumbs.has(p));
+  const paths = [
+    ...state.questions.map((q) => q.photo_path),
+    ...[...state.answers.values()].map((a) => a.answer_photo_path),
+  ].filter((p) => p && !state.thumbs.has(p));
   if (!paths.length) return;
   const { data } = await sb.storage.from('fotos').createSignedUrls(paths, 60 * 60);
   for (const row of data || []) if (row.signedUrl) state.thumbs.set(row.path, row.signedUrl);
@@ -243,6 +246,7 @@ function questionItem(q, i) {
         h('span', { class: 'muted' }, `${q.time_limit} s`),
         q.rate_tree && h('span', { class: 'muted' }, '★ cijfer'),
         q.tiebreak && h('span', { class: 'b-tiebreak' }, '⚖️ Schifting'),
+        ans?.answer_photo_path && h('span', { class: 'muted' }, '📷 antwoordfoto'),
         q.media_url && h('span', { class: 'b-music' }, q.media_mode === 'verbergen' ? '♪ Spotify (afgedekt)' : q.media_mode === 'alleen_tv' ? '♪ Spotify (alleen tv)' : '♪ Spotify'),
       ),
       h('div', { class: 'q-title' }, q.text),
@@ -294,6 +298,7 @@ async function removeQuestion(q) {
   const { error } = await sb.from('questions').delete().eq('id', q.id);
   if (error) return toast(errorText(error));
   await removePhoto(q.photo_path);
+  await removePhoto(state.answers.get(q.id)?.answer_photo_path);
   state.questions = state.questions.filter((x) => x.id !== q.id);
   state.answers.delete(q.id);
   toast('Vraag verwijderd');
@@ -459,6 +464,7 @@ function renderEdit(q) {
   };
 
   const photo = photoPicker(q?.photo_path ? state.thumbs.get(q.photo_path) : null);
+  const answerPhoto = photoPicker(ans?.answer_photo_path ? state.thumbs.get(ans.answer_photo_path) : null);
   const music = spotifyField(q?.media_url || '');
   // Standaard afdekken: de speler toont titel en artiest en zou het antwoord kunnen verraden.
   const currentMode = q?.media_url ? (q.media_mode || 'tonen') : 'verbergen';
@@ -513,7 +519,7 @@ function renderEdit(q) {
       saveBtn.disabled = true;
       saveBtn.textContent = 'Bezig met opslaan…';
       try {
-        await saveQuestion(q, row, answerRow, photo.get());
+        await saveQuestion(q, row, answerRow, photo.get(), answerPhoto.get());
         toast('Vraag opgeslagen');
         renderList();
       } catch (ex) {
@@ -527,6 +533,10 @@ function renderEdit(q) {
     h('div', { class: 'stack-tight' }, h('span', { class: 'field-label' }, 'Soort'), h('div', { class: 'segmented' }, kindButtons)),
     h('label', {}, 'Vraag', text),
     h('div', { class: 'stack-tight' }, h('span', { class: 'field-label' }, 'Foto (optioneel)'), photo.el),
+    h('div', { class: 'stack-tight' },
+      h('span', { class: 'field-label' }, 'Foto bij het antwoord (optioneel)'),
+      h('span', { class: 'hint' }, 'De tv toont deze foto in de antwoordenronde in plaats van de vraagfoto. Spelers zien hem pas dan.'),
+      answerPhoto.el),
     music.el,
     modeField,
     mcBlock, openBlock, estBlock,
@@ -553,8 +563,17 @@ function renderEdit(q) {
 }
 
 /** Vraag + juiste antwoord opslaan, inclusief foto-upload. */
-async function saveQuestion(existing, row, answerRow, photoChoice) {
+async function saveQuestion(existing, row, answerRow, photoChoice, answerPhotoChoice = null) {
   let newPath = null;
+  // Foto bij het antwoord (optioneel; staat bij de juiste antwoorden, alleen voor de beheerder)
+  const oldAnswerPath = existing ? state.answers.get(existing.id)?.answer_photo_path || null : null;
+  let newAnswerPath = null;
+  if (answerPhotoChoice?.blob) {
+    newAnswerPath = await uploadPhoto(answerPhotoChoice.blob);
+    answerRow.answer_photo_path = newAnswerPath;
+  } else if (answerPhotoChoice?.removed && oldAnswerPath) {
+    answerRow.answer_photo_path = null;
+  }
   const oldPath = existing?.photo_path || null;
   if (photoChoice.blob) newPath = await uploadPhoto(photoChoice.blob);
 
@@ -575,14 +594,15 @@ async function saveQuestion(existing, row, answerRow, photoChoice) {
 
   const { error: aErr } = await sb.from('question_answers')
     .upsert({ question_id: saved.id, ...answerRow }, { onConflict: 'question_id' });
-  if (aErr) throw aErr;
+  if (aErr) { if (newAnswerPath) await removePhoto(newAnswerPath); throw aErr; }
 
-  // oude foto opruimen als die is vervangen of verwijderd
+  // oude foto's opruimen als die zijn vervangen of verwijderd
   if (oldPath && (newPath || photoChoice.removed)) await removePhoto(oldPath);
+  if (oldAnswerPath && 'answer_photo_path' in answerRow) await removePhoto(oldAnswerPath);
 
   const idx = state.questions.findIndex((x) => x.id === saved.id);
   if (idx >= 0) state.questions[idx] = saved; else state.questions.push(saved);
-  state.answers.set(saved.id, { question_id: saved.id, ...answerRow });
+  state.answers.set(saved.id, { ...(state.answers.get(saved.id) || {}), question_id: saved.id, ...answerRow });
   await loadThumbs();
   return saved;
 }
@@ -597,6 +617,7 @@ function renderTreeForm() {
   const others = [1, 2, 3].map((n) => h('input', { type: 'text', list: listId, maxlength: '80', autocapitalize: 'words', placeholder: `Andere naam ${n}` }));
   const rate = h('input', { type: 'checkbox', checked: true });
   const photo = photoPicker(null, { big: true });
+  const answerPhoto = photoPicker(null);
   const err = h('p', { class: 'form-error', role: 'alert' });
   const count = h('span', { class: 'tree-count' }, treeCountText());
   const saveBtn = h('button', { class: 'btn btn-green btn-lg btn-block', type: 'submit' }, 'Opslaan en volgende boom');
@@ -628,12 +649,13 @@ function renderTreeForm() {
         await saveQuestion(null, {
           category: TREE_CATEGORY, kind: 'meerkeuze', text: TREE_CATEGORY,
           time_limit: 20, rate_tree: rate.checked, options, unit: null,
-        }, { correct_option: correct, correct_texts: null, correct_value: null }, { blob, removed: false });
+        }, { correct_option: correct, correct_texts: null, correct_value: null }, { blob, removed: false }, answerPhoto.get());
         toast(`Boom van ${ownerName} opgeslagen`);
         // formulier leegmaken voor de volgende boom (cijfer-vinkje blijft staan)
         owner.value = '';
         others.forEach((i) => { i.value = ''; });
         photo.reset();
+        answerPhoto.reset();
         count.textContent = treeCountText();
         names.replaceChildren(...treeNameSuggestions().map((n) => h('option', { value: n })));
         window.scrollTo(0, 0);
@@ -651,6 +673,10 @@ function renderTreeForm() {
       others,
     ),
     names,
+    h('div', { class: 'stack-tight' },
+      h('span', { class: 'field-label' }, 'Foto bij het antwoord (optioneel)'),
+      h('span', { class: 'hint' }, 'Bijvoorbeeld de eigenaar bij de boom. De tv toont hem pas in de antwoordenronde.'),
+      answerPhoto.el),
     h('label', { class: 'check' }, rate, 'Spelers geven deze boom een cijfer'),
     err,
     saveBtn,
