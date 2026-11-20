@@ -2,9 +2,9 @@
 // spelinstellingen en een spel starten. Licht thema; werkt op iPad en iPhone.
 import {
   sb, h, mount, toast, LETTERS, errorText, loginForm, parseSpotify, cleanSpotifyLink, spotifyPlayer, SCARE_SECONDS,
-} from './common.js?v=35';
-import { parseNumber, formatNumber } from './scoring.js?v=35';
-import { addTestPlayers } from './proef.js?v=35';
+} from './common.js?v=36';
+import { parseNumber, formatNumber } from './scoring.js?v=36';
+import { addTestPlayers } from './proef.js?v=36';
 
 const TREE_CATEGORY = 'Van wie is deze kerstboom?';
 // Drie soorten muziekvragen (zie renderMusicForm)
@@ -538,6 +538,7 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
 
   const photo = photoPicker(q?.photo_path ? state.thumbs.get(q.photo_path) : null);
   const answerPhoto = photoPicker(ans?.answer_photo_path ? state.thumbs.get(ans.answer_photo_path) : null);
+  const hideText = h('input', { type: 'checkbox', checked: Boolean(ans?.hide_answer_text) });
   const scarePhoto = photoPicker(q?.scare_path ? state.thumbs.get(q.scare_path) : null);
   const video = videoPicker(q?.video_path ? state.thumbs.get(q.video_path) : null, '🎬 Filmpje bij de vraag (optioneel)');
   const answerVideo = videoPicker(ans?.answer_video_path ? state.thumbs.get(ans.answer_video_path) : null, '🎬 Filmpje bij het antwoord (optioneel)');
@@ -575,6 +576,8 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
       const answerLink = answerMusic.value();
       if (answerLink === false) return (err.textContent = 'De Spotify-link bij het antwoord wordt niet herkend.');
       const answerRow = { correct_option: null, correct_texts: null, correct_value: null };
+      // Alleen meesturen als het aan staat of stond (dan werkt het ook zonder 013_antwoord_alleen_foto.sql).
+      if (hideText.checked || ans?.hide_answer_text) answerRow.hide_answer_text = hideText.checked;
 
       if (!row.text) return (err.textContent = 'Vul de vraag in.');
       if (scareOnly) {
@@ -653,11 +656,13 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
     h('div', { class: 'stack-tight' }, h('span', { class: 'field-label' }, 'Soort'), h('div', { class: 'segmented' }, kindButtons)),
     h('label', {}, scareOnly ? 'Vraag (verschijnt na de schrik)' : 'Vraag', text),
     h('div', { class: 'stack-tight' }, h('span', { class: 'field-label' }, 'Foto (optioneel)'), photo.el),
-    !scareOnly && h('div', { class: 'stack-tight' },
+    h('div', { class: 'stack-tight' },
       h('span', { class: 'field-label' }, 'Foto bij het antwoord (optioneel)'),
       h('span', { class: 'hint' }, 'De tv toont deze foto in de antwoordenronde in plaats van de vraagfoto. Spelers zien hem pas dan.'),
-      answerPhoto.el),
-    !scareOnly && video.el,
+      answerPhoto.el,
+      h('label', { class: 'check' }, hideText, 'Alleen de foto of het filmpje tonen, zonder antwoordtekst'),
+      h('span', { class: 'hint' }, 'Voor open vragen en meerkeuze, als de foto het antwoord al laat zien. Bij een schatting blijft het getal staan.')),
+    video.el,
     !scareOnly && h('div', { class: 'stack-tight' },
       answerVideo.el,
       h('span', { class: 'hint' }, 'Een filmpje start vanzelf met geluid op de tv en de telefoons, op de plek van de foto. Maximaal 50 MB (ongeveer een halve tot een hele minuut).')),

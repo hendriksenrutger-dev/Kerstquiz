@@ -969,3 +969,6 @@ body.pv-with-phone .stage { width: min(calc(100vw - 340px), calc((100dvh - 64px)
 .reveal.reveal-center .open-answer { flex: 0 0 auto; align-items: center; }
 .reveal.reveal-center .answer-card { align-self: center; font-size: max(56px, 6cqw); padding: .4em .9em; }
 .reveal.reveal-center .groups-toggle { align-self: center; }
+
+/* Antwoord als alleen foto/filmpje (zonder antwoordtekst): foto groter */
+.question.reveal.has-photo.photo-only .photo { flex-basis: 62%; }
