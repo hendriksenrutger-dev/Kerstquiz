@@ -4,12 +4,12 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer, inScarePhase, serverNow, SCARE_SECONDS,
-} from './common.js?v=34';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=34';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=34';
+} from './common.js?v=35';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=35';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=35';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking,
-} from './scoring.js?v=34';
+} from './scoring.js?v=35';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -505,11 +505,7 @@ function renderQuestion() {
       h('div', { class: 'q-main' },
         h('h2', { class: 'q-text' }, q.text),
         q.media_url && mediaSlot(q.media_url, q.media_mode),
-        q.kind === 'meerkeuze'
-          ? h('div', { class: 'options' }, options)
-          : h('p', { class: 'q-hint' }, q.kind === 'open'
-            ? '✎ Typ je antwoord op je telefoon'
-            : `✎ Vul je schatting in op je telefoon${q.unit ? ` (in ${q.unit})` : ''}`),
+        q.kind === 'meerkeuze' && h('div', { class: 'options' }, options),
       ),
     ),
     h('footer', { class: 'q-foot' },
