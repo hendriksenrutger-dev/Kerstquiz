@@ -972,3 +972,13 @@ body.pv-with-phone .stage { width: min(calc(100vw - 340px), calc((100dvh - 64px)
 
 /* Antwoord als alleen foto/filmpje (zonder antwoordtekst): foto groter */
 .question.reveal.has-photo.photo-only .photo { flex-basis: 62%; }
+
+/* Onderbalk (Vorige/Volgende) altijd bovenop en klikbaar, ook als de inhoud erboven te lang is */
+.q-foot { position: relative; z-index: 5; }
+.q-body { min-height: 0; overflow: hidden; }
+/* Antwoord meerkeuze met foto: foto iets smaller, foute opties compacter zodat alles past */
+.question.reveal-meerkeuze.has-photo .photo { flex-basis: 48%; }
+.question.reveal-meerkeuze.has-photo .options { gap: 1cqh; }
+.question.reveal-meerkeuze.has-photo .option.is-wrong { padding: .6cqh 1cqw; font-size: max(20px, 1.35cqw); }
+.question.reveal-meerkeuze.has-photo .option.is-wrong .letter { width: 1.6em; height: 1.6em; }
+.question.reveal-meerkeuze.has-photo .option.is-correct { transform: none; }
