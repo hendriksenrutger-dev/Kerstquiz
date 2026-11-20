@@ -3,13 +3,13 @@ import {
   sb, h, mount, toast, load, save, LETTERS, syncClock, secondsLeft,
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
-  brandTitle, ornament, deckPlayer,
-} from './common.js?v=31';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=31';
-import { scheduleScare } from './schrik.js?v=31';
+  brandTitle, ornament, deckPlayer, inScarePhase, serverNow, SCARE_SECONDS,
+} from './common.js?v=32';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=32';
+import { scheduleScare } from './schrik.js?v=32';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking,
-} from './scoring.js?v=31';
+} from './scoring.js?v=32';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -302,10 +302,9 @@ async function next() {
 
 const hasTrees = () => state.questions.some((q) => q.rate_tree);
 
-/** Eerstvolgende vraag met een antwoord vanaf `from` (richting `step`); schrikvragen overslaan. */
+/** Vraagnummer `from` als dat bestaat (anders null). */
 function answerIndex(from, step) {
-  for (let k = from; k >= 0 && k < state.questions.length; k += step) if (!state.questions[k].scare_only) return k;
-  return null;
+  return from >= 0 && from < state.questions.length ? from : null;
 }
 
 async function previous() {
@@ -477,7 +476,7 @@ function renderQuestion() {
       h('button', { class: 'btn btn-gold btn-lg', onclick: () => setState('lobby') }, 'Terug naar de wachtruimte'),
     )));
   }
-  if (q.scare_only) return renderScareQuestion(q, i);
+  if (inScarePhase(state.game, q)) return renderScareQuestion(q, i);
   const vpath = q.video_path || null;
   const photo = vpath ? null : state.game.photo_url;
   const isLast = i === state.questions.length - 1;
@@ -552,7 +551,7 @@ function renderScareQuestion(q, i) {
     ),
     h('div', { class: 'q-body' },
       photo && h('div', { class: 'photo' }, h('img', { src: photo, alt: '' })),
-      h('div', { class: 'q-main scare-main' }, h('h2', { class: 'q-text scare-text' }, q.text)),
+      h('div', { class: 'q-main scare-main' }, h('h2', { class: 'q-text scare-text' }, q.scare_text || 'Kijk goed…')),
     ),
     h('footer', { class: 'q-foot' },
       h('button', { class: 'btn btn-ghost', onclick: previous }, '◀ Vorige'),
@@ -562,6 +561,13 @@ function renderScareQuestion(q, i) {
   );
   mount(stage('screen-plain', bgLayer(i, Boolean(photo)), view));
   armScare(q);
+  // Na de schrik de echte vraag tonen
+  const startedAt = state.game.question_started_at;
+  const end = new Date(startedAt).getTime() + ((q.scare_after || 0) + SCARE_SECONDS) * 1000;
+  clearTimeout(state.scareTimer);
+  state.scareTimer = setTimeout(() => {
+    if (state.game.status === 'question' && state.game.current_question_id === q.id && state.game.question_started_at === startedAt) render();
+  }, Math.max(0, end - serverNow()) + 50);
 }
 
 function renderAnswersIntro() {
@@ -919,7 +925,7 @@ async function renderReveal() {
 
   const n = state.players.length;
   const mediaLink = r.key?.answer_media_url || q.media_url;
-  const view = h('div', { class: `question reveal reveal-${q.kind} ${photo || vpath ? 'has-photo' : ''}` },
+  const view = h('div', { class: `question reveal reveal-${q.kind} ${photo || vpath ? 'has-photo' : q.kind === 'open' ? 'reveal-center' : ''}` },
     h('header', { class: 'q-head' },
       h('div', { class: 'q-meta' },
         q.category && h('span', { class: 'label' }, q.category),
@@ -976,7 +982,7 @@ function revealOpen(q, key, groups) {
   return h('div', { class: 'open-answer' },
     h('div', { class: 'answer-card' },
       h('span', { class: 'mark mark-good', 'aria-hidden': 'true' }, '✓'),
-      h('span', { class: 'answer-card-text' }, (key.correct_texts || []).join(' / ')),
+      h('span', { class: 'answer-card-text' }, (key.correct_texts || [])[0] || ''),
     ),
     groups.length > 0 && h('button', {
       class: 'link groups-toggle',
@@ -1100,9 +1106,7 @@ function updateTimer() {
   const total = g.status === 'schifting' ? (g.tiebreak_names || []).length : state.players.length;
   const everyone = total > 0 && state.answered >= total;
   const btn = document.getElementById('next-btn');
-  // Schrikvraag: verder mag zodra de schrik geweest is
-  const scareDone = q?.scare_only && secondsLeft(g, q) <= q.time_limit - q.scare_after - 1;
-  if (btn) btn.disabled = state.busy || !(left <= 0 || everyone || scareDone);
+  if (btn) btn.disabled = state.busy || !(left <= 0 || everyone);
 }
 
 // ---------------------------------------------------------------- opmaak

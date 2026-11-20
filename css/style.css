@@ -963,3 +963,9 @@ body.pv-with-phone .stage { width: min(calc(100vw - 340px), calc((100dvh - 64px)
 .video-preview { width: 100%; max-width: 360px; border-radius: 12px; background: #000; }
 /* Telefoon: filmpje */
 .p-video { width: 100%; max-height: 40vh; border-radius: 12px; background: #000; display: block; }
+
+/* Antwoord bij een open vraag zonder foto: groot in het midden */
+.reveal.reveal-center .q-main { justify-content: center; align-items: center; text-align: center; }
+.reveal.reveal-center .open-answer { flex: 0 0 auto; align-items: center; }
+.reveal.reveal-center .answer-card { align-self: center; font-size: max(56px, 6cqw); padding: .4em .9em; }
+.reveal.reveal-center .groups-toggle { align-self: center; }

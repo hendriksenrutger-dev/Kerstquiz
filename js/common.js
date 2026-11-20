@@ -87,6 +87,16 @@ export async function syncClock() {
 export const serverNow = () => Date.now() + clockOffset;
 
 /** Resterende seconden (kan negatief zijn) voor de huidige vraag. */
+/** Duur van het schrikbeeld; bij een schrikvraag komt de echte vraag pas daarna. */
+export const SCARE_SECONDS = 3;
+
+/** Schrikvraag: zitten we nog vóór (of in) de schrik? Dan alleen de tekst "Kijk goed…" tonen. */
+export function inScarePhase(game, q) {
+  if (!q?.scare_only || !game?.question_started_at) return false;
+  const end = new Date(game.question_started_at).getTime() + ((q.scare_after || 0) + SCARE_SECONDS) * 1000;
+  return serverNow() < end;
+}
+
 export function secondsLeft(game, question) {
   if (!game?.question_started_at || !question) return 0;
   const end = new Date(game.question_started_at).getTime() + question.time_limit * 1000;
@@ -555,7 +565,7 @@ function musicDebug() {
 // ---------- Versie (altijd de nieuwste versie laden) ----------
 
 // Bij elke nieuwe versie ophogen, samen met version.txt en de ?v=… in index.html en de imports.
-export const APP_VERSION = '31';
+export const APP_VERSION = '32';
 
 /**
  * GitHub Pages en Safari bewaren bestanden een tijd in de cache. Is er een nieuwere

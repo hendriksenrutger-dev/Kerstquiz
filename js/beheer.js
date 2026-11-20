@@ -1,10 +1,10 @@
 // Beheer (#beheer): vragen beheren, foto's uploaden, kerstbomen toevoegen,
 // spelinstellingen en een spel starten. Licht thema; werkt op iPad en iPhone.
 import {
-  sb, h, mount, toast, LETTERS, errorText, loginForm, parseSpotify, cleanSpotifyLink, spotifyPlayer,
-} from './common.js?v=31';
-import { parseNumber, formatNumber } from './scoring.js?v=31';
-import { addTestPlayers } from './proef.js?v=31';
+  sb, h, mount, toast, LETTERS, errorText, loginForm, parseSpotify, cleanSpotifyLink, spotifyPlayer, SCARE_SECONDS,
+} from './common.js?v=32';
+import { parseNumber, formatNumber } from './scoring.js?v=32';
+import { addTestPlayers } from './proef.js?v=32';
 
 const TREE_CATEGORY = 'Van wie is deze kerstboom?';
 // Drie soorten muziekvragen (zie renderMusicForm)
@@ -302,8 +302,8 @@ function questionItem(q, i) {
     h('div', { class: 'q-info' },
       h('div', { class: 'q-tags' },
         q.category && h('span', { class: 'b-label' }, q.category),
-        !q.scare_only && h('span', { class: 'b-kind' }, KIND_LABEL[q.kind] || q.kind),
-        !q.scare_only && h('span', { class: 'muted' }, `${q.time_limit} s`),
+        h('span', { class: 'b-kind' }, KIND_LABEL[q.kind] || q.kind),
+        h('span', { class: 'muted' }, `${q.scare_only ? q.time_limit - (q.scare_after || 0) - SCARE_SECONDS : q.time_limit} s`),
         q.rate_tree && h('span', { class: 'muted' }, '★ cijfer'),
         q.tiebreak && h('span', { class: 'b-tiebreak' }, '⚖️ Schifting'),
         q.scare_after && h('span', { class: 'b-tiebreak' }, `${q.scare_path ? '🤡' : '👻'} ${q.scare_only ? 'Schrikvraag' : 'Schrik'} na ${q.scare_after} s`),
@@ -314,7 +314,7 @@ function questionItem(q, i) {
         q.media_url && h('span', { class: 'b-music' }, q.media_mode === 'verbergen' ? '♪ Spotify (afgedekt)' : q.media_mode === 'alleen_tv' ? '♪ Spotify (alleen tv)' : '♪ Spotify'),
       ),
       h('div', { class: 'q-title' }, q.text),
-      h('div', { class: 'muted q-answer' }, q.scare_only ? 'Geen antwoord, geen punten' : answerSummary(q, ans)),
+      h('div', { class: 'muted q-answer' }, answerSummary(q, ans)),
     ),
     h('div', { class: 'q-buttons' },
       h('button', { class: 'icon-btn', 'aria-label': 'Omhoog', title: 'Omhoog', disabled: i === 0, onclick: () => move(i, -1) }, '↑'),
@@ -469,7 +469,7 @@ async function logout() {
 function renderEdit(q, { scareOnly: newScare = false } = {}) {
   setScreen(null);
   const isNew = !q;
-  // Schrikvraag: alleen "Kijk goed…" in beeld, dan het schrikbeeld. Geen antwoorden, geen punten.
+  // Schrikvraag: eerst alleen "Kijk goed…" in beeld, dan het schrikbeeld, daarna de echte vraag.
   const scareOnly = q ? Boolean(q.scare_only) : newScare;
   const ans = q ? state.answers.get(q.id) : null;
   const opts = q?.options || ['', '', '', ''];
@@ -478,8 +478,11 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
   const category = h('input', { type: 'text', list: listId, value: q?.category || '', placeholder: 'Bijv. Kerstfeitje', maxlength: '60' });
   const datalist = h('datalist', { id: listId }, categorySuggestions().map((c) => h('option', { value: c })));
   const text = h('textarea', { rows: '3', required: true, maxlength: '300', placeholder: 'De vraag zoals spelers hem zien' });
-  text.value = q?.text || (scareOnly ? 'Kijk goed…' : '');
-  const time = h('input', { type: 'number', inputmode: 'numeric', min: '5', max: '600', step: '1', value: String(q?.time_limit ?? 20), class: 'input-short' });
+  text.value = q?.scare_only && !q.scare_text ? '' : q?.text || '';  // oude schrikvraag: tekst was "Kijk goed…"
+  const scareText = h('input', { type: 'text', maxlength: '80', value: q?.scare_text || (q?.scare_only ? q.text : 'Kijk goed…') });
+  // Bij een schrikvraag is de opgeslagen tijd: schrik + duur van de schrik + tijd om te antwoorden.
+  const answerTime = q?.scare_only ? q.time_limit - (q.scare_after || 0) - SCARE_SECONDS : q?.time_limit;
+  const time = h('input', { type: 'number', inputmode: 'numeric', min: '5', max: '600', step: '1', value: String(answerTime >= 5 && answerTime <= 120 ? answerTime : 20), class: 'input-short' });
   const rate = h('input', { type: 'checkbox', checked: Boolean(q?.rate_tree) });
   const scare = h('input', { type: 'number', inputmode: 'numeric', min: '1', max: '600', step: '1', value: q?.scare_after ? String(q.scare_after) : (scareOnly ? '5' : ''), placeholder: 'geen', class: 'input-short' });
 
@@ -557,7 +560,7 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
       err.textContent = '';
       const row = {
         category: category.value.trim(),
-        kind: scareOnly ? 'open' : kind,
+        kind,
         text: text.value.trim(),
         time_limit: parseInt(time.value, 10),
         rate_tree: rate.checked,
@@ -575,12 +578,14 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
 
       if (!row.text) return (err.textContent = 'Vul de vraag in.');
       if (scareOnly) {
-        // Geen antwoorden; de vraag duurt tot je op Volgende tikt.
+        // Eerst de tekst vóór de schrik, dan de schrik, daarna de echte vraag met de ingestelde tijd.
         const secs = parseInt(scare.value, 10);
-        if (!(secs >= 1 && secs <= 590)) return (err.textContent = 'Vul in na hoeveel seconden de schrik komt.');
-        row.time_limit = 600;
+        if (!(secs >= 1 && secs <= 300)) return (err.textContent = 'Vul in na hoeveel seconden de schrik komt.');
+        if (!(row.time_limit >= 5 && row.time_limit <= 290)) return (err.textContent = 'De tijd om te antwoorden moet tussen 5 en 290 seconden liggen.');
+        row.time_limit += secs + SCARE_SECONDS;
         row.scare_after = secs;
         row.scare_only = true;
+        row.scare_text = scareText.value.trim() || 'Kijk goed…';
         row.rate_tree = false;
       }
       if (!(row.time_limit >= 5 && row.time_limit <= 600)) return (err.textContent = 'De tijd moet tussen 5 en 600 seconden liggen.');
@@ -588,9 +593,7 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
       if (scareVal != null && !(scareVal >= 1 && scareVal < row.time_limit)) return (err.textContent = 'De schrik moet komen voordat de tijd om is (minimaal 1 seconde).');
       // Alleen meesturen als het is of was ingesteld (dan werkt het ook zonder 009_schrik.sql).
       if (scareVal != null || q?.scare_after) row.scare_after = scareVal;
-      if (scareOnly) {
-        // niets te controleren
-      } else if (kind === 'meerkeuze') {
+      if (kind === 'meerkeuze') {
         row.options = optionInputs.map((i) => i.value.trim());
         if (row.options.some((o) => !o)) return (err.textContent = 'Vul alle vier de opties in.');
         if (correct == null) return (err.textContent = 'Tik op de letter van het goede antwoord.');
@@ -645,9 +648,10 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
     },
   },
     h('label', {}, 'Rubriek', category, datalist),
-    !scareOnly && h('div', { class: 'stack-tight' }, h('span', { class: 'field-label' }, 'Soort'), h('div', { class: 'segmented' }, kindButtons)),
-    h('label', {}, scareOnly ? 'Tekst in beeld' : 'Vraag', text),
-    scareOnly && h('p', { class: 'hint' }, 'Op de tv en de telefoons staat alleen deze tekst, alsof er een vraag komt. Na het ingestelde aantal seconden verschijnt het schrikbeeld met een gil. Geen antwoorden, geen punten; in de antwoordenronde wordt hij overgeslagen.'),
+    scareOnly && h('label', {}, 'Tekst vóór de schrik', scareText,
+      h('span', { class: 'hint' }, 'Op de tv en de telefoons staat eerst alleen deze tekst. Na het ingestelde aantal seconden komt het schrikbeeld met een gil, en daarna de echte vraag hieronder.')),
+    h('div', { class: 'stack-tight' }, h('span', { class: 'field-label' }, 'Soort'), h('div', { class: 'segmented' }, kindButtons)),
+    h('label', {}, scareOnly ? 'Vraag (verschijnt na de schrik)' : 'Vraag', text),
     h('div', { class: 'stack-tight' }, h('span', { class: 'field-label' }, 'Foto (optioneel)'), photo.el),
     !scareOnly && h('div', { class: 'stack-tight' },
       h('span', { class: 'field-label' }, 'Foto bij het antwoord (optioneel)'),
@@ -662,12 +666,14 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
     !scareOnly && h('div', { class: 'stack-tight' },
       answerMusic.el,
       h('span', { class: 'hint' }, 'De tv toont deze speler in de antwoordenronde, bijvoorbeeld het nummer van het antwoord. Spelers zien hem pas dan.')),
-    !scareOnly && mcBlock, !scareOnly && openBlock, !scareOnly && estBlock,
-    !scareOnly && h('label', {}, 'Tijd in seconden', time),
+    mcBlock, openBlock, estBlock,
+    h('label', {}, scareOnly ? 'Tijd om te antwoorden (na de schrik), in seconden' : 'Tijd in seconden', time),
     h('fieldset', { class: 'b-fieldset' },
       h('legend', {}, scareOnly ? '👻 Schrik' : '👻 Schrikeffect (optioneel)'),
       h('label', {}, 'Na … seconden', scare),
-      h('span', { class: 'hint' }, 'Na zoveel seconden verschijnt op de tv en op de telefoons plotseling het schrikbeeld met een gil. Leeg = geen schrik. Tip: een vraag als "Kijk goed…" met een rustige foto.'),
+      h('span', { class: 'hint' }, scareOnly
+        ? 'Na zoveel seconden (vanaf het begin van de vraag) verschijnt op de tv en op de telefoons plotseling het schrikbeeld met een gil.'
+        : 'Na zoveel seconden verschijnt op de tv en op de telefoons plotseling het schrikbeeld met een gil. Leeg = geen schrik.'),
       h('span', { class: 'field-label' }, 'Schrikbeeld (foto of bewegende GIF)'),
       h('span', { class: 'hint' }, 'Zonder schrikbeeld komt er een getekende geest.'),
       scarePhoto.el),

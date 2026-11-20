@@ -1,10 +1,10 @@
 // Spelersscherm (#speler): telefoon, zonder login.
 import {
   sb, h, mount, toast, load, save, LETTERS, syncClock, secondsLeft,
-  fetchQuestions, fetchGame, errorText, liveSync, spotifyPlayer, hiddenSpotifyPlayer, brandTitle,
-} from './common.js?v=31';
-import { parseNumber, formatNumber } from './scoring.js?v=31';
-import { scheduleScare } from './schrik.js?v=31';
+  fetchQuestions, fetchGame, errorText, liveSync, spotifyPlayer, hiddenSpotifyPlayer, brandTitle, inScarePhase,
+} from './common.js?v=32';
+import { parseNumber, formatNumber } from './scoring.js?v=32';
+import { scheduleScare } from './schrik.js?v=32';
 
 const PLAYER_KEY = 'kerstquiz_speler';
 
@@ -142,7 +142,7 @@ async function render() {
     }
   }
   const timeUp = q ? secondsLeft(g, q) <= 0 : false;
-  const key = `${g.status}|${g.current_question_id}|${g.question_started_at}|${timeUp}|${g.photo_url || ''}|${g.video_url || ''}|${(g.tiebreak_names || []).join(',')}|${JSON.stringify(g.winners || null)}`;
+  const key = `${g.status}|${g.current_question_id}|${g.question_started_at}|${timeUp}|${g.photo_url || ''}|${g.video_url || ''}|${q ? inScarePhase(g, q) : ''}|${(g.tiebreak_names || []).join(',')}|${JSON.stringify(g.winners || null)}`;
   if (key === state.screen) return;
   state.screen = key;
   state.timeUp = timeUp;
@@ -184,6 +184,7 @@ function tick() {
   const t = document.getElementById('p-timer');
   if (t) t.textContent = `${Math.max(0, Math.ceil(left))} s`;
   if (left <= 0 && !state.timeUp) render();
+  else if (q?.scare_only) render(); // na de schrik: de echte vraag tonen (render doet niets als er niets verandert)
 }
 
 // ---------------------------------------------------------------- schermen
@@ -211,11 +212,11 @@ function renderWaiting() {
 }
 
 function renderQuestion(q) {
-  if (q.scare_only) {
-    // Schrikvraag: alleen de tekst, alsof er een vraag komt
+  if (inScarePhase(state.game, q)) {
+    // Schrikvraag: eerst alleen de tekst, alsof er een vraag komt; na de schrik de echte vraag
     return mount(h('div', { class: 'phone-page' },
       h('div', { class: 'phone-body center stack scare-phone' },
-        h('p', { class: 'scare-phone-text' }, q.text),
+        h('p', { class: 'scare-phone-text' }, q.scare_text || 'Kijk goed…'),
         h('p', { class: 'muted' }, 'Kijk naar het grote scherm'),
       ),
     ));
