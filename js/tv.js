@@ -4,12 +4,12 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer, inScarePhase, serverNow, SCARE_SECONDS,
-} from './common.js?v=35';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=35';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=35';
+} from './common.js?v=36';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=36';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=36';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking,
-} from './scoring.js?v=35';
+} from './scoring.js?v=36';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -905,16 +905,18 @@ async function renderReveal() {
 
   let body;
   let winners;
+  // Alleen de antwoordfoto/-filmpje tonen, zonder antwoordtekst (in beheer aangevinkt)
+  const photoOnly = Boolean(r.key?.hide_answer_text && (photo || vpath) && q.kind !== 'schatting');
   if (!r.key) {
     winners = new Set();
     body = h('p', { class: 'lead muted' }, 'Bij deze vraag is nog geen goed antwoord ingevuld in beheer.');
   } else if (q.kind === 'meerkeuze') {
     winners = choiceWinners(r.answers, r.key.correct_option);
-    body = revealChoice(q, r.key.correct_option);
+    body = photoOnly ? null : revealChoice(q, r.key.correct_option);
   } else if (q.kind === 'open') {
     const groups = judgeOpen(r.answers, r.key.correct_texts, r.overrides);
     winners = new Set(groups.filter((g) => g.correct).flatMap((g) => g.playerIds));
-    body = revealOpen(q, r.key, groups);
+    body = revealOpen(q, r.key, groups, photoOnly);
   } else {
     winners = estimateWinners(r.answers, r.key.correct_value);
     body = revealEstimate(q, r.key, r.answers, winners);
@@ -922,7 +924,7 @@ async function renderReveal() {
 
   const n = state.players.length;
   const mediaLink = r.key?.answer_media_url || null;  // alleen het nummer dat bij het antwoord is ingevuld
-  const view = h('div', { class: `question reveal reveal-${q.kind} ${photo || vpath ? 'has-photo' : q.kind === 'open' ? 'reveal-center' : ''}` },
+  const view = h('div', { class: `question reveal reveal-${q.kind} ${photo || vpath ? 'has-photo' : q.kind === 'open' ? 'reveal-center' : ''} ${photoOnly ? 'photo-only' : ''}` },
     h('header', { class: 'q-head' },
       h('div', { class: 'q-meta' },
         q.category && h('span', { class: 'label' }, q.category),
@@ -960,7 +962,7 @@ function revealChoice(q, correct) {
   }));
 }
 
-function revealOpen(q, key, groups) {
+function revealOpen(q, key, groups, hideCard = false) {
   // De ingezonden antwoorden staan standaard dicht; de quizmaster kan ze openklappen om iets goed/fout te rekenen.
   const open = state.showGroups === q.id;
   const list = groups.length
@@ -977,7 +979,7 @@ function revealOpen(q, key, groups) {
     )))
     : h('p', { class: 'muted small' }, 'Niemand heeft deze vraag beantwoord.');
   return h('div', { class: 'open-answer' },
-    h('div', { class: 'answer-card' },
+    !hideCard && h('div', { class: 'answer-card' },
       h('span', { class: 'mark mark-good', 'aria-hidden': 'true' }, '✓'),
       h('span', { class: 'answer-card-text' }, (key.correct_texts || [])[0] || ''),
     ),
