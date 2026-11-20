@@ -4,12 +4,12 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer, inScarePhase, serverNow, SCARE_SECONDS,
-} from './common.js?v=33';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=33';
-import { scheduleScare } from './schrik.js?v=33';
+} from './common.js?v=34';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=34';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=34';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking,
-} from './scoring.js?v=33';
+} from './scoring.js?v=34';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -73,6 +73,7 @@ async function afterLogin() {
     const all = await fetchQuestions();
     state.questions = all.filter((q) => !q.tiebreak);
     state.tiebreaks = all.filter((q) => q.tiebreak);
+    prepareScareAudio(state.questions);  // alleen als er een schrik in de quiz zit
     // Muziek bij de start en het einde (Beheer → Spelinstellingen); ontbreekt de tabel/kolom, dan geen muziek.
     const { data: settings } = await sb.from('settings').select('*').eq('id', 1).maybeSingle();
     state.music = { start: settings?.start_music || null, end: settings?.end_music || null };

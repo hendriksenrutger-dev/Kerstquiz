@@ -1,13 +1,20 @@
 // Schrikeffect: na een ingesteld aantal seconden verschijnt plotseling een geest met een gil.
 // Werkt op de tv en op de telefoons, op basis van de starttijd van de vraag (serverklok).
 
-import { serverNow } from './common.js?v=33';
+import { serverNow } from './common.js?v=34';
 
 let ctx = null;
 let timer = null;
 let timerKey = '';
 
-/** Geluid vrijgeven: browsers spelen pas geluid af na een tik van de gebruiker. */
+/**
+ * Geluid voor de gil vrijgeven: browsers spelen pas geluid af na een tik van de gebruiker.
+ * Alleen als de quiz een schrik heeft, en maar één keer: daarna staat het geluidskanaal
+ * weer op pauze. Op de iPad kan een actief geluidskanaal anders Spotify stilzetten.
+ */
+const UNLOCK_EVENTS = ['pointerdown', 'touchend', 'keydown'];
+let listening = false;
+
 function unlock() {
   try {
     if (!ctx) {
@@ -20,9 +27,18 @@ function unlock() {
     const b = ctx.createBuffer(1, 1, 22050);
     const s = ctx.createBufferSource();
     s.buffer = b; s.connect(ctx.destination); s.start(0);
+    setTimeout(() => { try { ctx.suspend(); } catch { /* */ } }, 300);
+    UNLOCK_EVENTS.forEach((ev) => document.removeEventListener(ev, unlock, { capture: true }));
+    listening = false;
   } catch { /* geen geluid mogelijk */ }
 }
-['pointerdown', 'touchend', 'keydown'].forEach((ev) => document.addEventListener(ev, unlock, { capture: true, passive: true }));
+
+/** Aanroepen met de vragenlijst: alleen bij een schrik wordt het geluid (één keer) vrijgegeven. */
+export function prepareScareAudio(questions) {
+  if (ctx || listening || !(questions || []).some((q) => q.scare_after)) return;
+  listening = true;
+  UNLOCK_EVENTS.forEach((ev) => document.addEventListener(ev, unlock, { capture: true, passive: true }));
+}
 
 /**
  * Plan de schrik voor deze vraag (of annuleer een oude).
@@ -91,8 +107,14 @@ export function showScare(imageUrl = null) {
 
 /** Een gil, opgebouwd met de geluidschip (geen geluidsbestand nodig). */
 function scream() {
-  if (!ctx) unlock();
   if (!ctx) return;
+  const go = () => playScream();
+  if (ctx.state === 'suspended') ctx.resume().then(go, go); else go();
+  // na de gil het geluidskanaal weer op pauze (zodat Spotify ongestoord kan spelen)
+  setTimeout(() => { try { ctx.suspend(); } catch { /* */ } }, 2600);
+}
+
+function playScream() {
   try {
     const t = ctx.currentTime + 0.02;
     const dur = 1.9;
