@@ -4,12 +4,12 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer, inScarePhase, serverNow, SCARE_SECONDS,
-} from './common.js?v=38';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=38';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=38';
+} from './common.js?v=39';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=39';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=39';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking,
-} from './scoring.js?v=38';
+} from './scoring.js?v=39';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -504,7 +504,7 @@ function renderQuestion() {
       vpath && videoSlot(vpath),
       h('div', { class: 'q-main' },
         h('h2', { class: 'q-text' }, q.text),
-        q.media_url && mediaSlot(q.media_url, q.media_mode),
+        q.media_url && q.media_mode !== 'alleen_geluid' && mediaSlot(q.media_url, q.media_mode),
         q.kind === 'meerkeuze' && h('div', { class: 'options' }, options),
       ),
     ),
@@ -944,7 +944,7 @@ async function renderReveal() {
     ),
     h('footer', { class: 'q-foot' },
       h('button', { class: 'btn btn-ghost', onclick: previous }, '◀ Vorige'),
-      mediaLink && mediaSlot(mediaLink, 'tonen', 'media-foot'),
+      mediaLink && !r.key?.answer_media_hidden && mediaSlot(mediaLink, 'tonen', 'media-foot'),
       h('button', { class: 'btn btn-gold btn-lg', onclick: () => { if (isLast) playMusic(state.music?.end); next(); } }, isLast ? 'Einde antwoordenronde ▶' : 'Volgende antwoord ▶'),
     ),
   );
