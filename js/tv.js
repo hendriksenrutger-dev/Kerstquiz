@@ -4,12 +4,12 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer, inScarePhase, serverNow, SCARE_SECONDS,
-} from './common.js?v=32';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=32';
-import { scheduleScare } from './schrik.js?v=32';
+} from './common.js?v=33';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=33';
+import { scheduleScare } from './schrik.js?v=33';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking,
-} from './scoring.js?v=32';
+} from './scoring.js?v=33';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -924,7 +924,7 @@ async function renderReveal() {
   }
 
   const n = state.players.length;
-  const mediaLink = r.key?.answer_media_url || q.media_url;
+  const mediaLink = r.key?.answer_media_url || null;  // alleen het nummer dat bij het antwoord is ingevuld
   const view = h('div', { class: `question reveal reveal-${q.kind} ${photo || vpath ? 'has-photo' : q.kind === 'open' ? 'reveal-center' : ''}` },
     h('header', { class: 'q-head' },
       h('div', { class: 'q-meta' },
@@ -1298,7 +1298,7 @@ async function loadKeys() {
 
 function mediaLinkFor(status, q) {
   if (!q) return null;
-  if (status === 'answers') return state.keys?.get(q.id)?.answer_media_url || q.media_url || null;
+  if (status === 'answers') return state.keys?.get(q.id)?.answer_media_url || null;
   if (status === 'question') return q.media_url || null;
   return null;
 }

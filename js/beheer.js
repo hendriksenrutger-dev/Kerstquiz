@@ -2,9 +2,9 @@
 // spelinstellingen en een spel starten. Licht thema; werkt op iPad en iPhone.
 import {
   sb, h, mount, toast, LETTERS, errorText, loginForm, parseSpotify, cleanSpotifyLink, spotifyPlayer, SCARE_SECONDS,
-} from './common.js?v=32';
-import { parseNumber, formatNumber } from './scoring.js?v=32';
-import { addTestPlayers } from './proef.js?v=32';
+} from './common.js?v=33';
+import { parseNumber, formatNumber } from './scoring.js?v=33';
+import { addTestPlayers } from './proef.js?v=33';
 
 const TREE_CATEGORY = 'Van wie is deze kerstboom?';
 // Drie soorten muziekvragen (zie renderMusicForm)
@@ -546,7 +546,7 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
   // Standaard afdekken: de speler toont titel en artiest en zou het antwoord kunnen verraden.
   const currentMode = q?.media_url ? (q.media_mode || 'tonen') : 'verbergen';
   const modeSelect = h('select', { class: 'b-select' }, MEDIA_MODES.map((m) => h('option', { value: m.value, selected: currentMode === m.value }, m.label)));
-  const modeField = h('label', {}, 'Speler tijdens de vraag', modeSelect, h('span', { class: 'hint' }, 'De Spotify-speler toont titel en artiest. Kies "tonen" alleen als dat het antwoord niet verraadt. Bij het antwoord is de speler altijd zichtbaar.'));
+  const modeField = h('label', {}, 'Speler tijdens de vraag', modeSelect, h('span', { class: 'hint' }, 'De Spotify-speler toont titel en artiest. Kies "tonen" alleen als dat het antwoord niet verraadt. In de antwoordenronde speelt alleen de Spotify-link bij het antwoord (als je die invult).'));
   const err = h('p', { class: 'form-error', role: 'alert' });
   const saveBtn = h('button', { class: 'btn btn-green btn-lg', type: 'submit' }, 'Opslaan');
 
