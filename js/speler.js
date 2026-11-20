@@ -2,9 +2,9 @@
 import {
   sb, h, mount, toast, load, save, LETTERS, syncClock, secondsLeft,
   fetchQuestions, fetchGame, errorText, liveSync, spotifyPlayer, hiddenSpotifyPlayer, brandTitle, inScarePhase,
-} from './common.js?v=38';
-import { parseNumber, formatNumber } from './scoring.js?v=38';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=38';
+} from './common.js?v=39';
+import { parseNumber, formatNumber } from './scoring.js?v=39';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=39';
 
 // Telefoon: geluid voor een eventuele schrik bij de eerste tik vrijgeven (één keer)
 prepareScareAudio([{ scare_after: 1 }]);
@@ -237,7 +237,7 @@ function renderQuestion(q) {
       q.category && h('span', { class: 'label' }, q.category),
       h('h2', { class: 'p-question' }, q.text),
       state.game.video_url ? phoneVideo(state.game.video_url) : photo && h('img', { class: 'p-photo', src: photo, alt: '' }),
-      q.media_url && phonePlayer(q),
+      q.media_url && q.media_mode !== 'alleen_geluid' && phonePlayer(q),
       twoStep(q)
         ? [h('div', { id: 'p-step1' }, answerArea), ratingStep(q)]
         : [answerArea, q.rate_tree && ratingArea(q)],

@@ -2,9 +2,9 @@
 // spelinstellingen en een spel starten. Licht thema; werkt op iPad en iPhone.
 import {
   sb, h, mount, toast, LETTERS, errorText, loginForm, parseSpotify, cleanSpotifyLink, spotifyPlayer, SCARE_SECONDS,
-} from './common.js?v=38';
-import { parseNumber, formatNumber } from './scoring.js?v=38';
-import { addTestPlayers } from './proef.js?v=38';
+} from './common.js?v=39';
+import { parseNumber, formatNumber } from './scoring.js?v=39';
+import { addTestPlayers } from './proef.js?v=39';
 
 const TREE_CATEGORY = 'Van wie is deze kerstboom?';
 // Drie soorten muziekvragen (zie renderMusicForm)
@@ -17,6 +17,7 @@ const MEDIA_MODES = [
   { value: 'tonen', label: 'Speler tonen op tv en telefoons' },
   { value: 'verbergen', label: 'Speler afdekken (titel en artiest niet zichtbaar)' },
   { value: 'alleen_tv', label: 'Alleen op de tv, niet op de telefoons' },
+  { value: 'alleen_geluid', label: 'Alleen geluid: geen speler in beeld (muziek via de tv)' },
 ];
 const DEFAULT_CATEGORIES = [TREE_CATEGORY, ...Object.values(MUSIC).map((m) => m.category), 'In welke stad staat deze kerstboom?', 'Kerstfeitje'];
 const KINDS = [
@@ -311,7 +312,7 @@ function questionItem(q, i) {
         ans?.answer_media_url && h('span', { class: 'muted' }, '♪ antwoordnummer'),
         q.video_path && h('span', { class: 'muted' }, '🎬 filmpje'),
         ans?.answer_video_path && h('span', { class: 'muted' }, '🎬 antwoordfilmpje'),
-        q.media_url && h('span', { class: 'b-music' }, q.media_mode === 'verbergen' ? '♪ Spotify (afgedekt)' : q.media_mode === 'alleen_tv' ? '♪ Spotify (alleen tv)' : '♪ Spotify'),
+        q.media_url && h('span', { class: 'b-music' }, q.media_mode === 'verbergen' ? '♪ Spotify (afgedekt)' : q.media_mode === 'alleen_tv' ? '♪ Spotify (alleen tv)' : q.media_mode === 'alleen_geluid' ? '♪ Spotify (alleen geluid)' : '♪ Spotify'),
       ),
       h('div', { class: 'q-title' }, q.text),
       h('div', { class: 'muted q-answer' }, answerSummary(q, ans)),
@@ -544,6 +545,7 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
   const answerVideo = videoPicker(ans?.answer_video_path ? state.thumbs.get(ans.answer_video_path) : null, '🎬 Filmpje bij het antwoord (optioneel)');
   const music = spotifyField(q?.media_url || '');
   const answerMusic = spotifyField(ans?.answer_media_url || '', { label: 'Spotify-link bij het antwoord (optioneel)' });
+  const answerSoundOnly = h('input', { type: 'checkbox', checked: Boolean(ans?.answer_media_hidden) });
   // Standaard afdekken: de speler toont titel en artiest en zou het antwoord kunnen verraden.
   const currentMode = q?.media_url ? (q.media_mode || 'tonen') : 'verbergen';
   const modeSelect = h('select', { class: 'b-select' }, MEDIA_MODES.map((m) => h('option', { value: m.value, selected: currentMode === m.value }, m.label)));
@@ -576,6 +578,7 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
       const answerLink = answerMusic.value();
       if (answerLink === false) return (err.textContent = 'De Spotify-link bij het antwoord wordt niet herkend.');
       const answerRow = { correct_option: null, correct_texts: null, correct_value: null };
+      if (answerSoundOnly.checked || ans?.answer_media_hidden) answerRow.answer_media_hidden = answerSoundOnly.checked;
       // Alleen meesturen als het aan staat of stond (dan werkt het ook zonder 013_antwoord_alleen_foto.sql).
       if (hideText.checked || ans?.hide_answer_text) answerRow.hide_answer_text = hideText.checked;
 
@@ -668,9 +671,10 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
       h('span', { class: 'hint' }, 'Een filmpje start vanzelf met geluid op de tv en de telefoons, op de plek van de foto. Maximaal 50 MB (ongeveer een halve tot een hele minuut).')),
     music.el,
     modeField,
-    !scareOnly && h('div', { class: 'stack-tight' },
+    h('div', { class: 'stack-tight' },
       answerMusic.el,
-      h('span', { class: 'hint' }, 'De tv toont deze speler in de antwoordenronde, bijvoorbeeld het nummer van het antwoord. Spelers zien hem pas dan.')),
+      h('span', { class: 'hint' }, 'Dit nummer speelt in de antwoordenronde, bijvoorbeeld het nummer van het antwoord.'),
+      h('label', { class: 'check' }, answerSoundOnly, 'Alleen geluid: geen speler in beeld bij het antwoord')),
     mcBlock, openBlock, estBlock,
     h('label', {}, scareOnly ? 'Tijd om te antwoorden (na de schrik), in seconden' : 'Tijd in seconden', time),
     h('fieldset', { class: 'b-fieldset' },

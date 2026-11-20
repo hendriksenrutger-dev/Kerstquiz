@@ -1017,3 +1017,6 @@ body.pv-with-phone .stage { width: min(calc(100vw - 340px), calc((100dvh - 64px)
 .reveal .groups-toggle { opacity: .7; }
 .question.reveal .option.is-correct { box-shadow: none; transform: none; }
 .question.reveal .open-answer { flex: 0 0 auto; }
+
+/* Antwoord naast een foto: tekst iets meer naar rechts voor een betere spreiding */
+.question.reveal.has-photo .q-main { padding-left: 4cqw; padding-right: 2cqw; }
