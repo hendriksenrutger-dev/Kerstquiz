@@ -4,12 +4,12 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer,
-} from './common.js?v=30';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=30';
-import { scheduleScare } from './schrik.js?v=30';
+} from './common.js?v=31';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=31';
+import { scheduleScare } from './schrik.js?v=31';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking,
-} from './scoring.js?v=30';
+} from './scoring.js?v=31';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -221,6 +221,8 @@ async function goTo(status, index) {
   // Muziek van het volgende scherm meteen starten, nog binnen de tik op de knop.
   const link = mediaLinkFor(status, q);
   if (link) playMedia(link); else stopMedia();
+  const vpath = videoPathFor(status, q);
+  if (vpath) playVideo(vpath); else stopVideos();
   state.busy = true;
   try {
     // In de antwoordenronde: de foto bij het antwoord, als die er is.
@@ -233,6 +235,12 @@ async function goTo(status, index) {
     if (path) {
       const { data } = await sb.storage.from('fotos').createSignedUrl(path, SIGNED_URL_SECONDS);
       photoUrl = data?.signedUrl || null;
+    }
+    // Filmpje: tijdelijke link voor de telefoons (vóór de vraag start)
+    const videoUrl = vpath ? await videoUrlFor(vpath) : null;
+    if ((videoUrl || null) !== (state.game.video_url || null)) {
+      await sb.from('games').update({ video_url: videoUrl }).eq('id', state.game.id);
+      state.game = { ...state.game, video_url: videoUrl };
     }
     // Schrikbeeld: tijdelijke link klaarzetten voor de telefoons (vóór de vraag start)
     if (status === 'question' && q.scare_after && q.scare_path) {
@@ -258,8 +266,8 @@ async function scareUrlFor(q) {
 }
 
 async function setState(status, questionId = null, photoUrl = null) {
-  if (status !== 'question' && status !== 'answers') stopMedia();
-  else if (!questionId) stopMedia();
+  if (status !== 'question' && status !== 'answers') { stopMedia(); stopVideos(); }
+  else if (!questionId) { stopMedia(); stopVideos(); }
   const { data, error } = await sb.rpc('set_game_state', {
     p_game_id: state.game.id, p_status: status, p_question_id: questionId, p_photo_url: photoUrl,
   });
@@ -470,7 +478,8 @@ function renderQuestion() {
     )));
   }
   if (q.scare_only) return renderScareQuestion(q, i);
-  const photo = state.game.photo_url;
+  const vpath = q.video_path || null;
+  const photo = vpath ? null : state.game.photo_url;
   const isLast = i === state.questions.length - 1;
 
   const options = (q.options || []).map((text, k) =>
@@ -479,7 +488,7 @@ function renderQuestion() {
       h('span', { class: 'option-text' }, h('span', { class: 'sr-only' }, `${LETTERS[k]}: `), text),
     ));
 
-  const view = h('div', { class: `question ${photo ? 'has-photo' : ''}` },
+  const view = h('div', { class: `question ${photo || vpath ? 'has-photo' : ''}` },
     h('header', { class: 'q-head' },
       h('div', { class: 'q-meta' },
         q.category && h('span', { class: 'label' }, q.category),
@@ -492,6 +501,7 @@ function renderQuestion() {
     ),
     h('div', { class: 'q-body' },
       photo && h('div', { class: 'photo' }, h('img', { src: photo, alt: '' })),
+      vpath && videoSlot(vpath),
       h('div', { class: 'q-main' },
         h('h2', { class: 'q-text' }, q.text),
         q.media_url && mediaSlot(q.media_url, q.media_mode),
@@ -886,7 +896,8 @@ async function renderReveal() {
   const q = state.questions[i];
   if (!q) return renderAnswersIntro();
   const r = state.reveal;
-  const photo = state.game.photo_url;
+  const vpath = r.key?.answer_video_path || null;
+  const photo = vpath ? null : state.game.photo_url;
   const isLast = answerIndex(i + 1, 1) == null;
 
   let body;
@@ -908,7 +919,7 @@ async function renderReveal() {
 
   const n = state.players.length;
   const mediaLink = r.key?.answer_media_url || q.media_url;
-  const view = h('div', { class: `question reveal reveal-${q.kind} ${photo ? 'has-photo' : ''}` },
+  const view = h('div', { class: `question reveal reveal-${q.kind} ${photo || vpath ? 'has-photo' : ''}` },
     h('header', { class: 'q-head' },
       h('div', { class: 'q-meta' },
         q.category && h('span', { class: 'label' }, q.category),
@@ -920,6 +931,7 @@ async function renderReveal() {
     ),
     h('div', { class: 'q-body' },
       photo && h('div', { class: 'photo' }, h('img', { src: photo, alt: '' })),
+      vpath && videoSlot(vpath),
       h('div', { class: 'q-main' },
         h('h2', { class: 'q-text q-text-small' }, q.text),
         body,
@@ -1166,6 +1178,10 @@ async function startPreview(id) {
   state.players = [];
   clearInterval(state.tick);
   state.tick = setInterval(updateTimer, 250);
+  // Filmpje van de eerste vraag alvast starten (zonder tik mogelijk zonder geluid)
+  const first = preview.list[preview.index];
+  const vp = first && !first.tiebreak ? videoPathFor('question', first) : null;
+  if (vp) playVideo(vp);
   await showPreview();
 }
 
@@ -1227,6 +1243,8 @@ function previewChrome(q) {
     const t = preview.list[preview.index];
     const link = t && !t.tiebreak ? mediaLinkFor(preview.mode === 'antwoord' ? 'answers' : 'question', t) : null;
     if (link) playMedia(link); else stopMedia();
+    const vp = t && !t.tiebreak ? videoPathFor(preview.mode === 'antwoord' ? 'answers' : 'question', t) : null;
+    if (vp) playVideo(vp); else stopVideos();
   };
   const go = (d) => { preview.index = (preview.index + d + n) % n; previewMedia(); showPreview(); };
   const normal = state.questions.length;
@@ -1295,6 +1313,7 @@ function deckFor(link) {
 }
 
 function preloadDeck() {
+  preloadVideos();
   for (const q of state.questions) {
     deckFor(q.media_url);
     deckFor(state.keys?.get(q.id)?.answer_media_url);
@@ -1348,6 +1367,86 @@ function placeDeck() {
 window.addEventListener('resize', () => requestAnimationFrame(placeDeck));
 document.addEventListener('fullscreenchange', () => setTimeout(placeDeck, 300));
 setInterval(placeDeck, 1000);
+
+// ---------------------------------------------------------------- filmpjes
+
+/** Filmpjes vooraf geladen (pad → <video>), zodat ze binnen de tik op "Volgende" kunnen starten. */
+const videos = new Map();
+let videoBox = null;
+
+function videoPathFor(status, q) {
+  if (!q || q.scare_only) return null;
+  if (status === 'answers') return state.keys?.get(q.id)?.answer_video_path || null;
+  if (status === 'question') return q.video_path || null;
+  return null;
+}
+
+function videoFor(path) {
+  if (!path) return null;
+  let v = videos.get(path);
+  if (!v) {
+    if (!videoBox) { videoBox = h('div', { id: 'video-deck' }); document.body.append(videoBox); }
+    const el = h('video', { class: 'deck-video', playsinline: true, controls: true, preload: 'auto', 'data-path': path });
+    v = { el, url: null, ready: null };
+    v.ready = sb.storage.from('fotos').createSignedUrl(path, SIGNED_URL_SECONDS).then(({ data }) => {
+      v.url = data?.signedUrl || null;
+      if (v.url) el.src = v.url;
+      return v.url;
+    }).catch(() => null);
+    videos.set(path, v);
+    videoBox.append(el);
+  }
+  return v;
+}
+
+async function videoUrlFor(path) {
+  const v = videoFor(path);
+  return v ? (v.url || await v.ready) : null;
+}
+
+function preloadVideos() {
+  for (const q of state.questions) {
+    videoFor(q.video_path);
+    videoFor(state.keys?.get(q.id)?.answer_video_path);
+  }
+}
+
+/** Starten met geluid (binnen een tik); lukt dat niet, dan zonder geluid (via de knop aanzetten). */
+function playVideo(path) {
+  for (const [p, v] of videos) if (p !== path) v.el.pause();
+  const v = videoFor(path);
+  if (!v) return;
+  const el = v.el;
+  el.muted = false;
+  try { el.currentTime = 0; } catch { /* nog niet geladen */ }
+  const go = () => el.play()?.catch(() => { el.muted = true; el.play()?.catch(() => {}); });
+  if (el.src) go(); else v.ready.then(go);
+}
+
+function stopVideos() {
+  for (const v of videos.values()) v.el.pause();
+}
+
+/** Vak voor het filmpje (op de plek van de foto); het filmpje zelf wordt erboven gelegd. */
+function videoSlot(path) {
+  videoFor(path);
+  requestAnimationFrame(placeVideos);
+  return h('div', { class: 'photo video-slot', 'data-path': path });
+}
+
+function placeVideos() {
+  const slot = document.querySelector('.video-slot');
+  const r = slot ? slot.getBoundingClientRect() : null;
+  for (const [p, v] of videos) {
+    const on = slot && slot.dataset.path === p && r.width > 0;
+    v.el.classList.toggle('video-show', Boolean(on));
+    if (on) Object.assign(v.el.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
+    else Object.assign(v.el.style, { left: '', top: '', width: '', height: '' });
+  }
+}
+window.addEventListener('resize', () => requestAnimationFrame(placeVideos));
+document.addEventListener('fullscreenchange', () => setTimeout(placeVideos, 300));
+setInterval(placeVideos, 1000);
 
 // ---------------------------------------------------------------- achtergronden
 

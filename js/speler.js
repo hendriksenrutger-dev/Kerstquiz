@@ -2,9 +2,9 @@
 import {
   sb, h, mount, toast, load, save, LETTERS, syncClock, secondsLeft,
   fetchQuestions, fetchGame, errorText, liveSync, spotifyPlayer, hiddenSpotifyPlayer, brandTitle,
-} from './common.js?v=30';
-import { parseNumber, formatNumber } from './scoring.js?v=30';
-import { scheduleScare } from './schrik.js?v=30';
+} from './common.js?v=31';
+import { parseNumber, formatNumber } from './scoring.js?v=31';
+import { scheduleScare } from './schrik.js?v=31';
 
 const PLAYER_KEY = 'kerstquiz_speler';
 
@@ -142,7 +142,7 @@ async function render() {
     }
   }
   const timeUp = q ? secondsLeft(g, q) <= 0 : false;
-  const key = `${g.status}|${g.current_question_id}|${g.question_started_at}|${timeUp}|${g.photo_url || ''}|${(g.tiebreak_names || []).join(',')}|${JSON.stringify(g.winners || null)}`;
+  const key = `${g.status}|${g.current_question_id}|${g.question_started_at}|${timeUp}|${g.photo_url || ''}|${g.video_url || ''}|${(g.tiebreak_names || []).join(',')}|${JSON.stringify(g.winners || null)}`;
   if (key === state.screen) return;
   state.screen = key;
   state.timeUp = timeUp;
@@ -232,7 +232,7 @@ function renderQuestion(q) {
     h('div', { class: 'phone-body stack' },
       q.category && h('span', { class: 'label' }, q.category),
       h('h2', { class: 'p-question' }, q.text),
-      photo && h('img', { class: 'p-photo', src: photo, alt: '' }),
+      state.game.video_url ? phoneVideo(state.game.video_url) : photo && h('img', { class: 'p-photo', src: photo, alt: '' }),
       q.media_url && phonePlayer(q),
       twoStep(q)
         ? [h('div', { id: 'p-step1' }, answerArea), ratingStep(q)]
@@ -421,6 +421,7 @@ function renderDone() {
   mount(h('div', { class: 'phone-page' },
     topBar(q),
     h('div', { class: 'phone-body center stack' },
+      state.game.video_url && phoneVideo(state.game.video_url),
       h('div', { class: `done-icon ${answered ? 'ok' : ''}`, 'aria-hidden': 'true' }, answered ? '✓' : '⏱'),
       h('p', { class: 'big' }, answered ? 'Antwoord ontvangen' : 'De tijd is om'),
       answered && h('p', { class: 'muted' }, `Jouw antwoord: ${mineText(q)}`),
@@ -446,7 +447,32 @@ function renderStarting() {
   ));
 }
 
+/**
+ * Filmpje op de telefoon. Hetzelfde element blijft bewaard zolang het filmpje gelijk is,
+ * zodat het doorspeelt als het scherm opnieuw wordt opgebouwd.
+ */
+let videoEl = null;
+function phoneVideo(url) {
+  const key = url.split('?')[0];
+  if (videoEl?.dataset.key === key) return videoEl;
+  videoEl?.pause();
+  const el = h('video', { class: 'p-video', src: url, playsinline: true, controls: true, preload: 'auto', 'data-key': key });
+  videoEl = el;
+  // Met geluid starten; mag dat niet (iPhone zonder tik), dan zonder geluid: spelers tikken zelf op 🔊.
+  el.play()?.catch(() => { el.muted = true; el.play()?.catch(() => {}); });
+  return el;
+}
+
 function renderLookUp(icon = '★', text = 'Kijk naar het grote scherm') {
+  if (state.game?.status === 'answers' && state.game.video_url) {
+    return mount(h('div', { class: 'phone-page' },
+      h('header', { class: 'p-top' }, h('span', {}), h('span', {}), h('span', { class: 'p-name' }, state.player.name)),
+      h('div', { class: 'phone-body center stack' },
+        phoneVideo(state.game.video_url),
+        h('p', { class: 'lead' }, text),
+      ),
+    ));
+  }
   mount(h('div', { class: 'phone-page' },
     h('header', { class: 'p-top' }, h('span', {}), h('span', {}), h('span', { class: 'p-name' }, state.player.name)),
     h('div', { class: 'phone-body center stack' },
