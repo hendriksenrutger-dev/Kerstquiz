@@ -559,9 +559,26 @@ body.beheer {
 
 .q-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .q-item {
-  display: grid; grid-template-columns: auto auto 1fr auto; align-items: center; gap: 14px; padding: 12px 14px;
+  display: grid; grid-template-columns: auto auto auto 1fr; align-items: center; gap: 8px 14px; padding: 12px 14px;
+  grid-template-areas: 'handle num thumb info' 'handle num thumb buttons';
+  transition: transform .15s ease;
 }
-.q-num { font-weight: 700; color: var(--b-muted); min-width: 1.6em; text-align: right; }
+.q-item > .drag-handle { grid-area: handle; }
+.q-item > .q-num { grid-area: num; }
+.q-item > .q-thumb { grid-area: thumb; }
+.q-item > .q-info { grid-area: info; }
+.q-item > .q-buttons { grid-area: buttons; justify-content: flex-start; }
+.q-item.dragging { transition: none; position: relative; z-index: 5; box-shadow: 0 12px 30px rgba(0, 0, 0, .25); opacity: .95; }
+.q-num {
+  font: inherit; font-weight: 700; color: var(--b-muted); min-width: 2em; text-align: center;
+  background: none; border: 1.5px dashed transparent; border-radius: 8px; padding: 6px 4px; cursor: pointer;
+}
+.q-num:hover { border-color: var(--b-border); }
+.drag-handle {
+  width: 36px; height: 52px; border: 0; border-radius: 8px; background: var(--beheer-bg); color: var(--b-muted);
+  font-size: 22px; line-height: 1; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none;
+}
+.drag-handle:active { cursor: grabbing; }
 .q-thumb { width: 64px; height: 64px; border-radius: 10px; object-fit: cover; border: 2px solid var(--gold); }
 .q-thumb-empty { border: 1.5px dashed var(--b-border); background: var(--beheer-bg); }
 .q-info { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
@@ -576,7 +593,8 @@ body.beheer {
 .icon-btn:disabled { opacity: .3; cursor: not-allowed; }
 
 @media (max-width: 640px) {
-  .q-item { grid-template-columns: auto 1fr; grid-template-areas: 'thumb info' 'buttons buttons'; }
+  .q-item { grid-template-columns: auto auto 1fr; grid-template-areas: 'handle thumb info' 'buttons buttons buttons'; }
+  .drag-handle { grid-area: handle; }
   .q-num { display: none; }
   .q-thumb { grid-area: thumb; width: 56px; height: 56px; }
   .q-info { grid-area: info; }
