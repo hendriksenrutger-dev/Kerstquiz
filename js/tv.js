@@ -4,12 +4,12 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer, inScarePhase, serverNow, SCARE_SECONDS,
-} from './common.js?v=32';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=32';
-import { scheduleScare } from './schrik.js?v=32';
+} from './common.js?v=33';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=33';
+import { scheduleScare } from './schrik.js?v=33';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking,
-} from './scoring.js?v=32';
+} from './scoring.js?v=33';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
