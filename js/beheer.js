@@ -2,9 +2,9 @@
 // spelinstellingen en een spel starten. Licht thema; werkt op iPad en iPhone.
 import {
   sb, h, mount, toast, LETTERS, errorText, loginForm, parseSpotify, cleanSpotifyLink, spotifyPlayer, SCARE_SECONDS,
-} from './common.js?v=40';
-import { parseNumber, formatNumber } from './scoring.js?v=40';
-import { addTestPlayers } from './proef.js?v=40';
+} from './common.js?v=41';
+import { parseNumber, formatNumber } from './scoring.js?v=41';
+import { addTestPlayers } from './proef.js?v=41';
 
 const TREE_CATEGORY = 'Van wie is deze kerstboom?';
 // Drie soorten muziekvragen (zie renderMusicForm)
@@ -297,8 +297,12 @@ function header() {
 function questionItem(q, i) {
   const thumb = q.photo_path ? state.thumbs.get(q.photo_path) : null;
   const ans = state.answers.get(q.id);
-  return h('li', { class: 'q-item b-card' },
-    h('div', { class: 'q-num' }, i + 1),
+  return h('li', { class: 'q-item b-card', 'data-index': i },
+    h('button', {
+      type: 'button', class: 'drag-handle', 'aria-label': 'Slepen om te verplaatsen', title: 'Vasthouden en slepen',
+      onpointerdown: (e) => startDrag(e, i),
+    }, '⠿'),
+    h('button', { type: 'button', class: 'q-num', title: 'Tik om naar een ander nummer te verplaatsen', onclick: () => moveAsk(i) }, i + 1),
     thumb ? h('img', { class: 'q-thumb', src: thumb, alt: '' }) : h('div', { class: 'q-thumb q-thumb-empty', 'aria-hidden': 'true' }),
     h('div', { class: 'q-info' },
       h('div', { class: 'q-tags' },
@@ -320,6 +324,7 @@ function questionItem(q, i) {
     h('div', { class: 'q-buttons' },
       h('button', { class: 'icon-btn', 'aria-label': 'Omhoog', title: 'Omhoog', disabled: i === 0, onclick: () => move(i, -1) }, '↑'),
       h('button', { class: 'icon-btn', 'aria-label': 'Omlaag', title: 'Omlaag', disabled: i === state.questions.length - 1, onclick: () => move(i, 1) }, '↓'),
+      h('button', { class: 'btn btn-light btn-small', onclick: () => moveAsk(i), title: 'Naar een ander nummer verplaatsen' }, '↕ Naar…'),
       h('a', { class: 'btn btn-light btn-small', href: `#tv?voorbeeld=${q.id}`, title: 'Bekijk deze vraag zoals op de tv' }, '👁 Voorbeeld'),
       h('button', { class: 'btn btn-light btn-small', onclick: () => renderEdit(q) }, 'Bewerken'),
       h('button', { class: 'btn btn-danger btn-small', onclick: () => removeQuestion(q) }, 'Verwijderen'),
@@ -338,10 +343,77 @@ function answerSummary(q, ans) {
 }
 
 
-async function move(i, dir) {
+function move(i, dir) {
+  return moveTo(i, i + dir);
+}
+
+/** Vraag `i` naar een ander nummer: vraag het nummer. */
+function moveAsk(i) {
+  const n = state.questions.length;
+  const answer = prompt(`Naar welk nummer moet vraag ${i + 1} (1–${n})?`, String(i + 1));
+  if (answer == null) return;
+  const to = parseInt(answer, 10);
+  if (!(to >= 1 && to <= n)) return toast(`Kies een nummer van 1 tot en met ${n}.`);
+  moveTo(i, to - 1);
+}
+
+/** Slepen aan het ⠿-handvat (werkt met vinger en muis). */
+function startDrag(e, from) {
+  const item = e.currentTarget.closest('.q-item');
+  const list = item?.parentElement;
+  if (!item || !list) return;
+  e.preventDefault();
+  const items = [...list.children];
+  const rects = items.map((el) => el.getBoundingClientRect());
+  const startY = e.clientY;
+  let to = from;
+  let lastY = e.clientY;
+  item.classList.add('dragging');
+  const scrollTimer = setInterval(() => {
+    // automatisch scrollen bij de rand van het scherm
+    const edge = 80;
+    if (lastY < edge) window.scrollBy(0, -12); else if (lastY > window.innerHeight - edge) window.scrollBy(0, 12);
+  }, 16);
+  const startScroll = window.scrollY;
+  const onMove = (ev) => {
+    lastY = ev.clientY;
+    const dy = ev.clientY - startY + (window.scrollY - startScroll);
+    item.style.transform = `translateY(${dy}px)`;
+    const center = rects[from].top + rects[from].height / 2 + dy;
+    to = from;
+    rects.forEach((r, k) => {
+      const mid = r.top + r.height / 2;
+      if (k < from && center < mid) to = Math.min(to, k);
+      if (k > from && center > mid) to = Math.max(to, k);
+    });
+    const h0 = rects[from].height + 10;
+    items.forEach((el, k) => {
+      if (el === item) return;
+      let shift = 0;
+      if (from < to && k > from && k <= to) shift = -h0;
+      if (from > to && k < from && k >= to) shift = h0;
+      el.style.transform = shift ? `translateY(${shift}px)` : '';
+    });
+  };
+  const onUp = () => {
+    clearInterval(scrollTimer);
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+    window.removeEventListener('pointercancel', onUp);
+    items.forEach((el) => { el.style.transform = ''; });
+    item.classList.remove('dragging');
+    if (to !== from) moveTo(from, to);
+  };
+  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', onUp);
+  window.addEventListener('pointercancel', onUp);
+}
+
+async function moveTo(i, j) {
+  if (i === j || j < 0 || j >= state.questions.length) return;
   const list = [...state.questions];
-  const j = i + dir;
-  [list[i], list[j]] = [list[j], list[i]];
+  const [q] = list.splice(i, 1);
+  list.splice(j, 0, q);
   // posities opnieuw nummeren 1..n en alleen gewijzigde rijen opslaan
   const updates = [];
   list.forEach((q, k) => {
