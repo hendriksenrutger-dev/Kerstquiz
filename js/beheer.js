@@ -2,9 +2,9 @@
 // spelinstellingen en een spel starten. Licht thema; werkt op iPad en iPhone.
 import {
   sb, h, mount, toast, LETTERS, errorText, loginForm, parseSpotify, cleanSpotifyLink, spotifyPlayer, SCARE_SECONDS,
-} from './common.js?v=39';
-import { parseNumber, formatNumber } from './scoring.js?v=39';
-import { addTestPlayers } from './proef.js?v=39';
+} from './common.js?v=40';
+import { parseNumber, formatNumber } from './scoring.js?v=40';
+import { addTestPlayers } from './proef.js?v=40';
 
 const TREE_CATEGORY = 'Van wie is deze kerstboom?';
 // Drie soorten muziekvragen (zie renderMusicForm)
@@ -548,8 +548,12 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
   const answerSoundOnly = h('input', { type: 'checkbox', checked: Boolean(ans?.answer_media_hidden) });
   // Standaard afdekken: de speler toont titel en artiest en zou het antwoord kunnen verraden.
   const currentMode = q?.media_url ? (q.media_mode || 'tonen') : 'verbergen';
-  const modeSelect = h('select', { class: 'b-select' }, MEDIA_MODES.map((m) => h('option', { value: m.value, selected: currentMode === m.value }, m.label)));
-  const modeField = h('label', {}, 'Speler tijdens de vraag', modeSelect, h('span', { class: 'hint' }, 'De Spotify-speler toont titel en artiest. Kies "tonen" alleen als dat het antwoord niet verraadt. In de antwoordenronde speelt alleen de Spotify-link bij het antwoord (als je die invult).'));
+  // "Alleen geluid" is een apart vinkje; de keuzelijst bevat de andere standen.
+  const soundOnly = h('input', { type: 'checkbox', checked: currentMode === 'alleen_geluid' });
+  const modeSelect = h('select', { class: 'b-select' }, MEDIA_MODES.filter((m) => m.value !== 'alleen_geluid')
+    .map((m) => h('option', { value: m.value, selected: currentMode === m.value }, m.label)));
+  const modeField = h('label', { hidden: currentMode === 'alleen_geluid' }, 'Speler tijdens de vraag', modeSelect, h('span', { class: 'hint' }, 'De Spotify-speler toont titel en artiest. Kies "tonen" alleen als dat het antwoord niet verraadt. In de antwoordenronde speelt alleen de Spotify-link bij het antwoord (als je die invult).'));
+  soundOnly.addEventListener('change', () => { modeField.hidden = soundOnly.checked; });
   const err = h('p', { class: 'form-error', role: 'alert' });
   const saveBtn = h('button', { class: 'btn btn-green btn-lg', type: 'submit' }, 'Opslaan');
 
@@ -574,7 +578,7 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
       if (link === false) return (err.textContent = 'Deze Spotify-link wordt niet herkend. Gebruik in Spotify: Delen → Link kopiëren.');
       // Alleen meesturen als er een link is of was (dan werkt het ook zonder 003_muziek.sql).
       if (link || q?.media_url) row.media_url = link;
-      if (link) row.media_mode = modeSelect.value;
+      if (link) row.media_mode = soundOnly.checked ? 'alleen_geluid' : modeSelect.value;
       const answerLink = answerMusic.value();
       if (answerLink === false) return (err.textContent = 'De Spotify-link bij het antwoord wordt niet herkend.');
       const answerRow = { correct_option: null, correct_texts: null, correct_value: null };
@@ -670,6 +674,7 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
       answerVideo.el,
       h('span', { class: 'hint' }, 'Een filmpje start vanzelf met geluid op de tv en de telefoons, op de plek van de foto. Maximaal 50 MB (ongeveer een halve tot een hele minuut).')),
     music.el,
+    h('label', { class: 'check' }, soundOnly, 'Alleen geluid: geen speler in beeld bij de vraag'),
     modeField,
     h('div', { class: 'stack-tight' },
       answerMusic.el,
@@ -886,6 +891,7 @@ function renderMusicForm() {
   const names = h('datalist', { id: listId }, treeNameSuggestions().map((n) => h('option', { value: n })));
   const music = spotifyField('', { label: 'Spotify-link van het nummer', required: true });
   const time = h('input', { type: 'number', inputmode: 'numeric', min: '5', max: '600', value: '30', class: 'input-short' });
+  const soundOnlyMusic = h('input', { type: 'checkbox' });
   const err = h('p', { class: 'form-error', role: 'alert' });
   const count = h('span', { class: 'tree-count' }, musicCountText());
   const saveBtn = h('button', { class: 'btn btn-green btn-lg btn-block', type: 'submit' }, 'Opslaan en volgend nummer');
@@ -942,7 +948,7 @@ function renderMusicForm() {
       const seconds = parseInt(time.value, 10);
       if (!(seconds >= 5 && seconds <= 600)) return (err.textContent = 'De tijd moet tussen 5 en 600 seconden liggen.');
       const cfg = MUSIC[musicVariant];
-      const row = { category: cfg.category, time_limit: seconds, rate_tree: false, unit: null, media_url: link, media_mode: cfg.mode };
+      const row = { category: cfg.category, time_limit: seconds, rate_tree: false, unit: null, media_url: link, media_mode: soundOnlyMusic.checked ? 'alleen_geluid' : cfg.mode };
       let answerRow;
       let label;
 
@@ -993,6 +999,7 @@ function renderMusicForm() {
   },
     h('div', { class: 'stack-tight' }, h('span', { class: 'field-label' }, 'Soort vraag'), h('div', { class: 'segmented segmented-wrap' }, segButtons)),
     music.el,
+    h('label', { class: 'check' }, soundOnlyMusic, 'Alleen geluid: geen speler in beeld bij de vraag'),
     blockSubmit, blockArtist, blockLyric,
     names,
     h('label', {}, 'Tijd in seconden', time, h('span', { class: 'hint' }, 'Tijd om te luisteren en te antwoorden.')),
