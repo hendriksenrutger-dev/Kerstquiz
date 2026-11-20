@@ -1,7 +1,7 @@
 // Schrikeffect: na een ingesteld aantal seconden verschijnt plotseling een geest met een gil.
 // Werkt op de tv en op de telefoons, op basis van de starttijd van de vraag (serverklok).
 
-import { serverNow } from './common.js?v=30';
+import { serverNow } from './common.js?v=31';
 
 let ctx = null;
 let timer = null;

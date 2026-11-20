@@ -2,9 +2,9 @@
 // spelinstellingen en een spel starten. Licht thema; werkt op iPad en iPhone.
 import {
   sb, h, mount, toast, LETTERS, errorText, loginForm, parseSpotify, cleanSpotifyLink, spotifyPlayer,
-} from './common.js?v=30';
-import { parseNumber, formatNumber } from './scoring.js?v=30';
-import { addTestPlayers } from './proef.js?v=30';
+} from './common.js?v=31';
+import { parseNumber, formatNumber } from './scoring.js?v=31';
+import { addTestPlayers } from './proef.js?v=31';
 
 const TREE_CATEGORY = 'Van wie is deze kerstboom?';
 // Drie soorten muziekvragen (zie renderMusicForm)
@@ -28,6 +28,7 @@ const KIND_LABEL = Object.fromEntries(KINDS.map((k) => [k.value, k.label]));
 const PHOTO_MAX = 1600;
 const PHOTO_QUALITY = 0.8;
 const GIF_MAX_BYTES = 10 * 1024 * 1024;
+const VIDEO_MAX_BYTES = 50 * 1024 * 1024;  // grens van Supabase (gratis)
 
 const state = {
   questions: [],
@@ -85,6 +86,8 @@ async function loadThumbs() {
     ...state.questions.map((q) => q.photo_path),
     ...[...state.answers.values()].map((a) => a.answer_photo_path),
     ...state.questions.map((q) => q.scare_path),
+    ...state.questions.map((q) => q.video_path),
+    ...[...state.answers.values()].map((a) => a.answer_video_path),
   ].filter((p) => p && !state.thumbs.has(p));
   if (!paths.length) return;
   const { data } = await sb.storage.from('fotos').createSignedUrls(paths, 60 * 60);
@@ -144,6 +147,52 @@ async function uploadPhoto(blob) {
   const { error } = await sb.storage.from('fotos').upload(path, blob, { contentType: gif ? 'image/gif' : 'image/jpeg', upsert: false });
   if (error) throw error;
   return path;
+}
+
+async function uploadVideo(file) {
+  const type = file.type || 'video/mp4';
+  const ext = type === 'video/quicktime' ? 'mov' : type === 'video/webm' ? 'webm' : 'mp4';
+  const path = `filmpjes/${crypto.randomUUID()}.${ext}`;
+  const { error } = await sb.storage.from('fotos').upload(path, file, { contentType: type, upsert: false });
+  if (error) throw error;
+  return path;
+}
+
+/** Filmpjekiezer met voorbeeld. Geeft { el, get() } terug; get() → { file, removed }. */
+function videoPicker(currentUrl, label) {
+  let file = null;
+  let removed = false;
+  const preview = h('video', { class: 'video-preview', controls: true, playsinline: true, preload: 'metadata' });
+  const status = h('p', { class: 'hint' });
+  const input = h('input', { type: 'file', accept: 'video/*', class: 'sr-only' });
+  const removeBtn = h('button', { type: 'button', class: 'btn btn-light btn-small' }, 'Filmpje verwijderen');
+  const show = (url) => {
+    preview.hidden = !url;
+    removeBtn.hidden = !url;
+    if (url) preview.src = url; else preview.removeAttribute('src');
+  };
+  show(currentUrl);
+  input.addEventListener('change', () => {
+    const f = input.files?.[0];
+    input.value = '';
+    if (!f) return;
+    if (f.size > VIDEO_MAX_BYTES) {
+      status.textContent = `Dit filmpje is te groot (${Math.round(f.size / 1048576)} MB). Maximaal 50 MB: kort het in, of kies een lagere kwaliteit.`;
+      return;
+    }
+    file = f;
+    removed = false;
+    show(URL.createObjectURL(f));
+    status.textContent = `Gekozen (${Math.round(f.size / 1048576)} MB). Wordt geüpload bij Opslaan.`;
+  });
+  removeBtn.addEventListener('click', () => { file = null; removed = true; show(null); status.textContent = ''; });
+  const pick = h('label', { class: 'btn btn-green' }, input, currentUrl ? 'Ander filmpje kiezen' : 'Filmpje kiezen');
+  const el = h('div', { class: 'stack-tight' },
+    h('span', { class: 'field-label' }, label),
+    preview,
+    h('div', { class: 'row' }, pick, removeBtn),
+    status);
+  return { el, get: () => ({ file, removed }) };
 }
 
 async function removePhoto(path) {
@@ -260,6 +309,8 @@ function questionItem(q, i) {
         q.scare_after && h('span', { class: 'b-tiebreak' }, `${q.scare_path ? '🤡' : '👻'} ${q.scare_only ? 'Schrikvraag' : 'Schrik'} na ${q.scare_after} s`),
         ans?.answer_photo_path && h('span', { class: 'muted' }, '📷 antwoordfoto'),
         ans?.answer_media_url && h('span', { class: 'muted' }, '♪ antwoordnummer'),
+        q.video_path && h('span', { class: 'muted' }, '🎬 filmpje'),
+        ans?.answer_video_path && h('span', { class: 'muted' }, '🎬 antwoordfilmpje'),
         q.media_url && h('span', { class: 'b-music' }, q.media_mode === 'verbergen' ? '♪ Spotify (afgedekt)' : q.media_mode === 'alleen_tv' ? '♪ Spotify (alleen tv)' : '♪ Spotify'),
       ),
       h('div', { class: 'q-title' }, q.text),
@@ -313,6 +364,8 @@ async function removeQuestion(q) {
   await removePhoto(q.photo_path);
   await removePhoto(state.answers.get(q.id)?.answer_photo_path);
   await removePhoto(q.scare_path);
+  await removePhoto(q.video_path);
+  await removePhoto(state.answers.get(q.id)?.answer_video_path);
   state.questions = state.questions.filter((x) => x.id !== q.id);
   state.answers.delete(q.id);
   toast('Vraag verwijderd');
@@ -483,6 +536,8 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
   const photo = photoPicker(q?.photo_path ? state.thumbs.get(q.photo_path) : null);
   const answerPhoto = photoPicker(ans?.answer_photo_path ? state.thumbs.get(ans.answer_photo_path) : null);
   const scarePhoto = photoPicker(q?.scare_path ? state.thumbs.get(q.scare_path) : null);
+  const video = videoPicker(q?.video_path ? state.thumbs.get(q.video_path) : null, '🎬 Filmpje bij de vraag (optioneel)');
+  const answerVideo = videoPicker(ans?.answer_video_path ? state.thumbs.get(ans.answer_video_path) : null, '🎬 Filmpje bij het antwoord (optioneel)');
   const music = spotifyField(q?.media_url || '');
   const answerMusic = spotifyField(ans?.answer_media_url || '', { label: 'Spotify-link bij het antwoord (optioneel)' });
   // Standaard afdekken: de speler toont titel en artiest en zou het antwoord kunnen verraden.
@@ -559,15 +614,27 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
         if (answerLink || ans?.answer_media_url) answerRow.answer_media_url = answerLink;
         const sc = scarePhoto.get();
         const oldScare = q?.scare_path || null;
-        if (sc.blob) row.scare_path = await uploadPhoto(sc.blob);
-        else if (sc.removed && oldScare) row.scare_path = null;
+        const vd = video.get();
+        const avd = answerVideo.get();
+        const oldVideo = q?.video_path || null;
+        const oldAnswerVideo = ans?.answer_video_path || null;
+        const uploaded = [];
         try {
+          if (sc.blob) uploaded.push(row.scare_path = await uploadPhoto(sc.blob));
+          else if (sc.removed && oldScare) row.scare_path = null;
+          if (vd.file) { saveBtn.textContent = 'Filmpje uploaden…'; uploaded.push(row.video_path = await uploadVideo(vd.file)); }
+          else if (vd.removed && oldVideo) row.video_path = null;
+          if (avd.file) { saveBtn.textContent = 'Filmpje uploaden…'; uploaded.push(answerRow.answer_video_path = await uploadVideo(avd.file)); }
+          else if (avd.removed && oldAnswerVideo) answerRow.answer_video_path = null;
+          saveBtn.textContent = 'Bezig met opslaan…';
           await saveQuestion(q, row, answerRow, photo.get(), answerPhoto.get());
         } catch (ex2) {
-          if (sc.blob && row.scare_path) await removePhoto(row.scare_path);
+          for (const p of uploaded) await removePhoto(p);
           throw ex2;
         }
         if (oldScare && 'scare_path' in row) await removePhoto(oldScare);
+        if (oldVideo && 'video_path' in row) await removePhoto(oldVideo);
+        if (oldAnswerVideo && 'answer_video_path' in answerRow) await removePhoto(oldAnswerVideo);
         toast('Vraag opgeslagen');
         renderList();
       } catch (ex) {
@@ -586,6 +653,10 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
       h('span', { class: 'field-label' }, 'Foto bij het antwoord (optioneel)'),
       h('span', { class: 'hint' }, 'De tv toont deze foto in de antwoordenronde in plaats van de vraagfoto. Spelers zien hem pas dan.'),
       answerPhoto.el),
+    !scareOnly && video.el,
+    !scareOnly && h('div', { class: 'stack-tight' },
+      answerVideo.el,
+      h('span', { class: 'hint' }, 'Een filmpje start vanzelf met geluid op de tv en de telefoons, op de plek van de foto. Maximaal 50 MB (ongeveer een halve tot een hele minuut).')),
     music.el,
     modeField,
     !scareOnly && h('div', { class: 'stack-tight' },
