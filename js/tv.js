@@ -4,12 +4,12 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer, inScarePhase, serverNow, SCARE_SECONDS,
-} from './common.js?v=47';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=47';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=47';
+} from './common.js?v=48';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=48';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=48';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking, fastestWinners,
-} from './scoring.js?v=47';
+} from './scoring.js?v=48';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -224,6 +224,8 @@ async function goTo(status, index) {
   if (link) playMedia(link, { seconds: introSeconds(status, q) }); else stopMedia();
   const vpath = videoPathFor(status, q);
   if (vpath) playVideo(vpath); else stopVideos();
+  const clip = clipFor(status, q);
+  if (clip) playClip(clip.path, clip.reverse); else stopClip();
   state.answerShownFor = null;  // onthul-effect van de antwoordfoto opnieuw laten beginnen
   state.busy = true;
   try {
@@ -268,8 +270,8 @@ async function scareUrlFor(q) {
 }
 
 async function setState(status, questionId = null, photoUrl = null) {
-  if (status !== 'question' && status !== 'answers') { stopMedia(); stopVideos(); }
-  else if (!questionId) { stopMedia(); stopVideos(); }
+  if (status !== 'question' && status !== 'answers') { stopMedia(); stopVideos(); stopClip(); }
+  else if (!questionId) { stopMedia(); stopVideos(); stopClip(); }
   const { data, error } = await sb.rpc('set_game_state', {
     p_game_id: state.game.id, p_status: status, p_question_id: questionId, p_photo_url: photoUrl,
   });
@@ -519,6 +521,9 @@ function renderQuestion() {
       intro && h('button', {
         class: 'btn btn-ghost intro-again', onclick: () => playMedia(q.media_url, { seconds: q.media_seconds }),
       }, `♪ Nog een keer (${q.media_seconds} s)`),
+      q.audio_path && h('button', {
+        class: 'btn btn-ghost intro-again', onclick: () => playClip(q.audio_path, Boolean(q.audio_reverse)),
+      }, q.audio_reverse ? '⏪ Nog een keer' : '🔊 Nog een keer'),
       h('button', { class: 'btn btn-gold btn-lg', id: 'next-btn', onclick: next },
         isLast ? 'Einde vragenronde ▶' : 'Volgende vraag ▶'),
     ),
@@ -960,6 +965,9 @@ async function renderReveal() {
     h('footer', { class: 'q-foot' },
       h('button', { class: 'btn btn-ghost', onclick: previous }, '◀ Vorige'),
       mediaLink && !r.key?.answer_media_hidden && mediaSlot(mediaLink, 'tonen', 'media-foot'),
+      q.audio_path && q.audio_reverse && h('button', {
+        class: 'btn btn-ghost intro-again', onclick: () => playClip(q.audio_path, false),
+      }, '▶ Vooruit afspelen'),
       h('button', { class: 'btn btn-gold btn-lg', onclick: () => { if (isLast) playMusic(state.music?.end); next(); } }, isLast ? 'Einde antwoordenronde ▶' : 'Volgende antwoord ▶'),
     ),
   );
@@ -1202,6 +1210,8 @@ async function startPreview(id) {
   if (link) playMedia(link, { seconds: introSeconds('question', first) });
   const vp = first && !first.tiebreak ? videoPathFor('question', first) : null;
   if (vp) playVideo(vp);
+  const clip = first && !first.tiebreak ? clipFor('question', first) : null;
+  if (clip) playClip(clip.path, clip.reverse);
   await showPreview();
 }
 
@@ -1267,6 +1277,8 @@ function previewChrome(q) {
     if (link) playMedia(link, { seconds: introSeconds(mode, t) }); else stopMedia();
     const vp = t && !t.tiebreak ? videoPathFor(preview.mode === 'antwoord' ? 'answers' : 'question', t) : null;
     if (vp) playVideo(vp); else stopVideos();
+    const clip = t && !t.tiebreak ? clipFor(mode, t) : null;
+    if (clip) playClip(clip.path, clip.reverse); else stopClip();
   };
   const go = (d) => { preview.index = (preview.index + d + n) % n; previewMedia(); showPreview(); };
   const normal = state.questions.length;
@@ -1336,6 +1348,7 @@ function deckFor(link) {
 
 function preloadDeck() {
   preloadVideos();
+  for (const q of state.questions) if (q.audio_path) loadClip(q.audio_path);
   for (const q of state.questions) {
     deckFor(q.media_url);
     deckFor(state.keys?.get(q.id)?.answer_media_url);
@@ -1392,6 +1405,90 @@ function placeDeck() {
 window.addEventListener('resize', () => requestAnimationFrame(placeDeck));
 document.addEventListener('fullscreenchange', () => setTimeout(placeDeck, 300));
 setInterval(placeDeck, 1000);
+
+// ---------------------------------------------------------------- geluidsfragment (ook achterstevoren)
+
+/**
+ * Eigen geluidsfragment bij een vraag (beheer). De tv laadt en decodeert het vooraf en kan
+ * het achterstevoren afspelen (bij de vraag) en vooruit (bij het antwoord). Alleen op de tv.
+ */
+const clips = new Map();   // pad → { ready: Promise<{ fwd, rev }> }
+let clipCtx = null;
+let clipSrc = null;
+
+function clipFor(status, q) {
+  if (!q?.audio_path) return null;
+  if (status === 'question') return { path: q.audio_path, reverse: Boolean(q.audio_reverse) };
+  if (status === 'answers' && q.audio_reverse) return { path: q.audio_path, reverse: false };
+  return null;
+}
+
+function clipContext() {
+  if (!clipCtx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    clipCtx = new AC();
+  }
+  return clipCtx;
+}
+
+function loadClip(path) {
+  let c = clips.get(path);
+  if (c) return c;
+  const ctx = clipContext();
+  if (!ctx) return null;
+  c = {
+    ready: sb.storage.from('fotos').createSignedUrl(path, SIGNED_URL_SECONDS)
+      .then(({ data }) => fetch(data.signedUrl))
+      .then((r) => r.arrayBuffer())
+      .then((ab) => new Promise((ok, fail) => ctx.decodeAudioData(ab, ok, fail)))
+      .then((fwd) => {
+        // omgekeerde kopie maken
+        const rev = ctx.createBuffer(fwd.numberOfChannels, fwd.length, fwd.sampleRate);
+        for (let ch = 0; ch < fwd.numberOfChannels; ch++) {
+          const src = fwd.getChannelData(ch);
+          const dst = rev.getChannelData(ch);
+          for (let i = 0, n = src.length; i < n; i++) dst[i] = src[n - 1 - i];
+        }
+        return { fwd, rev };
+      }),
+  };
+  c.ready.catch(() => clips.delete(path));  // mislukt: later opnieuw proberen
+  clips.set(path, c);
+  return c;
+}
+
+/** Afspelen; moet binnen een tik worden aangeroepen (dan mag de browser geluid maken). */
+function playClip(path, reverse) {
+  const ctx = clipContext();
+  if (!ctx) return;
+  stopClip();
+  if (ctx.state === 'suspended') ctx.resume();   // binnen de tik: geluid vrijgeven
+  const c = loadClip(path);
+  const token = {};
+  clipSrc = token;
+  c?.ready.then(({ fwd, rev }) => {
+    if (clipSrc !== token) return;                // intussen alweer gestopt of iets anders gestart
+    const src = ctx.createBufferSource();
+    src.buffer = reverse ? rev : fwd;
+    src.connect(ctx.destination);
+    src.onended = () => {
+      if (clipSrc !== token) return;
+      clipSrc = null;
+      try { ctx.suspend(); } catch { /* */ }       // geluidskanaal weer dicht (laat Spotify ongestoord)
+    };
+    if (ctx.state === 'suspended') ctx.resume();
+    src.start();
+    token.src = src;
+  }).catch(() => toast('Het geluidsfragment kon niet worden geladen.'));
+}
+
+function stopClip() {
+  const t = clipSrc;
+  clipSrc = null;
+  try { t?.src?.stop(); } catch { /* */ }
+  if (t && clipCtx) { try { clipCtx.suspend(); } catch { /* */ } }
+}
 
 // ---------------------------------------------------------------- foto langzaam onthullen
 

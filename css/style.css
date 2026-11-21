@@ -1065,3 +1065,4 @@ body.pv-with-phone .stage { width: min(calc(100vw - 340px), calc((100dvh - 64px)
 }
 .fast-list { font-size: max(20px, 1.5cqw); color: var(--gold-light); }
 .p-fast { margin: 0; padding: 8px 12px; border-radius: 10px; background: rgba(205, 163, 73, .15); color: var(--gold-light); font-weight: 600; font-size: 15px; }
+.audio-preview { width: 100%; max-width: 360px; }
