@@ -4,12 +4,12 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer, inScarePhase, serverNow, SCARE_SECONDS,
-} from './common.js?v=62';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=62';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=62';
+} from './common.js?v=63';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=63';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=63';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking, fastestWinners,
-} from './scoring.js?v=62';
+} from './scoring.js?v=63';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -78,6 +78,7 @@ async function afterLogin() {
     const { data: settings } = await sb.from('settings').select('*').eq('id', 1).maybeSingle();
     state.music = { start: settings?.start_music || null, end: settings?.end_music || null, countdown: settings?.countdown_music || null };
     state.countdownSecs = settings?.countdown_seconds || 0;  // 0 = geen aftelscherm
+    state.countdownStart = settings?.countdown_music_start || 0;
     preloadMusic();
   } catch (e) {
     return renderLogin(errorText(e));
@@ -259,7 +260,7 @@ async function goTo(status, index) {
   if (!q) return;
   // Muziek van het volgende scherm meteen starten, nog binnen de tik op de knop.
   const link = mediaLinkFor(status, q);
-  if (link) playMedia(link, { seconds: introSeconds(status, q) }); else stopMedia();
+  if (link) playMedia(link, { seconds: introSeconds(status, q), start: mediaStartFor(status, q) }); else stopMedia();
   const vpath = videoPathFor(status, q);
   if (vpath) playVideo(vpath); else stopVideos();
   const clip = clipFor(status, q);
@@ -479,7 +480,7 @@ function beginQuiz() {
   if (!secs) return next();
   fxAudio();  // geluid voor de overgang alvast vrijgeven (binnen deze tik)
   state.countdown = { until: Date.now() + secs * 1000 };
-  if (state.music?.countdown) { bgMusic(state.music.countdown); playMusic(state.music.countdown); } // binnen de tik
+  if (state.music?.countdown) { bgMusic(state.music.countdown); musicPlayer(state.music.countdown)?.play({ start: state.countdownStart }); } // binnen de tik
   else bgMusic(null);
   renderCountdown();
 }
@@ -691,7 +692,7 @@ function renderQuestion() {
       h('button', { class: 'btn btn-ghost', onclick: previous }, '◀ Vorige'),
       q.rate_tree && h('p', { class: 'rate-hint' }, '★ Geef deze boom ook een cijfer op je telefoon'),
       intro && h('button', {
-        class: 'btn btn-ghost intro-again', onclick: () => playMedia(q.media_url, { seconds: q.media_seconds }),
+        class: 'btn btn-ghost intro-again', onclick: () => playMedia(q.media_url, { seconds: q.media_seconds, start: q.media_start || 0 }),
       }, `♪ Nog een keer (${q.media_seconds} s)`),
       q.audio_path && h('button', {
         class: 'btn btn-ghost intro-again', onclick: () => playClip(q.audio_path, Boolean(q.audio_reverse)),
@@ -1392,7 +1393,7 @@ async function startPreview(id) {
   // Muziek en filmpje van de eerste vraag meteen starten (de tik op 👁 Voorbeeld telt als tik)
   const first = preview.list[preview.index];
   const link = first && !first.tiebreak ? mediaLinkFor('question', first) : null;
-  if (link) playMedia(link, { seconds: introSeconds('question', first) });
+  if (link) playMedia(link, { seconds: introSeconds('question', first), start: mediaStartFor('question', first) });
   const vp = first && !first.tiebreak ? videoPathFor('question', first) : null;
   if (vp) playVideo(vp);
   const clip = first && !first.tiebreak ? clipFor('question', first) : null;
@@ -1459,7 +1460,7 @@ function previewChrome(q) {
     const mode = preview.mode === 'antwoord' ? 'answers' : 'question';
     state.answerShownFor = null;
     const link = t && !t.tiebreak ? mediaLinkFor(mode, t) : null;
-    if (link) playMedia(link, { seconds: introSeconds(mode, t) }); else stopMedia();
+    if (link) playMedia(link, { seconds: introSeconds(mode, t), start: mediaStartFor(mode, t) }); else stopMedia();
     const vp = t && !t.tiebreak ? videoPathFor(preview.mode === 'antwoord' ? 'answers' : 'question', t) : null;
     if (vp) playVideo(vp); else stopVideos();
     const clip = t && !t.tiebreak ? clipFor(mode, t) : null;
@@ -1557,6 +1558,9 @@ function playMedia(link, opts = {}) {
 
 /** Intro raden: hoeveel seconden van het nummer bij deze vraag (alleen tijdens de vraag). */
 const introSeconds = (status, q) => (status === 'question' && q?.media_seconds) || null;
+
+/** Beginpunt (seconden) van het nummer bij de vraag of bij het antwoord (beheer). */
+const mediaStartFor = (status, q) => (status === 'answers' ? state.keys?.get(q?.id)?.answer_media_start : q?.media_start) || 0;
 
 function stopMedia() {
   for (const p of deck.values()) p.pause();
