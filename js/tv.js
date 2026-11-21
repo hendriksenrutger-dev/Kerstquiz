@@ -4,12 +4,12 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer, inScarePhase, serverNow, SCARE_SECONDS,
-} from './common.js?v=60';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=60';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=60';
+} from './common.js?v=61';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=61';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=61';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking, fastestWinners,
-} from './scoring.js?v=60';
+} from './scoring.js?v=61';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -117,11 +117,26 @@ function renderHome(savedGame) {
     ),
     h('div', { class: 'row home-links' },
       fullscreenButton(),
+      h('button', { class: 'link', onclick: showRemoteQr }, '📱 Afstandsbediening'),
       h('button', { class: 'link', onclick: logout }, 'Uitloggen'),
       h('span', { class: 'version' }, `versie ${APP_VERSION}`),
     ),
   );
   mount(stage('screen-free', heroLayout(content)));
+}
+
+/** QR-code om de afstandsbediening (#afstand) op je telefoon te openen. */
+function showRemoteQr() {
+  const url = `${location.href.split('#')[0]}#afstand`;
+  const close = () => box.remove();
+  const box = h('div', { class: 'remote-qr', onclick: close },
+    h('div', { class: 'remote-qr-card', onclick: (e) => e.stopPropagation() },
+      h('h2', { class: 'serif' }, '📱 Afstandsbediening'),
+      h('div', { class: 'qr' }, qrSvg(url)),
+      h('p', {}, 'Scan met je telefoon en log in met je beheer-account. Start daarna hier de quiz; met ◀ en ▶ op je telefoon bedien je de tablet.'),
+      h('p', { class: 'muted small' }, url),
+      h('button', { class: 'btn btn-gold', onclick: close }, 'Sluiten')));
+  document.body.append(box);
 }
 
 async function newGame() {
@@ -156,8 +171,10 @@ async function openGame(game) {
       { event: '*', table: 'games', filter: `id=eq.${game.id}` },
       { event: '*', table: 'players', filter: `game_id=eq.${game.id}` },
       { event: '*', table: 'answers', filter: `game_id=eq.${game.id}` },
+      { event: 'INSERT', table: 'remote_commands', filter: `game_id=eq.${game.id}` },
     ],
     (payload) => {
+      if (payload.table === 'remote_commands') { handleRemote(payload.new); return; }
       if (payload.table === 'games' && payload.new?.id) {
         const changedScreen = screenKey(payload.new) !== screenKey(state.game);
         state.game = payload.new;
@@ -170,6 +187,22 @@ async function openGame(game) {
   );
 
   state.tick = setInterval(updateTimer, 250);
+}
+
+/**
+ * Opdracht van de afstandsbediening (#afstand op de telefoon van de quizmaster):
+ * tik op dezelfde knop als de quizmaster zou doen. Oude opdrachten (na herladen) negeren.
+ */
+function handleRemote(cmd) {
+  if (!cmd || serverNow() - new Date(cmd.created_at).getTime() > 20000) return;
+  if (cmd.action === 'next') {
+    const welcome = document.querySelector('.welcome-tap');
+    if (welcome) return welcome.click();
+    const btn = [...document.querySelectorAll('#app .btn-gold')].filter((b) => !b.disabled).pop();
+    if (btn) btn.click(); else toast('Nog even wachten: de tijd loopt nog');
+  } else if (cmd.action === 'prev') {
+    document.querySelector('#app .q-foot .btn-ghost, #app .btn-ghost')?.click();
+  }
 }
 
 function stopLive() {

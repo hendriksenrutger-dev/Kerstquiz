@@ -1144,3 +1144,22 @@ body.pv-with-phone .stage { width: min(calc(100vw - 340px), calc((100dvh - 64px)
 }
 .morph-enter #app .stage > * { animation: morph-in 1.3s cubic-bezier(.2, .7, .2, 1) both; }
 @keyframes morph-in { from { opacity: 0; transform: scale(1.08); filter: blur(16px); } to { opacity: 1; transform: none; filter: none; } }
+
+/* Afstandsbediening (#afstand op de telefoon) */
+.remote { min-height: 100dvh; display: flex; flex-direction: column; gap: 18px; padding: 18px 16px 28px; }
+.remote-head { display: flex; justify-content: space-between; align-items: center; }
+.remote-status { margin: 0; text-align: center; font-family: var(--serif); font-weight: 700; font-size: 26px; color: var(--gold-light); }
+.remote-buttons { flex: 1; display: grid; grid-template-rows: 2fr 1fr; gap: 14px; min-height: 340px; }
+.remote-btn {
+  border: 0; border-radius: 24px; font-size: 64px; font-weight: 700; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+}
+.remote-next { background: linear-gradient(180deg, var(--gold-light), var(--gold) 55%, var(--gold-dark)); color: #1b1405; box-shadow: 0 10px 30px rgba(0, 0, 0, .35); }
+.remote-prev { background: var(--surface); color: var(--text); border: 2px solid var(--border); font-size: 44px; }
+.remote-btn:active { transform: scale(.97); }
+.remote-btn:disabled { opacity: .6; }
+/* QR-code voor de afstandsbediening (tv-beginscherm) */
+.remote-qr { position: fixed; inset: 0; z-index: 500; background: rgba(0, 0, 0, .6); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.remote-qr-card { background: var(--surface); border: 1px solid var(--gold); border-radius: 18px; padding: 22px; max-width: 420px; display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+.remote-qr-card .qr { width: 220px; }
+.remote-qr-card p { margin: 0; overflow-wrap: anywhere; }
