@@ -4,12 +4,12 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer, inScarePhase, serverNow, SCARE_SECONDS,
-} from './common.js?v=56';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=56';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=56';
+} from './common.js?v=57';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=57';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=57';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking, fastestWinners,
-} from './scoring.js?v=56';
+} from './scoring.js?v=57';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -76,7 +76,8 @@ async function afterLogin() {
     prepareScareAudio(state.questions);  // alleen als er een schrik in de quiz zit
     // Muziek bij de start en het einde (Beheer → Spelinstellingen); ontbreekt de tabel/kolom, dan geen muziek.
     const { data: settings } = await sb.from('settings').select('*').eq('id', 1).maybeSingle();
-    state.music = { start: settings?.start_music || null, end: settings?.end_music || null };
+    state.music = { start: settings?.start_music || null, end: settings?.end_music || null, countdown: settings?.countdown_music || null };
+    state.countdownSecs = settings?.countdown_seconds || 0;  // 0 = geen aftelscherm
     preloadMusic();
   } catch (e) {
     return renderLogin(errorText(e));
@@ -369,7 +370,8 @@ function render() {
   const g = state.game;
   if (!g) return;
   // Achtergrondmuziek: start in de wachtruimte en bij "Zo werkt het", einde vanaf de definitieve eindstand.
-  if (g.status === 'lobby' || (g.status === 'question' && !g.current_question_id)) bgMusic(state.music?.start);
+  if (g.status === 'question' && !g.current_question_id && state.countdown) bgMusic(state.music?.countdown || null);
+  else if (g.status === 'lobby' || (g.status === 'question' && !g.current_question_id)) bgMusic(state.music?.start);
   else if (g.status === 'tree') bgMusic(state.music?.end);
   else if (g.status !== 'final') bgMusic(null); // bij de eindstand beslist renderScoreboard
   if (g.status === 'lobby') return renderLobby();
@@ -433,7 +435,57 @@ function renderLobby() {
 
 // ---------------------------------------------------------------- uitleg na de start
 
+// ---------------------------------------------------------------- aftellen vóór de eerste vraag
+
+/** Na de uitleg: eerst aftellen (Beheer → Spelinstellingen), dan de eerste vraag. Zonder instelling meteen. */
+function beginQuiz() {
+  const secs = state.countdownSecs;
+  if (!secs) return next();
+  state.countdown = { until: Date.now() + secs * 1000 };
+  if (state.music?.countdown) { bgMusic(state.music.countdown); playMusic(state.music.countdown); } // binnen de tik
+  else bgMusic(null);
+  renderCountdown();
+}
+
+function stopCountdown() {
+  clearInterval(state.countdownTimer);
+  state.countdown = null;
+}
+
+function finishCountdown() {
+  if (!state.countdown) return;
+  stopCountdown();
+  next();  // eerste vraag (de muziek van het aftellen stopt daar vanzelf)
+}
+
+function renderCountdown() {
+  const left = () => Math.max(0, Math.ceil((state.countdown.until - Date.now()) / 1000));
+  const num = h('div', { class: 'countdown-num', 'aria-live': 'polite' }, String(left()));
+  const view = h('div', { class: 'countdown' },
+    h('div', { class: 'countdown-center' },
+      h('p', { class: 'countdown-title' }, 'Quiz begint in'),
+      num,
+      ornament()),
+    h('footer', { class: 'q-foot' },
+      h('button', { class: 'btn btn-ghost', onclick: () => { stopCountdown(); bgMusic(state.music?.start); renderRules(); } }, '◀ Terug'),
+      h('button', { class: 'btn btn-gold btn-lg', onclick: finishCountdown }, 'Nu beginnen ▶'),
+    ),
+  );
+  mount(stage('screen-hero', heroLayout(), view));
+  clearInterval(state.countdownTimer);
+  state.countdownTimer = setInterval(() => {
+    if (!state.countdown) return clearInterval(state.countdownTimer);
+    const n = left();
+    if (num.textContent !== String(n)) {
+      num.textContent = String(n);
+      num.classList.remove('tick'); void num.offsetWidth; num.classList.add('tick');
+    }
+    if (n <= 0) finishCountdown();
+  }, 200);
+}
+
 function renderRules() {
+  if (state.countdown) return renderCountdown();
   const qs = state.questions;
   const has = (fn) => qs.some(fn);
   const tiles = [
@@ -457,7 +509,7 @@ function renderRules() {
     h('footer', { class: 'q-foot' },
       h('button', { class: 'btn btn-ghost', onclick: previous }, '◀ Vorige'),
       h('span', { class: 'muted rules-count' }, `${qs.length} vragen · ${playersCountText().toLowerCase()}`),
-      h('button', { class: 'btn btn-gold btn-lg', onclick: next }, 'Eerste vraag ▶'),
+      h('button', { class: 'btn btn-gold btn-lg', onclick: beginQuiz }, state.countdownSecs ? 'Aftellen ▶' : 'Eerste vraag ▶'),
     ),
   );
   mount(stage('screen-plain', view));
@@ -1199,6 +1251,7 @@ function playMusic(link) {
 function preloadMusic() {
   musicPlayer(state.music?.start);
   musicPlayer(state.music?.end);
+  musicPlayer(state.music?.countdown);
 }
 
 // ---------------------------------------------------------------- voorbeeld (vanuit beheer)
