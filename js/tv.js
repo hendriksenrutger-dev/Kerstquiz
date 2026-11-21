@@ -4,12 +4,12 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer, inScarePhase, serverNow, SCARE_SECONDS,
-} from './common.js?v=64';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=64';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=64';
+} from './common.js?v=65';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=65';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=65';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking, fastestWinners,
-} from './scoring.js?v=64';
+} from './scoring.js?v=65';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -479,7 +479,7 @@ function beginQuiz() {
   const secs = state.countdownSecs;
   if (!secs) return next();
   fxAudio();  // geluid voor de overgang alvast vrijgeven (binnen deze tik)
-  state.countdown = { until: Date.now() + secs * 1000 };
+  state.countdown = { until: Date.now() + secs * 1000, total: secs * 1000 };
   if (state.music?.countdown) { bgMusic(state.music.countdown); musicPlayer(state.music.countdown)?.play({ start: state.countdownStart }); } // binnen de tik
   else bgMusic(null);
   renderCountdown();
@@ -564,29 +564,60 @@ function playTransition() {
 }
 
 function renderCountdown() {
-  const left = () => Math.max(0, Math.ceil((state.countdown.until - Date.now()) / 1000));
+  const cd = state.countdown;
+  const msLeft = () => Math.max(0, cd.until - Date.now());
+  const left = () => Math.ceil(msLeft() / 1000);
+  const elapsed = (cd.total - msLeft()) / 1000;
   const num = h('div', { class: 'countdown-num', 'aria-live': 'polite' }, String(left()));
+  const grow = h('div', { class: 'countdown-grow' }, num);
+  // "Quiz begint in" en het sierlijntje verdwijnen na een paar seconden; daarna alleen het getal
+  const fadeDelay = `${Math.min(3, cd.total / 3000) - elapsed}s`;
+  const title = h('p', { class: 'countdown-title', style: { animationDelay: fadeDelay } }, 'Quiz begint in');
+  const orn = ornament(); orn.classList.add('countdown-orn'); orn.style.animationDelay = fadeDelay;
   const view = h('div', { class: 'countdown' },
-    h('div', { class: 'countdown-center' },
-      h('p', { class: 'countdown-title' }, 'Quiz begint in'),
-      num,
-      ornament()),
+    h('div', { class: 'countdown-center' }, title, grow, orn),
     h('footer', { class: 'q-foot' },
       h('button', { class: 'btn btn-ghost', onclick: () => { stopCountdown(); bgMusic(state.music?.start); renderRules(); } }, '◀ Terug'),
       h('button', { class: 'btn btn-gold btn-lg btn-arrow', onclick: finishCountdown, 'aria-label': 'Nu beginnen', title: 'Nu beginnen' }, '▶'),
     ),
   );
   mount(stage('screen-hero', heroLayout(), view));
-  clearInterval(state.countdownTimer);
-  state.countdownTimer = setInterval(() => {
+  const update = () => {
     if (!state.countdown) return clearInterval(state.countdownTimer);
+    // het getal wordt steeds groter
+    const progress = 1 - msLeft() / cd.total;
+    grow.style.transform = `scale(${(0.45 + progress * 0.95).toFixed(3)})`;
     const n = left();
     if (num.textContent !== String(n)) {
       num.textContent = String(n);
-      num.classList.remove('tick'); void num.offsetWidth; num.classList.add('tick');
+      const final = n > 0 && n <= 5;
+      view.classList.toggle('countdown-final', final);
+      // laatste seconden: harde hartslag (beeld en geluid), daarvoor een rustige tik
+      num.classList.remove('tick', 'beat'); void num.offsetWidth; num.classList.add(final ? 'beat' : 'tick');
+      if (final) heartbeat(n);
     }
     if (n <= 0) finishCountdown();
-  }, 200);
+  };
+  clearInterval(state.countdownTimer);
+  state.countdownTimer = setInterval(update, 100);
+  update();
+}
+
+/** Doffe hartslag (twee slagen) in de laatste seconden van het aftellen; hoe dichter bij 0, hoe harder. */
+function heartbeat(n) {
+  const ctx = fxAudio();
+  if (!ctx) return;
+  try {
+    const vol = 0.35 + (5 - n) * 0.12;
+    [0, 0.17].forEach((dt, k) => {
+      const t = ctx.currentTime + 0.02 + dt;
+      const o = ctx.createOscillator(); o.type = 'sine';
+      o.frequency.setValueAtTime(70, t); o.frequency.exponentialRampToValueAtTime(38, t + 0.22);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol * (k ? 0.7 : 1), t + 0.015); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
+      o.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t + 0.3);
+    });
+  } catch { /* geen geluid */ }
 }
 
 function renderRules() {
