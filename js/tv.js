@@ -4,12 +4,12 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer, inScarePhase, serverNow, SCARE_SECONDS,
-} from './common.js?v=57';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=57';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=57';
+} from './common.js?v=58';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=58';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=58';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking, fastestWinners,
-} from './scoring.js?v=57';
+} from './scoring.js?v=58';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -144,7 +144,7 @@ async function openGame(game) {
   stopLive();
   state.game = game;
   save(TV_GAME_KEY, game.id);
-  await Promise.all([loadPlayers(), loadAnswered(), loadKeys()]);
+  await Promise.all([loadPlayers(), loadAnswered(), loadKeys(), reloadQuestions()]);
   preloadDeck();
   render();
 
@@ -658,6 +658,9 @@ function renderAnswersIntro() {
     ),
   );
   mount(stage('screen-hero', heroLayout(content), cornerMenu()));
+  // Antwoorden (en antwoordmuziek/-filmpjes) opnieuw ophalen: misschien is er in beheer
+  // nog iets aangepast nadat de quiz is geopend. Spelers alvast laden, zodat ze bij de tik starten.
+  loadKeys().then(preloadDeck).catch(() => {});
 }
 
 // ---------------------------------------------------------------- eindstand en mooiste boom
@@ -1389,6 +1392,16 @@ function startQuestion() { showPreview(); }
  */
 const deck = new Map(); // link → deckPlayer
 let deckBox = null;
+
+/** Vragen opnieuw ophalen (misschien is er in beheer iets aangepast sinds het inloggen). */
+async function reloadQuestions() {
+  try {
+    const all = await fetchQuestions();
+    state.questions = all.filter((q) => !q.tiebreak);
+    state.tiebreaks = all.filter((q) => q.tiebreak);
+    prepareScareAudio(state.questions);
+  } catch { /* oude lijst houden */ }
+}
 
 async function loadKeys() {
   const { data } = await sb.from('question_answers').select('*');
