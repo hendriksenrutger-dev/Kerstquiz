@@ -2,9 +2,9 @@
 // spelinstellingen en een spel starten. Licht thema; werkt op iPad en iPhone.
 import {
   sb, h, mount, toast, LETTERS, errorText, loginForm, parseSpotify, cleanSpotifyLink, spotifyPlayer, SCARE_SECONDS,
-} from './common.js?v=48';
-import { parseNumber, formatNumber } from './scoring.js?v=48';
-import { addTestPlayers } from './proef.js?v=48';
+} from './common.js?v=49';
+import { parseNumber, formatNumber } from './scoring.js?v=49';
+import { addTestPlayers } from './proef.js?v=49';
 
 const TREE_CATEGORY = 'Van wie is deze kerstboom?';
 // Drie soorten muziekvragen (zie renderMusicForm)
@@ -186,7 +186,9 @@ function videoPicker(currentUrl, label, { audio = false } = {}) {
     ? h('audio', { class: 'audio-preview', controls: true, preload: 'metadata' })
     : h('video', { class: 'video-preview', controls: true, playsinline: true, preload: 'metadata' });
   const status = h('p', { class: 'hint' });
-  const input = h('input', { type: 'file', accept: audio ? 'audio/*,.mp3,.m4a,video/mp4,video/webm' : 'video/*', class: 'sr-only' });
+  const input = h('input', { type: 'file', accept: audio ? 'audio/*,.mp3,.m4a' : 'video/*', class: 'sr-only' });
+  // Bij geluid ook een aparte knop voor een filmpje uit de galerij (Android toont de galerij alleen bij video/*).
+  const galleryInput = audio ? h('input', { type: 'file', accept: 'video/*', class: 'sr-only' }) : null;
   const removeBtn = h('button', { type: 'button', class: 'btn btn-light btn-small' }, `${audio ? 'Geluid' : 'Filmpje'} verwijderen`);
   const show = (url) => {
     preview.hidden = !url;
@@ -194,9 +196,9 @@ function videoPicker(currentUrl, label, { audio = false } = {}) {
     if (url) preview.src = url; else preview.removeAttribute('src');
   };
   show(currentUrl);
-  input.addEventListener('change', () => {
-    const f = input.files?.[0];
-    input.value = '';
+  const onPick = (inp) => {
+    const f = inp.files?.[0];
+    inp.value = '';
     if (!f) return;
     if (f.size > VIDEO_MAX_BYTES) {
       status.textContent = `Dit ${what} is te groot (${Math.round(f.size / 1048576)} MB). Maximaal 50 MB: kort het in, of kies een lagere kwaliteit.`;
@@ -206,13 +208,15 @@ function videoPicker(currentUrl, label, { audio = false } = {}) {
     removed = false;
     show(URL.createObjectURL(f));
     status.textContent = `Gekozen (${Math.round(f.size / 1048576)} MB). Wordt geüpload bij Opslaan.`;
-  });
+  };
+  input.addEventListener('change', () => onPick(input));
+  galleryInput?.addEventListener('change', () => onPick(galleryInput));
   removeBtn.addEventListener('click', () => { file = null; removed = true; show(null); status.textContent = ''; });
   const pick = h('label', { class: 'btn btn-green' }, input, currentUrl ? `Ander ${what} kiezen` : `${audio ? 'Geluidsbestand' : 'Filmpje'} kiezen`);
   const el = h('div', { class: 'stack-tight' },
     h('span', { class: 'field-label' }, label),
     preview,
-    h('div', { class: 'row' }, pick, removeBtn),
+    h('div', { class: 'row' }, pick, galleryInput && h('label', { class: 'btn btn-light' }, galleryInput, '🎬 Filmpje uit galerij'), removeBtn),
     status);
   return { el, get: () => ({ file, removed }) };
 }
