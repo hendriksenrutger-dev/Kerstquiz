@@ -4,12 +4,12 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer, inScarePhase, serverNow, SCARE_SECONDS,
-} from './common.js?v=49';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=49';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=49';
+} from './common.js?v=50';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=50';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=50';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking, fastestWinners,
-} from './scoring.js?v=49';
+} from './scoring.js?v=50';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -912,7 +912,7 @@ async function renderReveal() {
   const q = state.questions[i];
   if (!q) return renderAnswersIntro();
   const r = state.reveal;
-  const vpath = r.key?.answer_video_path || null;
+  const vpath = r.key?.answer_video_path || (q.audio_reverse && isVideoClip(q) ? q.audio_path : null);
   const photo = vpath ? null : state.game.photo_url;
   const isLast = answerIndex(i + 1, 1) == null;
 
@@ -965,7 +965,7 @@ async function renderReveal() {
     h('footer', { class: 'q-foot' },
       h('button', { class: 'btn btn-ghost', onclick: previous }, '◀ Vorige'),
       mediaLink && !r.key?.answer_media_hidden && mediaSlot(mediaLink, 'tonen', 'media-foot'),
-      q.audio_path && q.audio_reverse && h('button', {
+      clipFor('answers', q) && h('button', {
         class: 'btn btn-ghost intro-again', onclick: () => playClip(q.audio_path, false),
       }, '▶ Vooruit afspelen'),
       h('button', { class: 'btn btn-gold btn-lg', onclick: () => { if (isLast) playMusic(state.music?.end); next(); } }, isLast ? 'Einde antwoordenronde ▶' : 'Volgende antwoord ▶'),
@@ -1419,7 +1419,8 @@ let clipSrc = null;
 function clipFor(status, q) {
   if (!q?.audio_path) return null;
   if (status === 'question') return { path: q.audio_path, reverse: Boolean(q.audio_reverse) };
-  if (status === 'answers' && q.audio_reverse) return { path: q.audio_path, reverse: false };
+  // Bij het antwoord vooruit, tenzij er dan een filmpje speelt (anders klinkt het dubbel)
+  if (status === 'answers' && q.audio_reverse && !videoPathFor('answers', q)) return { path: q.audio_path, reverse: false };
   return null;
 }
 
@@ -1559,9 +1560,13 @@ window.addEventListener('resize', () => requestAnimationFrame(() => document.que
 const videos = new Map();
 let videoBox = null;
 
+/** Is het geluidsfragment eigenlijk een filmpje (bijv. uit de galerij)? */
+const isVideoClip = (q) => /\.(mp4|webm)$/i.test(q?.audio_path || '');
+
 function videoPathFor(status, q) {
   if (!q || q.scare_only) return null;
-  if (status === 'answers') return state.keys?.get(q.id)?.answer_video_path || null;
+  // Bij het antwoord: het antwoordfilmpje, of anders het hele filmpje dat bij de vraag achterstevoren klonk.
+  if (status === 'answers') return state.keys?.get(q.id)?.answer_video_path || (q.audio_reverse && isVideoClip(q) ? q.audio_path : null);
   if (status === 'question') return q.video_path || null;
   return null;
 }
@@ -1592,7 +1597,7 @@ async function videoUrlFor(path) {
 function preloadVideos() {
   for (const q of state.questions) {
     videoFor(q.video_path);
-    videoFor(state.keys?.get(q.id)?.answer_video_path);
+    videoFor(videoPathFor('answers', q));
   }
 }
 
