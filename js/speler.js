@@ -2,9 +2,9 @@
 import {
   sb, h, mount, toast, load, save, LETTERS, syncClock, secondsLeft,
   fetchQuestions, fetchGame, errorText, liveSync, spotifyPlayer, hiddenSpotifyPlayer, brandTitle, inScarePhase,
-} from './common.js?v=66';
-import { parseNumber, formatNumber } from './scoring.js?v=66';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=66';
+} from './common.js?v=67';
+import { parseNumber, formatNumber } from './scoring.js?v=67';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=67';
 
 const PLAYER_KEY = 'kerstquiz_speler';
 
@@ -459,16 +459,12 @@ function renderStarting() {
  * Filmpje op de telefoon. Hetzelfde element blijft bewaard zolang het filmpje gelijk is,
  * zodat het doorspeelt als het scherm opnieuw wordt opgebouwd.
  */
-let videoEl = null;
-function phoneVideo(url) {
-  const key = url.split('?')[0];
-  if (videoEl?.dataset.key === key) return videoEl;
-  videoEl?.pause();
-  const el = h('video', { class: 'p-video', src: url, playsinline: true, controls: true, preload: 'auto', 'data-key': key });
-  videoEl = el;
-  // Met geluid starten; mag dat niet (iPhone zonder tik), dan zonder geluid: spelers tikken zelf op 🔊.
-  el.play()?.catch(() => { el.muted = true; el.play()?.catch(() => {}); });
-  return el;
+/**
+ * Filmpjes spelen alleen op de tv (scheelt veel dataverkeer: anders downloadt elke telefoon het hele filmpje).
+ * Op de telefoon staat op die plek alleen een verwijzing naar het grote scherm.
+ */
+function phoneVideo() {
+  return h('p', { class: 'p-listen' }, '🎬 Kijk naar het grote scherm');
 }
 
 function renderLookUp(icon = '★', text = 'Kijk naar het grote scherm') {

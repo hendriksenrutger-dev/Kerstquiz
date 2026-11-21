@@ -2,9 +2,9 @@
 // spelinstellingen en een spel starten. Licht thema; werkt op iPad en iPhone.
 import {
   sb, h, mount, toast, LETTERS, errorText, loginForm, parseSpotify, cleanSpotifyLink, spotifyPlayer, SCARE_SECONDS,
-} from './common.js?v=66';
-import { parseNumber, formatNumber } from './scoring.js?v=66';
-import { addTestPlayers } from './proef.js?v=66';
+} from './common.js?v=67';
+import { parseNumber, formatNumber } from './scoring.js?v=67';
+import { addTestPlayers } from './proef.js?v=67';
 
 const TREE_CATEGORY = 'Van wie is deze kerstboom?';
 // Drie soorten muziekvragen (zie renderMusicForm)
@@ -852,7 +852,7 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
       h('label', {}, 'Foto onthullen', revealFx,
         h('span', { class: 'hint' }, 'De foto wordt tijdens de vraag langzaam zichtbaar op de tv (na ongeveer 85% van de tijd helemaal). Op de telefoons staat de foto dan niet.')),
       video.el,
-      h('span', { class: 'hint' }, 'Een filmpje start vanzelf met geluid op de tv en de telefoons, op de plek van de foto. Maximaal 50 MB.')),
+      h('span', { class: 'hint' }, 'Een filmpje start vanzelf met geluid op de tv, op de plek van de foto (op de telefoons staat dan "Kijk naar het grote scherm"). Maximaal 50 MB.')),
 
     // ---- 3. Muziek en geluid bij de vraag
     formSection('🎵 Muziek of geluid bij de vraag', Boolean(q?.media_url || q?.audio_path),
