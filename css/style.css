@@ -1142,8 +1142,8 @@ body.pv-with-phone .stage { width: min(calc(100vw - 340px), calc((100dvh - 64px)
 }
 .countdown > * { position: relative; z-index: 1; }
 .countdown.countdown-final::before { opacity: 1; }
-.countdown .q-foot { transition: opacity 1s ease; }
-.countdown.countdown-final .q-foot { opacity: .3; }
+/* knoppen vervagen samen met de titel (blijven wel aan te tikken, en de afstandsbediening werkt gewoon) */
+.countdown-foot { animation: countdown-fade-orn 1.4s ease forwards; }
 
 /* Knoppen met alleen een pijl */
 .btn.btn-arrow { min-width: max(104px, 7.5cqw); padding-inline: 1em; font-size: max(26px, 2cqw); line-height: 1; }
