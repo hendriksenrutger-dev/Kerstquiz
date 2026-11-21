@@ -4,12 +4,12 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer, inScarePhase, serverNow, SCARE_SECONDS,
-} from './common.js?v=45';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=45';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=45';
+} from './common.js?v=46';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=46';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=46';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking, fastestWinners,
-} from './scoring.js?v=45';
+} from './scoring.js?v=46';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -1418,7 +1418,11 @@ function answerPhotoBox(q, key, photo) {
 /** Foto met onthul-effect: wazig → scherp, uitzoomen of puzzelstukjes die wegvallen. */
 function fxPhoto(fx, photo, total, elapsed, seedText) {
   const img = h('img', { src: photo, alt: '' });
-  const box = h('div', { class: `photo photo-fx fx-${fx}` }, img);
+  // Lijst in de verhouding van de foto (zo blijft de hele foto in beeld); het vak eromheen is onzichtbaar.
+  const frame = h('div', { class: 'fx-frame' }, img);
+  const box = h('div', { class: `photo photo-fx fx-${fx}` }, frame);
+  img.addEventListener('load', () => fitFxFrame(frame));
+  requestAnimationFrame(() => fitFxFrame(frame));
   img.style.animationDuration = `${total}s`;
   img.style.animationDelay = `${-elapsed}s`;
   if (fx === 'puzzel') {
@@ -1431,10 +1435,24 @@ function fxPhoto(fx, photo, total, elapsed, seedText) {
       const at = ((order.indexOf(k) + 1) / n) * total;              // moment waarop dit stukje wegvalt
       return h('span', { class: 'fx-tile', style: { animationDelay: `${at - elapsed}s` } });
     });
-    box.append(h('div', { class: 'fx-tiles', 'aria-hidden': 'true', style: { gridTemplateColumns: `repeat(${cols}, 1fr)` } }, tiles));
+    frame.append(h('div', { class: 'fx-tiles', 'aria-hidden': 'true', style: { gridTemplateColumns: `repeat(${cols}, 1fr)` } }, tiles));
   }
   return box;
 }
+
+/** De lijst zo groot mogelijk maken in het vak, in de verhouding van de foto. */
+function fitFxFrame(frame) {
+  const img = frame.querySelector('img');
+  const box = frame.parentElement;
+  if (!img?.naturalWidth || !box) return;
+  const W = box.clientWidth; const H = box.clientHeight;
+  if (!W || !H) return;
+  const r = img.naturalWidth / img.naturalHeight;
+  const w = W / H > r ? H * r : W;
+  frame.style.width = `${Math.floor(w)}px`;
+  frame.style.height = `${Math.floor(w / r)}px`;
+}
+window.addEventListener('resize', () => requestAnimationFrame(() => document.querySelectorAll('.fx-frame').forEach(fitFxFrame)));
 
 // ---------------------------------------------------------------- filmpjes
 

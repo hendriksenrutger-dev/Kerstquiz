@@ -1040,11 +1040,12 @@ body.pv-with-phone .stage { width: min(calc(100vw - 340px), calc((100dvh - 64px)
 .question.reveal.has-photo .q-main { padding-left: 4cqw; padding-right: 2cqw; }
 
 /* Foto langzaam onthullen (tv) */
-.photo.photo-fx {
-  position: relative; overflow: hidden; align-self: stretch;
-  border: 4px solid var(--gold); border-radius: var(--radius); background: #000;
+.photo.photo-fx { position: relative; align-self: stretch; display: flex; align-items: center; justify-content: center; }
+.fx-frame {
+  position: relative; overflow: hidden; max-width: 100%; max-height: 100%;
+  border: 4px solid var(--gold); border-radius: var(--radius); background: #000; box-sizing: border-box;
 }
-.photo.photo-fx img { width: 100%; height: 100%; max-width: none; max-height: none; object-fit: cover; border: 0; border-radius: 0; }
+.photo.photo-fx img { display: block; width: 100%; height: 100%; max-width: none; max-height: none; object-fit: cover; border: 0; border-radius: 0; }
 .fx-vervagen img { animation-name: fx-blur; animation-timing-function: linear; animation-fill-mode: both; }
 .fx-inzoomen img { animation-name: fx-zoom; animation-timing-function: cubic-bezier(.3, 0, .2, 1); animation-fill-mode: both; }
 @keyframes fx-blur { from { filter: blur(48px) saturate(.6); transform: scale(1.15); } to { filter: blur(0) saturate(1); transform: scale(1); } }
