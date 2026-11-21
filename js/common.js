@@ -485,6 +485,8 @@ export function loopingSpotifyPlayer(link) {
   let restarts = 0;
   let startMs = 0;             // beginpunt (ms), bijv. bij het aftellen
   let jump = false;            // zodra het speelt naar het beginpunt springen
+  let jumpAt = 0;
+  let jumpTries = 0;
 
   const startPlayback = () => {
     if (!ctrl) return;
@@ -495,7 +497,7 @@ export function loopingSpotifyPlayer(link) {
     restarts++;
     note(`opnieuw (${why})`);
     if (isList && typeof ctrl.loadUri === 'function') { ctrl.loadUri(uri); setTimeout(startPlayback, 800); return; }
-    if (typeof ctrl.seek === 'function') ctrl.seek(startMs);
+    if (typeof ctrl.seek === 'function') ctrl.seek(startMs / 1000);  // Spotify: seek in seconden
     startPlayback();
   };
   const note = (extra = '') => {
@@ -524,8 +526,12 @@ export function loopingSpotifyPlayer(link) {
           lastUpdate = Date.now();
           if (!d.isPaused) heard = Date.now();
           if (jump && !d.isPaused) {
-            jump = false;
-            if (Math.abs((d.position || 0) - startMs) > 800 && typeof ctrl.seek === 'function') ctrl.seek(startMs);
+            // Naar het beginpunt springen; Spotify negeert een sprong soms tijdens het laden, dus zo nodig opnieuw.
+            if (Math.abs((d.position || 0) - startMs) <= 1500) jump = false;
+            else if (Date.now() - jumpAt > 900 && jumpTries < 5 && typeof ctrl.seek === 'function') {
+              jumpAt = Date.now(); jumpTries++;
+              ctrl.seek(startMs / 1000);  // Spotify: seek in seconden
+            }
           }
           clearTimeout(restartTimer);
           if (d.isPaused && wanted && wasPlaying) {
@@ -578,7 +584,7 @@ export function loopingSpotifyPlayer(link) {
     el,
     /** Afspelen; met `start` (seconden) vanaf dat moment (zodra het speelt wordt er gesprongen). */
     play({ start: from = null } = {}) {
-      if (from != null) { startMs = Math.max(0, from * 1000); jump = startMs > 0; }
+      if (from != null) { startMs = Math.max(0, from * 1000); jump = startMs > 0; jumpTries = 0; jumpAt = 0; }
       wanted = true; lastUpdate = Date.now(); startPlayback(); watch();
     },
     refreshIfOld(maxAgeMs = 20 * 60 * 1000) {
@@ -603,7 +609,7 @@ function musicDebug() {
 // ---------- Versie (altijd de nieuwste versie laden) ----------
 
 // Bij elke nieuwe versie ophogen, samen met version.txt en de ?v=… in index.html en de imports.
-export const APP_VERSION = '63';
+export const APP_VERSION = '64';
 
 /**
  * GitHub Pages en Safari bewaren bestanden een tijd in de cache. Is er een nieuwere
@@ -674,6 +680,8 @@ export function deckPlayer(link, { height = 152 } = {}) {
   let limitMs = null;    // intro raden: na zoveel ms vanzelf stoppen
   let rewind = false;    // zodra het speelt, naar het beginpunt springen
   let startMs = 0;       // beginpunt (in ms) van het nummer, in beheer in te stellen
+  let rewindAt = 0;
+  let rewindTries = 0;
   let limitTimer = null;
   const listeners = [];
 
@@ -701,8 +709,13 @@ export function deckPlayer(link, { height = 152 } = {}) {
           // Speelt het, maar niet vanaf het begin (verder waar het gebleven was)?
           // Dan nu pas terugspoelen: vóór het afspelen spoelen gaf op de iPad haperingen.
           if (rewind && nowPlaying) {
-            rewind = false;
-            if (Math.abs(e.data.position - startMs) > 800 && typeof ctrl.seek === 'function') { ctrl.seek(startMs); playing = true; return; }
+            // Naar het beginpunt springen (Spotify: seek in seconden); tijdens het laden soms genegeerd, dan opnieuw.
+            if (Math.abs(e.data.position - startMs) <= 1500 || typeof ctrl.seek !== 'function') rewind = false;
+            else {
+              if (Date.now() - rewindAt > 900 && rewindTries < 5) { rewindAt = Date.now(); rewindTries++; ctrl.seek(startMs / 1000); }
+              playing = true;
+              return;
+            }
           }
           // Intro raden: genoeg gehoord (vanaf het beginpunt)? Dan stoppen.
           if (limitMs != null && nowPlaying && !rewind && e.data.position >= startMs + limitMs) { limitMs = null; api.pause(); return; }
@@ -751,6 +764,7 @@ export function deckPlayer(link, { height = 152 } = {}) {
       wanted = true;
       clearTimeout(limitTimer);
       startMs = Math.max(0, (from || 0) * 1000);
+      rewindAt = 0; rewindTries = 0;
       limitMs = seconds ? seconds * 1000 : null;
       rewind = true;  // altijd vanaf het begin (een vooraf geladen nummer gaat anders verder waar het was)
       // vangnet als Spotify de positie niet (op tijd) doorgeeft
