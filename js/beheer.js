@@ -2,9 +2,9 @@
 // spelinstellingen en een spel starten. Licht thema; werkt op iPad en iPhone.
 import {
   sb, h, mount, toast, LETTERS, errorText, loginForm, parseSpotify, cleanSpotifyLink, spotifyPlayer, SCARE_SECONDS,
-} from './common.js?v=44';
-import { parseNumber, formatNumber } from './scoring.js?v=44';
-import { addTestPlayers } from './proef.js?v=44';
+} from './common.js?v=45';
+import { parseNumber, formatNumber } from './scoring.js?v=45';
+import { addTestPlayers } from './proef.js?v=45';
 
 const TREE_CATEGORY = 'Van wie is deze kerstboom?';
 // Drie soorten muziekvragen (zie renderMusicForm)
@@ -622,6 +622,7 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
   const photo = photoPicker(q?.photo_path ? state.thumbs.get(q.photo_path) : null);
   const answerPhoto = photoPicker(ans?.answer_photo_path ? state.thumbs.get(ans.answer_photo_path) : null);
   const hideText = h('input', { type: 'checkbox', checked: Boolean(ans?.hide_answer_text) });
+  const answerFx = h('select', { class: 'b-select' }, REVEAL_EFFECTS.map((r) => h('option', { value: r.value, selected: (ans?.answer_reveal_effect || '') === r.value }, r.label)));
   const scarePhoto = photoPicker(q?.scare_path ? state.thumbs.get(q.scare_path) : null);
   const video = videoPicker(q?.video_path ? state.thumbs.get(q.video_path) : null, '🎬 Filmpje bij de vraag (optioneel)');
   const answerVideo = videoPicker(ans?.answer_video_path ? state.thumbs.get(ans.answer_video_path) : null, '🎬 Filmpje bij het antwoord (optioneel)');
@@ -673,6 +674,8 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
       if (answerLink === false) return (err.textContent = 'De Spotify-link bij het antwoord wordt niet herkend.');
       const answerRow = { correct_option: null, correct_texts: null, correct_value: null };
       if (answerSoundOnly.checked || ans?.answer_media_hidden) answerRow.answer_media_hidden = answerSoundOnly.checked;
+      // Alleen meesturen als ingesteld of eerder ingesteld (werkt dan ook zonder 017_antwoordfoto_onthullen.sql).
+      if (answerFx.value || ans?.answer_reveal_effect) answerRow.answer_reveal_effect = answerFx.value || null;
       // Alleen meesturen als het aan staat of stond (dan werkt het ook zonder 013_antwoord_alleen_foto.sql).
       if (hideText.checked || ans?.hide_answer_text) answerRow.hide_answer_text = hideText.checked;
 
@@ -762,6 +765,8 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
       h('span', { class: 'hint' }, 'De tv toont deze foto in de antwoordenronde in plaats van de vraagfoto. Spelers zien hem pas dan.'),
       answerPhoto.el,
       h('label', { class: 'check' }, hideText, 'Alleen de foto of het filmpje tonen, zonder antwoordtekst'),
+      h('label', {}, 'Antwoordfoto onthullen', answerFx,
+        h('span', { class: 'hint' }, `De antwoordfoto wordt in ${8} seconden langzaam zichtbaar zodra het antwoord op de tv komt.`)),
       h('span', { class: 'hint' }, 'Voor open vragen en meerkeuze, als de foto het antwoord al laat zien. Bij een schatting blijft het getal staan.')),
     video.el,
     !scareOnly && h('div', { class: 'stack-tight' },

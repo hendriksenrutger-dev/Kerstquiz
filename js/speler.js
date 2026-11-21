@@ -2,9 +2,9 @@
 import {
   sb, h, mount, toast, load, save, LETTERS, syncClock, secondsLeft,
   fetchQuestions, fetchGame, errorText, liveSync, spotifyPlayer, hiddenSpotifyPlayer, brandTitle, inScarePhase,
-} from './common.js?v=44';
-import { parseNumber, formatNumber } from './scoring.js?v=44';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=44';
+} from './common.js?v=45';
+import { parseNumber, formatNumber } from './scoring.js?v=45';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=45';
 
 // Telefoon: geluid voor een eventuele schrik bij de eerste tik vrijgeven (één keer)
 prepareScareAudio([{ scare_after: 1 }]);

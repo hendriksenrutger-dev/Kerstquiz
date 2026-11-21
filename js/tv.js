@@ -4,12 +4,12 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer, inScarePhase, serverNow, SCARE_SECONDS,
-} from './common.js?v=44';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=44';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=44';
+} from './common.js?v=45';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=45';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=45';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking, fastestWinners,
-} from './scoring.js?v=44';
+} from './scoring.js?v=45';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -224,6 +224,7 @@ async function goTo(status, index) {
   if (link) playMedia(link, { seconds: introSeconds(status, q) }); else stopMedia();
   const vpath = videoPathFor(status, q);
   if (vpath) playVideo(vpath); else stopVideos();
+  state.answerShownFor = null;  // onthul-effect van de antwoordfoto opnieuw laten beginnen
   state.busy = true;
   try {
     // In de antwoordenronde: de foto bij het antwoord, als die er is.
@@ -949,7 +950,7 @@ async function renderReveal() {
       ),
     ),
     h('div', { class: 'q-body' },
-      photo && h('div', { class: 'photo' }, h('img', { src: photo, alt: '' })),
+      photo && answerPhotoBox(q, r.key, photo),
       vpath && videoSlot(vpath),
       h('div', { class: 'q-main' },
         h('h2', { class: 'q-text q-text-small' }, q.text),
@@ -1259,6 +1260,7 @@ function previewChrome(q) {
   const previewMedia = () => {
     const t = preview.list[preview.index];
     const mode = preview.mode === 'antwoord' ? 'answers' : 'question';
+    state.answerShownFor = null;
     const link = t && !t.tiebreak ? mediaLinkFor(mode, t) : null;
     if (link) playMedia(link, { seconds: introSeconds(mode, t) }); else stopMedia();
     const vp = t && !t.tiebreak ? videoPathFor(preview.mode === 'antwoord' ? 'answers' : 'question', t) : null;
@@ -1396,18 +1398,33 @@ setInterval(placeDeck, 1000);
  * puzzelstukjes die wegvallen. Het effect loopt mee met de tijd van de vraag (ook na herladen).
  */
 function photoBox(q, photo) {
-  const fx = q.reveal_effect;
-  const img = h('img', { src: photo, alt: '' });
-  if (!fx || state.game.status !== 'question') return h('div', { class: 'photo' }, img);
+  if (!q.reveal_effect || state.game.status !== 'question') return h('div', { class: 'photo' }, h('img', { src: photo, alt: '' }));
   const total = Math.max(4, (q.time_limit || 20) * 0.85);       // na 85% van de tijd helemaal zichtbaar
   const elapsed = Math.max(0, (serverNow() - new Date(state.game.question_started_at).getTime()) / 1000);
+  return fxPhoto(q.reveal_effect, photo, total, elapsed, q.id);
+}
+
+/** Antwoordfoto langzaam onthullen (in beheer ingesteld): in een vaste tijd vanaf het moment dat het antwoord verschijnt. */
+const ANSWER_REVEAL_SECONDS = 8;
+function answerPhotoBox(q, key, photo) {
+  const fx = key?.answer_reveal_effect;
+  if (!fx || !key.answer_photo_path) return h('div', { class: 'photo' }, h('img', { src: photo, alt: '' }));
+  const mark = `${q.id}|${state.game.id}`;
+  if (state.answerShownFor !== mark) { state.answerShownFor = mark; state.answerShownAt = Date.now(); }
+  const elapsed = (Date.now() - state.answerShownAt) / 1000;
+  return fxPhoto(fx, photo, ANSWER_REVEAL_SECONDS, elapsed, `${q.id}-antwoord`);
+}
+
+/** Foto met onthul-effect: wazig → scherp, uitzoomen of puzzelstukjes die wegvallen. */
+function fxPhoto(fx, photo, total, elapsed, seedText) {
+  const img = h('img', { src: photo, alt: '' });
   const box = h('div', { class: `photo photo-fx fx-${fx}` }, img);
   img.style.animationDuration = `${total}s`;
   img.style.animationDelay = `${-elapsed}s`;
   if (fx === 'puzzel') {
     const cols = 6; const rows = 4; const n = cols * rows;
     // vaste, maar door elkaar gegooide volgorde per vraag
-    let seed = [...String(q.id)].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
+    let seed = [...String(seedText)].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
     const order = Array.from({ length: n }, (_, k) => k);
     for (let k = n - 1; k > 0; k--) { seed = (seed * 1103515245 + 12345) >>> 0; const j = seed % (k + 1); [order[k], order[j]] = [order[j], order[k]]; }
     const tiles = Array.from({ length: n }, (_, k) => {
