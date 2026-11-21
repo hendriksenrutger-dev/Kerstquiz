@@ -2,9 +2,9 @@
 // spelinstellingen en een spel starten. Licht thema; werkt op iPad en iPhone.
 import {
   sb, h, mount, toast, LETTERS, errorText, loginForm, parseSpotify, cleanSpotifyLink, spotifyPlayer, SCARE_SECONDS,
-} from './common.js?v=47';
-import { parseNumber, formatNumber } from './scoring.js?v=47';
-import { addTestPlayers } from './proef.js?v=47';
+} from './common.js?v=48';
+import { parseNumber, formatNumber } from './scoring.js?v=48';
+import { addTestPlayers } from './proef.js?v=48';
 
 const TREE_CATEGORY = 'Van wie is deze kerstboom?';
 // Drie soorten muziekvragen (zie renderMusicForm)
@@ -94,6 +94,7 @@ async function loadThumbs() {
     ...[...state.answers.values()].map((a) => a.answer_photo_path),
     ...state.questions.map((q) => q.scare_path),
     ...state.questions.map((q) => q.video_path),
+    ...state.questions.map((q) => q.audio_path),
     ...[...state.answers.values()].map((a) => a.answer_video_path),
   ].filter((p) => p && !state.thumbs.has(p));
   if (!paths.length) return;
@@ -156,6 +157,16 @@ async function uploadPhoto(blob) {
   return path;
 }
 
+const AUDIO_TYPES = { mp3: 'audio/mpeg', m4a: 'audio/mp4', aac: 'audio/aac', wav: 'audio/wav', ogg: 'audio/ogg' };
+async function uploadAudio(file) {
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  const type = AUDIO_TYPES[ext] || (file.type && file.type.startsWith('audio/') ? file.type : 'audio/mpeg');
+  const path = `geluid/${crypto.randomUUID()}.${AUDIO_TYPES[ext] ? ext : 'mp3'}`;
+  const { error } = await sb.storage.from('fotos').upload(path, file, { contentType: type, upsert: false });
+  if (error) throw error;
+  return path;
+}
+
 async function uploadVideo(file) {
   const type = file.type || 'video/mp4';
   const ext = type === 'video/quicktime' ? 'mov' : type === 'video/webm' ? 'webm' : 'mp4';
@@ -166,13 +177,16 @@ async function uploadVideo(file) {
 }
 
 /** Filmpjekiezer met voorbeeld. Geeft { el, get() } terug; get() → { file, removed }. */
-function videoPicker(currentUrl, label) {
+function videoPicker(currentUrl, label, { audio = false } = {}) {
   let file = null;
   let removed = false;
-  const preview = h('video', { class: 'video-preview', controls: true, playsinline: true, preload: 'metadata' });
+  const what = audio ? 'geluidsbestand' : 'filmpje';
+  const preview = audio
+    ? h('audio', { class: 'audio-preview', controls: true, preload: 'metadata' })
+    : h('video', { class: 'video-preview', controls: true, playsinline: true, preload: 'metadata' });
   const status = h('p', { class: 'hint' });
-  const input = h('input', { type: 'file', accept: 'video/*', class: 'sr-only' });
-  const removeBtn = h('button', { type: 'button', class: 'btn btn-light btn-small' }, 'Filmpje verwijderen');
+  const input = h('input', { type: 'file', accept: audio ? 'audio/*,.mp3,.m4a' : 'video/*', class: 'sr-only' });
+  const removeBtn = h('button', { type: 'button', class: 'btn btn-light btn-small' }, `${audio ? 'Geluid' : 'Filmpje'} verwijderen`);
   const show = (url) => {
     preview.hidden = !url;
     removeBtn.hidden = !url;
@@ -184,7 +198,7 @@ function videoPicker(currentUrl, label) {
     input.value = '';
     if (!f) return;
     if (f.size > VIDEO_MAX_BYTES) {
-      status.textContent = `Dit filmpje is te groot (${Math.round(f.size / 1048576)} MB). Maximaal 50 MB: kort het in, of kies een lagere kwaliteit.`;
+      status.textContent = `Dit ${what} is te groot (${Math.round(f.size / 1048576)} MB). Maximaal 50 MB: kort het in, of kies een lagere kwaliteit.`;
       return;
     }
     file = f;
@@ -193,7 +207,7 @@ function videoPicker(currentUrl, label) {
     status.textContent = `Gekozen (${Math.round(f.size / 1048576)} MB). Wordt geüpload bij Opslaan.`;
   });
   removeBtn.addEventListener('click', () => { file = null; removed = true; show(null); status.textContent = ''; });
-  const pick = h('label', { class: 'btn btn-green' }, input, currentUrl ? 'Ander filmpje kiezen' : 'Filmpje kiezen');
+  const pick = h('label', { class: 'btn btn-green' }, input, currentUrl ? `Ander ${what} kiezen` : `${audio ? 'Geluidsbestand' : 'Filmpje'} kiezen`);
   const el = h('div', { class: 'stack-tight' },
     h('span', { class: 'field-label' }, label),
     preview,
@@ -321,6 +335,7 @@ function questionItem(q, i) {
         ans?.answer_photo_path && h('span', { class: 'muted' }, '📷 antwoordfoto'),
         ans?.answer_media_url && h('span', { class: 'muted' }, '♪ antwoordnummer'),
         q.video_path && h('span', { class: 'muted' }, '🎬 filmpje'),
+        q.audio_path && h('span', { class: 'muted' }, q.audio_reverse ? '⏪ geluid achterstevoren' : '🔊 geluid'),
         q.reveal_effect && h('span', { class: 'muted' }, `🧩 ${q.reveal_effect === 'puzzel' ? 'puzzelstukjes' : q.reveal_effect === 'inzoomen' ? 'uitzoomen' : 'wazig → scherp'}`),
         q.media_seconds && h('span', { class: 'muted' }, `🎧 intro ${q.media_seconds} s`),
         q.fastest_count && h('span', { class: 'muted' }, `⚡ ${q.fastest_count} snelsten`),
@@ -447,6 +462,7 @@ async function removeQuestion(q) {
   await removePhoto(state.answers.get(q.id)?.answer_photo_path);
   await removePhoto(q.scare_path);
   await removePhoto(q.video_path);
+  await removePhoto(q.audio_path);
   await removePhoto(state.answers.get(q.id)?.answer_video_path);
   state.questions = state.questions.filter((x) => x.id !== q.id);
   state.answers.delete(q.id);
@@ -626,6 +642,8 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
   const scarePhoto = photoPicker(q?.scare_path ? state.thumbs.get(q.scare_path) : null);
   const video = videoPicker(q?.video_path ? state.thumbs.get(q.video_path) : null, '🎬 Filmpje bij de vraag (optioneel)');
   const answerVideo = videoPicker(ans?.answer_video_path ? state.thumbs.get(ans.answer_video_path) : null, '🎬 Filmpje bij het antwoord (optioneel)');
+  const audioPick = videoPicker(q?.audio_path ? state.thumbs.get(q.audio_path) : null, '🔊 Geluidsfragment bij de vraag (mp3 of m4a, optioneel)', { audio: true });
+  const audioReverse = h('input', { type: 'checkbox', checked: Boolean(q?.audio_reverse) });
   const music = spotifyField(q?.media_url || '');
   const answerMusic = spotifyField(ans?.answer_media_url || '', { label: 'Spotify-link bij het antwoord (optioneel)' });
   const answerSoundOnly = h('input', { type: 'checkbox', checked: Boolean(ans?.answer_media_hidden) });
@@ -724,6 +742,10 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
         const oldScare = q?.scare_path || null;
         const vd = video.get();
         const avd = answerVideo.get();
+        const au = audioPick.get();
+        const oldAudio = q?.audio_path || null;
+        // Alleen meesturen als er geluid is of was (werkt dan ook zonder 018_geluid_achterstevoren.sql).
+        if (au.file || oldAudio || audioReverse.checked) row.audio_reverse = audioReverse.checked;
         const oldVideo = q?.video_path || null;
         const oldAnswerVideo = ans?.answer_video_path || null;
         const uploaded = [];
@@ -734,6 +756,8 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
           else if (vd.removed && oldVideo) row.video_path = null;
           if (avd.file) { saveBtn.textContent = 'Filmpje uploaden…'; uploaded.push(answerRow.answer_video_path = await uploadVideo(avd.file)); }
           else if (avd.removed && oldAnswerVideo) answerRow.answer_video_path = null;
+          if (au.file) { saveBtn.textContent = 'Geluid uploaden…'; uploaded.push(row.audio_path = await uploadAudio(au.file)); }
+          else if (au.removed && oldAudio) { row.audio_path = null; row.audio_reverse = false; }
           saveBtn.textContent = 'Bezig met opslaan…';
           await saveQuestion(q, row, answerRow, photo.get(), answerPhoto.get());
         } catch (ex2) {
@@ -743,6 +767,7 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
         if (oldScare && 'scare_path' in row) await removePhoto(oldScare);
         if (oldVideo && 'video_path' in row) await removePhoto(oldVideo);
         if (oldAnswerVideo && 'answer_video_path' in answerRow) await removePhoto(oldAnswerVideo);
+        if (oldAudio && 'audio_path' in row) await removePhoto(oldAudio);
         toast('Vraag opgeslagen');
         renderList();
       } catch (ex) {
@@ -772,6 +797,10 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
     !scareOnly && h('div', { class: 'stack-tight' },
       answerVideo.el,
       h('span', { class: 'hint' }, 'Een filmpje start vanzelf met geluid op de tv en de telefoons, op de plek van de foto. Maximaal 50 MB (ongeveer een halve tot een hele minuut).')),
+    h('div', { class: 'stack-tight' },
+      audioPick.el,
+      h('label', { class: 'check' }, audioReverse, '⏪ Achterstevoren afspelen bij de vraag (bij het antwoord gewoon vooruit)'),
+      h('span', { class: 'hint' }, 'Alleen op de tv, zonder speler in beeld. Op de tv staat een knop "Nog een keer". Tip: kies een kort fragment met een herkenbaar refrein. Een mp3 of m4a koop je bijvoorbeeld in de iTunes Store, of neem je op.')),
     music.el,
     h('label', { class: 'check' }, soundOnly, 'Alleen geluid: geen speler in beeld bij de vraag'),
     h('label', {}, '🎧 Intro raden: speel maar … seconden', introSecs,
