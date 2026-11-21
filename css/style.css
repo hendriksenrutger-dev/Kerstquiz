@@ -1089,3 +1089,21 @@ body.pv-with-phone .stage { width: min(calc(100vw - 340px), calc((100dvh - 64px)
   visibility: visible; opacity: .01; pointer-events: none; z-index: -1;
   bottom: auto; top: 50%; transform: translate(-50%, -50%);
 }
+
+/* Welkomstscherm vóór de wachtruimte */
+.welcome-tap {
+  position: absolute; inset: 0; z-index: 1; border: 0; padding: 0; margin: 0; background: none; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3cqh; color: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+.welcome-brand { display: flex; flex-direction: column; align-items: center; gap: 2cqh; animation: welcome-in 1.6s ease both; }
+.brand-welcome { align-items: center; text-align: center; }
+.brand-welcome .brand-script { font-size: max(110px, 16cqw); }
+.welcome-brand .ornament { width: min(520px, 40cqw); }
+.welcome-hint {
+  position: absolute; bottom: 5cqh; left: 0; right: 0; text-align: center;
+  font: 500 max(14px, 1.1cqw) var(--sans); letter-spacing: .2em; text-transform: uppercase; color: var(--muted); opacity: .45;
+}
+.screen-hero.welcome .hero-bg { filter: none; }
+.welcome .corner { z-index: 3; }
+@keyframes welcome-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
