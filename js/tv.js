@@ -4,12 +4,12 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer, inScarePhase, serverNow, SCARE_SECONDS,
-} from './common.js?v=53';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=53';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=53';
+} from './common.js?v=55';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=55';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=55';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking, fastestWinners,
-} from './scoring.js?v=53';
+} from './scoring.js?v=55';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -384,13 +384,18 @@ function render() {
 
 /** Welkomstscherm: alleen de naam, de sfeerfoto en de muziek. Tik ergens → wachtruimte met QR-code. */
 function renderWelcome() {
-  const go = () => { state.welcome = false; playMusic(state.music?.start); renderLobby(); };
+  const go = () => {
+    state.welcome = false;
+    // Muziek laten doorlopen; alleen starten als er (nog) niets speelt
+    const p = musicPlayer(state.music?.start);
+    if (p && !p.isPlaying()) p.play();
+    renderLobby();
+  };
   mount(stage('screen-hero welcome',
     heroLayout(),
     h('button', { class: 'welcome-tap', 'aria-label': 'Verder naar de kamercode', onclick: go },
-      h('div', { class: 'welcome-brand' }, brandTitle('brand-welcome'), ornament()),
-      h('span', { class: 'welcome-hint' }, 'tik om te beginnen')),
-    cornerMenu()));
+      h('div', { class: 'welcome-brand' }, brandTitle('brand-welcome'), ornament()))));
+  // Alleen de naam in beeld: geen menu, geen knoppen. Na de tik verschijnt het menu weer (wachtruimte).
 }
 
 function renderLobby() {

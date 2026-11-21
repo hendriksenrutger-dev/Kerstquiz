@@ -549,6 +549,8 @@ export function loopingSpotifyPlayer(link) {
   return {
     el,
     play() { wanted = true; lastUpdate = Date.now(); startPlayback(); },
+    /** Speelt er nu muziek? */
+    isPlaying() { return wanted && ctrl != null && !last.isPaused; },
     pause() {
       wanted = false;
       clearTimeout(restartTimer);
@@ -565,7 +567,7 @@ function musicDebug() {
 // ---------- Versie (altijd de nieuwste versie laden) ----------
 
 // Bij elke nieuwe versie ophogen, samen met version.txt en de ?v=… in index.html en de imports.
-export const APP_VERSION = '53';
+export const APP_VERSION = '55';
 
 /**
  * GitHub Pages en Safari bewaren bestanden een tijd in de cache. Is er een nieuwere
