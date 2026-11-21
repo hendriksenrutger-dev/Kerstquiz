@@ -35,3 +35,6 @@ Gebruik voor de echte avond "Start quiz op dit scherm" of "Start nieuwe quiz".
 Verhoog het versienummer op vier plekken, zodat browsers meteen de nieuwe bestanden laden:
 `version.txt`, `APP_VERSION` in `js/common.js`, de `?v=…` in `index.html` en de `?v=…` in alle `import`-regels in `js/`.
 De app vergelijkt bij het laden zijn eigen versie met `version.txt` en herlaadt zichzelf als er een nieuwere online staat.
+
+Staat een nieuwe versie na het mergen niet online? Kijk bij **Actions** of er een nieuwe run van
+"pages build and deployment" is gestart. Zo niet, dan start een volgende merge naar `main` het opnieuw.

@@ -1,10 +1,10 @@
 // Spelersscherm (#speler): telefoon, zonder login.
 import {
   sb, h, mount, toast, load, save, LETTERS, syncClock, secondsLeft,
-  fetchQuestions, fetchGame, errorText, liveSync, spotifyPlayer, hiddenSpotifyPlayer, brandTitle, inScarePhase,
-} from './common.js?v=66';
-import { parseNumber, formatNumber } from './scoring.js?v=66';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=66';
+  fetchQuestions, fetchGame, errorText, liveSync, brandTitle, inScarePhase,
+} from './common.js?v=68';
+import { parseNumber, formatNumber } from './scoring.js?v=68';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=68';
 
 const PLAYER_KEY = 'kerstquiz_speler';
 
@@ -238,9 +238,8 @@ function renderQuestion(q) {
       h('h2', { class: 'p-question' }, q.text),
       state.game.video_url ? phoneVideo(state.game.video_url)
         : photo && !q.reveal_effect && h('img', { class: 'p-photo', src: photo, alt: '' }),
-      // Foto met onthul-effect of intro raden: alleen op het grote scherm
-      q.media_url && q.media_mode !== 'alleen_geluid' && (q.media_seconds
-        ? h('p', { class: 'p-listen' }, '♪ Luister naar het grote scherm') : phonePlayer(q)),
+      // Muziek speelt alleen op de tv (scheelt dataverkeer en echo)
+      q.media_url && h('p', { class: 'p-listen' }, '♪ Luister naar het grote scherm'),
       photo && q.reveal_effect && h('p', { class: 'p-listen' }, '👀 Kijk naar het grote scherm'),
       twoStep(q)
         ? [h('div', { id: 'p-step1' }, answerArea), ratingStep(q)]
@@ -280,13 +279,6 @@ function choiceArea(q) {
     h('div', { class: 'p-options' }, buttons),
     h('p', { class: 'hint center' }, 'Je kunt je keuze wijzigen tot de tijd om is.'),
   ];
-}
-
-/** Muziek op de telefoon: zichtbaar, afgedekt of alleen op de tv. */
-function phonePlayer(q) {
-  if (q.media_mode === 'alleen_tv') return h('p', { class: 'p-listen' }, '♪ Luister naar het grote scherm');
-  if (q.media_mode === 'verbergen') return hiddenSpotifyPlayer(q.media_url, { compact: true });
-  return spotifyPlayer(q.media_url, { compact: true });
 }
 
 /** Cijfer 1–10 voor de boom (telt niet voor de score). */
@@ -459,16 +451,12 @@ function renderStarting() {
  * Filmpje op de telefoon. Hetzelfde element blijft bewaard zolang het filmpje gelijk is,
  * zodat het doorspeelt als het scherm opnieuw wordt opgebouwd.
  */
-let videoEl = null;
-function phoneVideo(url) {
-  const key = url.split('?')[0];
-  if (videoEl?.dataset.key === key) return videoEl;
-  videoEl?.pause();
-  const el = h('video', { class: 'p-video', src: url, playsinline: true, controls: true, preload: 'auto', 'data-key': key });
-  videoEl = el;
-  // Met geluid starten; mag dat niet (iPhone zonder tik), dan zonder geluid: spelers tikken zelf op 🔊.
-  el.play()?.catch(() => { el.muted = true; el.play()?.catch(() => {}); });
-  return el;
+/**
+ * Filmpjes spelen alleen op de tv (scheelt veel dataverkeer: anders downloadt elke telefoon het hele filmpje).
+ * Op de telefoon staat op die plek alleen een verwijzing naar het grote scherm.
+ */
+function phoneVideo() {
+  return h('p', { class: 'p-listen' }, '🎬 Kijk naar het grote scherm');
 }
 
 function renderLookUp(icon = '★', text = 'Kijk naar het grote scherm') {

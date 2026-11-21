@@ -2,23 +2,18 @@
 // spelinstellingen en een spel starten. Licht thema; werkt op iPad en iPhone.
 import {
   sb, h, mount, toast, LETTERS, errorText, loginForm, parseSpotify, cleanSpotifyLink, spotifyPlayer, SCARE_SECONDS,
-} from './common.js?v=66';
-import { parseNumber, formatNumber } from './scoring.js?v=66';
-import { addTestPlayers } from './proef.js?v=66';
+} from './common.js?v=68';
+import { parseNumber, formatNumber } from './scoring.js?v=68';
+import { addTestPlayers } from './proef.js?v=68';
 
 const TREE_CATEGORY = 'Van wie is deze kerstboom?';
 // Drie soorten muziekvragen (zie renderMusicForm)
 const MUSIC = {
-  ingestuurd: { category: 'Wie heeft dit nummer ingestuurd?', mode: 'tonen' },
-  artiest: { category: 'Van wie is dit nummer?', mode: 'verbergen' },
+  // Spotify speelt alleen op de tv: met speler in beeld, of alleen geluid (als de speler het antwoord zou verraden)
+  ingestuurd: { category: 'Wie heeft dit nummer ingestuurd?', mode: 'alleen_tv' },
+  artiest: { category: 'Van wie is dit nummer?', mode: 'alleen_geluid' },
   zin: { category: 'Maak de zin af', mode: 'alleen_tv' },
 };
-const MEDIA_MODES = [
-  { value: 'tonen', label: 'Speler tonen op tv en telefoons' },
-  { value: 'verbergen', label: 'Speler afdekken (titel en artiest niet zichtbaar)' },
-  { value: 'alleen_tv', label: 'Alleen op de tv, niet op de telefoons' },
-  { value: 'alleen_geluid', label: 'Alleen geluid: geen speler in beeld (muziek via de tv)' },
-];
 const DEFAULT_CATEGORIES = [TREE_CATEGORY, ...Object.values(MUSIC).map((m) => m.category), 'In welke stad staat deze kerstboom?', 'Kerstfeitje'];
 const REVEAL_EFFECTS = [
   { value: '', label: 'Gewoon tonen' },
@@ -358,7 +353,7 @@ function questionItem(q, i) {
         q.media_start && h('span', { class: 'muted' }, `⏩ vanaf ${formatTime(q.media_start)}`),
         q.fastest_count && h('span', { class: 'muted' }, `⚡ ${q.fastest_count} snelsten`),
         ans?.answer_video_path && h('span', { class: 'muted' }, '🎬 antwoordfilmpje'),
-        q.media_url && h('span', { class: 'b-music' }, q.media_mode === 'verbergen' ? '♪ Spotify (afgedekt)' : q.media_mode === 'alleen_tv' ? '♪ Spotify (alleen tv)' : q.media_mode === 'alleen_geluid' ? '♪ Spotify (alleen geluid)' : '♪ Spotify'),
+        q.media_url && h('span', { class: 'b-music' }, ['alleen_geluid', 'verbergen'].includes(q.media_mode) ? '♪ Spotify (alleen geluid)' : '♪ Spotify (speler op tv)'),
       ),
       h('div', { class: 'q-title' }, q.text),
       h('div', { class: 'muted q-answer' }, answerSummary(q, ans)),
@@ -701,16 +696,13 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
   const answerSoundOnly = h('input', { type: 'checkbox', checked: Boolean(ans?.answer_media_hidden) });
   const mediaStart = timeInput(q?.media_start);
   const answerMediaStart = timeInput(ans?.answer_media_start);
-  // Standaard afdekken: de speler toont titel en artiest en zou het antwoord kunnen verraden.
-  const currentMode = q?.media_url ? (q.media_mode || 'tonen') : 'verbergen';
-  // "Alleen geluid" is een apart vinkje; de keuzelijst bevat de andere standen.
-  const soundOnly = h('input', { type: 'checkbox', checked: currentMode === 'alleen_geluid' });
+  // Spotify speelt alleen op de tv. Standaard alleen geluid: de speler toont titel en artiest en zou het antwoord verraden.
+  // Een oude "afgedekt"-vraag telt ook als alleen geluid.
+  const currentMode = q?.media_url ? (q.media_mode || 'alleen_tv') : 'alleen_geluid';
+  const soundOnly = h('input', { type: 'checkbox', checked: currentMode === 'alleen_geluid' || currentMode === 'verbergen' });
   const introSecs = h('input', { type: 'number', inputmode: 'numeric', min: '1', max: '30', step: '1', value: q?.media_seconds ? String(q.media_seconds) : '', placeholder: 'heel', class: 'input-short' });
   const revealFx = h('select', { class: 'b-select' }, REVEAL_EFFECTS.map((r) => h('option', { value: r.value, selected: (q?.reveal_effect || '') === r.value }, r.label)));
-  const modeSelect = h('select', { class: 'b-select' }, MEDIA_MODES.filter((m) => m.value !== 'alleen_geluid')
-    .map((m) => h('option', { value: m.value, selected: currentMode === m.value }, m.label)));
-  const modeField = h('label', { hidden: currentMode === 'alleen_geluid' }, 'Speler tijdens de vraag', modeSelect, h('span', { class: 'hint' }, 'De Spotify-speler toont titel en artiest. Kies "tonen" alleen als dat het antwoord niet verraadt. In de antwoordenronde speelt alleen de Spotify-link bij het antwoord (als je die invult).'));
-  soundOnly.addEventListener('change', () => { modeField.hidden = soundOnly.checked; });
+  const modeField = h('span', { class: 'hint' }, 'Het nummer speelt alleen op de tv. Zonder vinkje staat de Spotify-speler in beeld; die toont titel en artiest, dus vink "alleen geluid" aan als dat het antwoord verraadt.');
   const err = h('p', { class: 'form-error', role: 'alert' });
   const saveBtn = h('button', { class: 'btn btn-green btn-lg', type: 'submit' }, 'Opslaan');
 
@@ -735,7 +727,7 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
       if (link === false) return (err.textContent = 'Deze Spotify-link wordt niet herkend. Gebruik in Spotify: Delen → Link kopiëren.');
       // Alleen meesturen als er een link is of was (dan werkt het ook zonder 003_muziek.sql).
       if (link || q?.media_url) row.media_url = link;
-      if (link) row.media_mode = soundOnly.checked ? 'alleen_geluid' : modeSelect.value;
+      if (link) row.media_mode = soundOnly.checked ? 'alleen_geluid' : 'alleen_tv';
       // Intro raden en foto onthullen: alleen meesturen als ingesteld of eerder ingesteld (werkt dan ook zonder 015).
       const secs = introSecs.value.trim() ? parseInt(introSecs.value, 10) : null;
       if (secs != null && !(secs >= 1 && secs <= 30)) return (err.textContent = 'Intro raden: kies 1 tot 30 seconden (of laat het leeg).');
@@ -852,7 +844,7 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
       h('label', {}, 'Foto onthullen', revealFx,
         h('span', { class: 'hint' }, 'De foto wordt tijdens de vraag langzaam zichtbaar op de tv (na ongeveer 85% van de tijd helemaal). Op de telefoons staat de foto dan niet.')),
       video.el,
-      h('span', { class: 'hint' }, 'Een filmpje start vanzelf met geluid op de tv en de telefoons, op de plek van de foto. Maximaal 50 MB.')),
+      h('span', { class: 'hint' }, 'Een filmpje start vanzelf met geluid op de tv, op de plek van de foto (op de telefoons staat dan "Kijk naar het grote scherm"). Maximaal 50 MB.')),
 
     // ---- 3. Muziek en geluid bij de vraag
     formSection('🎵 Muziek of geluid bij de vraag', Boolean(q?.media_url || q?.audio_path),
