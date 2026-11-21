@@ -4,12 +4,12 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer, inScarePhase, serverNow, SCARE_SECONDS,
-} from './common.js?v=65';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=65';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=65';
+} from './common.js?v=66';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=66';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=66';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking, fastestWinners,
-} from './scoring.js?v=65';
+} from './scoring.js?v=66';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -576,7 +576,7 @@ function renderCountdown() {
   const orn = ornament(); orn.classList.add('countdown-orn'); orn.style.animationDelay = fadeDelay;
   const view = h('div', { class: 'countdown' },
     h('div', { class: 'countdown-center' }, title, grow, orn),
-    h('footer', { class: 'q-foot' },
+    h('footer', { class: 'q-foot countdown-foot', style: { animationDelay: fadeDelay } },
       h('button', { class: 'btn btn-ghost', onclick: () => { stopCountdown(); bgMusic(state.music?.start); renderRules(); } }, '◀ Terug'),
       h('button', { class: 'btn btn-gold btn-lg btn-arrow', onclick: finishCountdown, 'aria-label': 'Nu beginnen', title: 'Nu beginnen' }, '▶'),
     ),
@@ -608,14 +608,15 @@ function heartbeat(n) {
   const ctx = fxAudio();
   if (!ctx) return;
   try {
-    const vol = 0.35 + (5 - n) * 0.12;
+    const vol = 0.5 + (5 - n) * 0.15;  // iets harder, zodat hij boven de muziek uitkomt
     [0, 0.17].forEach((dt, k) => {
       const t = ctx.currentTime + 0.02 + dt;
       const o = ctx.createOscillator(); o.type = 'sine';
       o.frequency.setValueAtTime(70, t); o.frequency.exponentialRampToValueAtTime(38, t + 0.22);
       const g = ctx.createGain();
       g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol * (k ? 0.7 : 1), t + 0.015); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
-      o.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t + 0.3);
+      const comp = ctx.createDynamicsCompressor();
+      o.connect(g); g.connect(comp); comp.connect(ctx.destination); o.start(t); o.stop(t + 0.3);
     });
   } catch { /* geen geluid */ }
 }
