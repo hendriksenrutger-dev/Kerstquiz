@@ -4,12 +4,12 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer, inScarePhase, serverNow, SCARE_SECONDS,
-} from './common.js?v=41';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=41';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=41';
+} from './common.js?v=42';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=42';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=42';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking,
-} from './scoring.js?v=41';
+} from './scoring.js?v=42';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -221,7 +221,7 @@ async function goTo(status, index) {
   if (!q) return;
   // Muziek van het volgende scherm meteen starten, nog binnen de tik op de knop.
   const link = mediaLinkFor(status, q);
-  if (link) playMedia(link); else stopMedia();
+  if (link) playMedia(link, { seconds: introSeconds(status, q) }); else stopMedia();
   const vpath = videoPathFor(status, q);
   if (vpath) playVideo(vpath); else stopVideos();
   state.busy = true;
@@ -276,6 +276,8 @@ async function setState(status, questionId = null, photoUrl = null) {
   state.game = data;
   await loadAnswered();
   render();
+  // spelers/filmpjes van het vorige scherm meteen weghalen (niet wachten op de controle elke seconde)
+  requestAnimationFrame(() => { placeDeck(); placeVideos(); });
 }
 
 // Volgorde: wachtruimte → vragen → "De antwoorden" → antwoorden → einde.
@@ -488,6 +490,7 @@ function renderQuestion() {
       h('span', { class: 'option-text' }, h('span', { class: 'sr-only' }, `${LETTERS[k]}: `), text),
     ));
 
+  const intro = q.media_url && q.media_seconds;
   const view = h('div', { class: `question ${photo || vpath ? 'has-photo' : ''}` },
     h('header', { class: 'q-head' },
       h('div', { class: 'q-meta' },
@@ -500,17 +503,20 @@ function renderQuestion() {
       ),
     ),
     h('div', { class: 'q-body' },
-      photo && h('div', { class: 'photo' }, h('img', { src: photo, alt: '' })),
+      photo && photoBox(q, photo),
       vpath && videoSlot(vpath),
       h('div', { class: 'q-main' },
         h('h2', { class: 'q-text' }, q.text),
-        q.media_url && q.media_mode !== 'alleen_geluid' && mediaSlot(q.media_url, q.media_mode),
+        q.media_url && q.media_mode !== 'alleen_geluid' && !intro && mediaSlot(q.media_url, q.media_mode),
         q.kind === 'meerkeuze' && h('div', { class: 'options' }, options),
       ),
     ),
     h('footer', { class: 'q-foot' },
       h('button', { class: 'btn btn-ghost', onclick: previous }, '◀ Vorige'),
       q.rate_tree && h('p', { class: 'rate-hint' }, '★ Geef deze boom ook een cijfer op je telefoon'),
+      intro && h('button', {
+        class: 'btn btn-ghost intro-again', onclick: () => playMedia(q.media_url, { seconds: q.media_seconds }),
+      }, `♪ Nog een keer (${q.media_seconds} s)`),
       h('button', { class: 'btn btn-gold btn-lg', id: 'next-btn', onclick: next },
         isLast ? 'Einde vragenronde ▶' : 'Volgende vraag ▶'),
     ),
@@ -1244,8 +1250,9 @@ function previewChrome(q) {
   const n = preview.list.length;
   const previewMedia = () => {
     const t = preview.list[preview.index];
-    const link = t && !t.tiebreak ? mediaLinkFor(preview.mode === 'antwoord' ? 'answers' : 'question', t) : null;
-    if (link) playMedia(link); else stopMedia();
+    const mode = preview.mode === 'antwoord' ? 'answers' : 'question';
+    const link = t && !t.tiebreak ? mediaLinkFor(mode, t) : null;
+    if (link) playMedia(link, { seconds: introSeconds(mode, t) }); else stopMedia();
     const vp = t && !t.tiebreak ? videoPathFor(preview.mode === 'antwoord' ? 'answers' : 'question', t) : null;
     if (vp) playVideo(vp); else stopVideos();
   };
@@ -1323,10 +1330,13 @@ function preloadDeck() {
   }
 }
 
-function playMedia(link) {
+function playMedia(link, opts = {}) {
   for (const [l, p] of deck) if (l !== link) p.pause();
-  deckFor(link)?.play();
+  deckFor(link)?.play(opts);
 }
+
+/** Intro raden: hoeveel seconden van het nummer bij deze vraag (alleen tijdens de vraag). */
+const introSeconds = (status, q) => (status === 'question' && q?.media_seconds) || null;
 
 function stopMedia() {
   for (const p of deck.values()) p.pause();
@@ -1370,6 +1380,36 @@ function placeDeck() {
 window.addEventListener('resize', () => requestAnimationFrame(placeDeck));
 document.addEventListener('fullscreenchange', () => setTimeout(placeDeck, 300));
 setInterval(placeDeck, 1000);
+
+// ---------------------------------------------------------------- foto langzaam onthullen
+
+/**
+ * Vraagfoto, eventueel met een onthul-effect: langzaam scherper, langzaam uitzoomen of
+ * puzzelstukjes die wegvallen. Het effect loopt mee met de tijd van de vraag (ook na herladen).
+ */
+function photoBox(q, photo) {
+  const fx = q.reveal_effect;
+  const img = h('img', { src: photo, alt: '' });
+  if (!fx || state.game.status !== 'question') return h('div', { class: 'photo' }, img);
+  const total = Math.max(4, (q.time_limit || 20) * 0.85);       // na 85% van de tijd helemaal zichtbaar
+  const elapsed = Math.max(0, (serverNow() - new Date(state.game.question_started_at).getTime()) / 1000);
+  const box = h('div', { class: `photo photo-fx fx-${fx}` }, img);
+  img.style.animationDuration = `${total}s`;
+  img.style.animationDelay = `${-elapsed}s`;
+  if (fx === 'puzzel') {
+    const cols = 6; const rows = 4; const n = cols * rows;
+    // vaste, maar door elkaar gegooide volgorde per vraag
+    let seed = [...String(q.id)].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
+    const order = Array.from({ length: n }, (_, k) => k);
+    for (let k = n - 1; k > 0; k--) { seed = (seed * 1103515245 + 12345) >>> 0; const j = seed % (k + 1); [order[k], order[j]] = [order[j], order[k]]; }
+    const tiles = Array.from({ length: n }, (_, k) => {
+      const at = ((order.indexOf(k) + 1) / n) * total;              // moment waarop dit stukje wegvalt
+      return h('span', { class: 'fx-tile', style: { animationDelay: `${at - elapsed}s` } });
+    });
+    box.append(h('div', { class: 'fx-tiles', 'aria-hidden': 'true', style: { gridTemplateColumns: `repeat(${cols}, 1fr)` } }, tiles));
+  }
+  return box;
+}
 
 // ---------------------------------------------------------------- filmpjes
 

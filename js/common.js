@@ -565,7 +565,7 @@ function musicDebug() {
 // ---------- Versie (altijd de nieuwste versie laden) ----------
 
 // Bij elke nieuwe versie ophogen, samen met version.txt en de ?v=… in index.html en de imports.
-export const APP_VERSION = '41';
+export const APP_VERSION = '42';
 
 /**
  * GitHub Pages en Safari bewaren bestanden een tijd in de cache. Is er een nieuwere
@@ -627,6 +627,8 @@ export function deckPlayer(link, { height = 152 } = {}) {
   let playing = false;
   let startedAt = 0;     // tijdstip van de laatste start door de app
   let kicks = 0;         // hoe vaak we het nummer na een onverwachte stop opnieuw hebben aangezet
+  let limitMs = null;    // intro raden: na zoveel ms vanzelf stoppen
+  let limitTimer = null;
   const listeners = [];
 
   // Alleen "speel af" sturen (geen terugspoelen ervoor: die twee berichten kwamen
@@ -644,11 +646,13 @@ export function deckPlayer(link, { height = 152 } = {}) {
   };
   const init = () => {
     if (!holder.isConnected) { requestAnimationFrame(init); return; }
-    loadSpotifyApi().then((api) => {
-      api.createController(holder, { uri: `spotify:${s.type}:${s.id}`, width: '100%', height }, (c) => {
+    loadSpotifyApi().then((spotify) => {
+      spotify.createController(holder, { uri: `spotify:${s.type}:${s.id}`, width: '100%', height }, (c) => {
         ctrl = c;
         c.addListener('playback_update', (e) => {
           const nowPlaying = !e.data.isPaused;
+          // Intro raden: genoeg gehoord? Dan stoppen.
+          if (limitMs != null && nowPlaying && e.data.position >= limitMs) { limitMs = null; api.pause(); return; }
           // Stopt het vlak na de start uit zichzelf? Dan nog een duwtje geven.
           if (!nowPlaying && playing && wanted && Date.now() - startedAt < 3500 && kicks < 2) setTimeout(kick, 250);
           playing = nowPlaying;
@@ -664,9 +668,18 @@ export function deckPlayer(link, { height = 152 } = {}) {
 
   const api = {
     el,
-    play() { wanted = true; start(); },
+    /** Afspelen vanaf het begin; met `seconds` stopt het daarna vanzelf (intro raden). */
+    play({ seconds = null } = {}) {
+      wanted = true;
+      clearTimeout(limitTimer);
+      limitMs = seconds ? seconds * 1000 : null;
+      // vangnet als Spotify de positie niet (op tijd) doorgeeft
+      if (seconds) limitTimer = setTimeout(() => { if (limitMs != null) { limitMs = null; api.pause(); } }, seconds * 1000 + 2500);
+      start();
+    },
     pause() {
       wanted = false;
+      clearTimeout(limitTimer);
       if (ctrl && playing) { if (typeof ctrl.pause === 'function') ctrl.pause(); else ctrl.togglePlay(); }
     },
     toggle() {
