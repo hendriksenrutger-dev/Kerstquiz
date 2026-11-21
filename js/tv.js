@@ -4,12 +4,12 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer, inScarePhase, serverNow, SCARE_SECONDS,
-} from './common.js?v=58';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=58';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=58';
+} from './common.js?v=59';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=59';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=59';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking, fastestWinners,
-} from './scoring.js?v=58';
+} from './scoring.js?v=59';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -102,6 +102,7 @@ async function afterLogin() {
 function renderHome(savedGame) {
   stopLive();
   bgMusic(null);
+  setTimeout(refreshPlayers, 500);  // na de pauze; daarna zijn ze weer vers
   const n = state.questions.length;
   const running = savedGame && savedGame.status !== 'tree' ? savedGame : null;
   const content = h('div', { class: 'home-center home' },
@@ -661,6 +662,7 @@ function renderAnswersIntro() {
   // Antwoorden (en antwoordmuziek/-filmpjes) opnieuw ophalen: misschien is er in beheer
   // nog iets aangepast nadat de quiz is geopend. Spelers alvast laden, zodat ze bij de tik starten.
   loadKeys().then(preloadDeck).catch(() => {});
+  setTimeout(refreshPlayers, 500);
 }
 
 // ---------------------------------------------------------------- eindstand en mooiste boom
@@ -787,6 +789,7 @@ function podium(info, pts) {
 // ---------------------------------------------------------------- tussenstand
 
 async function renderInterim() {
+  setTimeout(refreshPlayers, 500);
   const i = currentIndex();
   loadingScreen('Tussenstand berekenen…');
   let top = [];
@@ -1248,6 +1251,15 @@ function bgMusic(link) {
 function playMusic(link) {
   const p = musicPlayer(link);
   if (p) p.play();
+}
+
+/**
+ * Spotify-spelers die al lang bestaan en nu niet spelen, vernieuwen (op een rustig moment).
+ * Een speler die lang heeft stilgestaan, reageert soms niet meer tot je de pagina ververst.
+ */
+function refreshPlayers() {
+  for (const p of deck.values()) p.refreshIfOld?.();
+  for (const p of musicPlayers.values()) p.refreshIfOld?.();
 }
 
 /** Spelers alvast laden, zodat ze bij een tik meteen kunnen starten. */

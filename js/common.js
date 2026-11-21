@@ -466,7 +466,11 @@ export function loopingSpotifyPlayer(link) {
   if (!s) return null;
   const uri = `spotify:${s.type}:${s.id}`;
   const isList = s.type !== 'track'; // playlist/album: Spotify speelt zelf het volgende nummer
-  const holder = h('div', { class: 'spotify-holder' });
+  let holder = h('div', { class: 'spotify-holder' });
+  let createdAt = Date.now();
+  let heard = 0;          // laatste keer dat Spotify "speelt" meldde
+  let watchdog = null;
+  let rebuilds = 0;
   const debug = h('div', { class: 'bg-music-debug', hidden: !musicDebug() });
   const el = h('div', { class: 'bg-music', 'data-link': link },
     h('span', { class: 'bg-music-label', 'aria-hidden': 'true' }, '♪'),
@@ -516,6 +520,7 @@ export function loopingSpotifyPlayer(link) {
           const d = e.data || {};
           const wasPlaying = !last.isPaused;
           lastUpdate = Date.now();
+          if (!d.isPaused) heard = Date.now();
           clearTimeout(restartTimer);
           if (d.isPaused && wanted && wasPlaying) {
             if (looksEnded(d)) {
@@ -546,14 +551,35 @@ export function loopingSpotifyPlayer(link) {
     else if (last.isPaused && silentFor > 8000 && looksEnded(last)) restart('stil na einde');
   }, 2000);
 
+  // Speler opnieuw opbouwen (zie deckPlayer): na lang stilstaan reageert hij soms niet meer.
+  const rebuild = () => {
+    ctrl = null;
+    createdAt = Date.now();
+    last = { position: 0, duration: 0, isPaused: true };
+    holder = h('div', { class: 'spotify-holder' });
+    el.querySelector('.bg-music-frame').replaceChildren(holder);
+    init();
+  };
+  const watch = () => {
+    clearTimeout(watchdog);
+    const askedAt = Date.now();
+    watchdog = setTimeout(() => {
+      if (wanted && heard < askedAt && rebuilds < 3) { rebuilds++; note('vernieuwd'); rebuild(); }
+    }, 4000);
+  };
+
   return {
     el,
-    play() { wanted = true; lastUpdate = Date.now(); startPlayback(); },
+    play() { wanted = true; lastUpdate = Date.now(); startPlayback(); watch(); },
+    refreshIfOld(maxAgeMs = 20 * 60 * 1000) {
+      if (!wanted && last.isPaused && Date.now() - createdAt > maxAgeMs) { rebuilds = 0; rebuild(); }
+    },
     /** Speelt er nu muziek? */
     isPlaying() { return wanted && ctrl != null && !last.isPaused; },
     pause() {
       wanted = false;
       clearTimeout(restartTimer);
+      clearTimeout(watchdog);
       if (ctrl && !last.isPaused) { if (typeof ctrl.pause === 'function') ctrl.pause(); else ctrl.togglePlay(); }
     },
   };
@@ -567,7 +593,7 @@ function musicDebug() {
 // ---------- Versie (altijd de nieuwste versie laden) ----------
 
 // Bij elke nieuwe versie ophogen, samen met version.txt en de ?v=… in index.html en de imports.
-export const APP_VERSION = '58';
+export const APP_VERSION = '59';
 
 /**
  * GitHub Pages en Safari bewaren bestanden een tijd in de cache. Is er een nieuwere
@@ -624,8 +650,12 @@ export function ornament() {
 export function deckPlayer(link, { height = 152 } = {}) {
   const s = parseSpotify(link);
   if (!s) return null;
-  const holder = h('div', { class: 'spotify-holder' });
+  let holder = h('div', { class: 'spotify-holder' });
   const el = h('div', { class: 'deck-player', 'data-link': link }, holder);
+  let createdAt = Date.now();
+  let heard = 0;          // tijdstip van het laatste signaal "speelt" van Spotify
+  let watchdog = null;
+  let rebuilds = 0;
   let ctrl = null;
   let wanted = false;
   let playing = false;
@@ -656,6 +686,7 @@ export function deckPlayer(link, { height = 152 } = {}) {
         ctrl = c;
         c.addListener('playback_update', (e) => {
           const nowPlaying = !e.data.isPaused;
+          if (nowPlaying) heard = Date.now();
           // Speelt het, maar niet vanaf het begin (verder waar het gebleven was)?
           // Dan nu pas terugspoelen: vóór het afspelen spoelen gaf op de iPad haperingen.
           if (rewind && nowPlaying) {
@@ -677,8 +708,33 @@ export function deckPlayer(link, { height = 152 } = {}) {
   };
   init();
 
+  /**
+   * Speler opnieuw opbouwen. Een Spotify-speler die lang heeft stilgestaan reageert soms niet
+   * meer (na verversen werkte het weer); een verse speler lost dat op.
+   */
+  const rebuild = () => {
+    ctrl = null;
+    playing = false;
+    createdAt = Date.now();
+    holder = h('div', { class: 'spotify-holder' });
+    el.replaceChildren(holder);
+    init();   // start vanzelf als `wanted`
+  };
+  // Vangnet: na "speel af" binnen 4 s geen geluid? Dan de speler één keer vernieuwen.
+  const watch = () => {
+    clearTimeout(watchdog);
+    const askedAt = Date.now();
+    watchdog = setTimeout(() => {
+      if (wanted && heard < askedAt && rebuilds < 3) { rebuilds++; rebuild(); }
+    }, 4000);
+  };
+
   const api = {
     el,
+    /** Vernieuwen als de speler al lang bestaat en nu niet speelt (aanroepen op een rustig moment). */
+    refreshIfOld(maxAgeMs = 20 * 60 * 1000) {
+      if (!wanted && !playing && Date.now() - createdAt > maxAgeMs) { rebuilds = 0; rebuild(); }
+    },
     /** Afspelen vanaf het begin; met `seconds` stopt het daarna vanzelf (intro raden). */
     play({ seconds = null } = {}) {
       wanted = true;
@@ -688,10 +744,12 @@ export function deckPlayer(link, { height = 152 } = {}) {
       // vangnet als Spotify de positie niet (op tijd) doorgeeft
       if (seconds) limitTimer = setTimeout(() => { if (limitMs != null) { limitMs = null; api.pause(); } }, seconds * 1000 + 3500);
       start();
+      watch();
     },
     pause() {
       wanted = false;
       clearTimeout(limitTimer);
+      clearTimeout(watchdog);
       if (ctrl && playing) { if (typeof ctrl.pause === 'function') ctrl.pause(); else ctrl.togglePlay(); }
     },
     toggle() {
