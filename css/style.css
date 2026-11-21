@@ -150,17 +150,15 @@ body.tv { background: #000; overflow: hidden; }
 }
 
 .stage {
+  /* Het tv-beeld vult het hele scherm (ook op een tablet die minder breed is dan 16:9) */
   position: relative; overflow: hidden;
-  width: min(100vw, calc(100dvh * 16 / 9));
-  aspect-ratio: 16 / 9;
-  max-height: 100dvh;
+  width: 100vw; height: 100vh; height: 100dvh;
   background: var(--bg);
   container-type: size;
   font-size: max(20px, 1.5cqw);
 }
 @supports not (height: 100dvh) {
   .tv-frame { height: 100vh; }
-  .stage { width: min(100vw, calc(100vh * 16 / 9)); max-height: 100vh; }
 }
 
 /* Inloggen en beginscherm: geen vaste 16:9, zodat het ook op een telefoon past */
