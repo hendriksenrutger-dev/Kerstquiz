@@ -2,9 +2,9 @@
 // spelinstellingen en een spel starten. Licht thema; werkt op iPad en iPhone.
 import {
   sb, h, mount, toast, LETTERS, errorText, loginForm, parseSpotify, cleanSpotifyLink, spotifyPlayer, SCARE_SECONDS,
-} from './common.js?v=49';
-import { parseNumber, formatNumber } from './scoring.js?v=49';
-import { addTestPlayers } from './proef.js?v=49';
+} from './common.js?v=50';
+import { parseNumber, formatNumber } from './scoring.js?v=50';
+import { addTestPlayers } from './proef.js?v=50';
 
 const TREE_CATEGORY = 'Van wie is deze kerstboom?';
 // Drie soorten muziekvragen (zie renderMusicForm)
@@ -805,7 +805,7 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
     h('div', { class: 'stack-tight' },
       audioPick.el,
       h('label', { class: 'check' }, audioReverse, '⏪ Achterstevoren afspelen bij de vraag (bij het antwoord gewoon vooruit)'),
-      h('span', { class: 'hint' }, 'Alleen op de tv, zonder speler in beeld. Op de tv staat een knop "Nog een keer". Tip: kies een kort fragment met een herkenbaar refrein. Een mp3 of m4a koop je bijvoorbeeld in de iTunes Store, of neem je op.')),
+      h('span', { class: 'hint' }, 'Alleen op de tv, zonder speler in beeld. Op de tv staat een knop "Nog een keer". Is het een filmpje en staat "achterstevoren" aan, dan speelt bij het antwoord het hele filmpje met beeld (op tv en telefoons). Tip: kies een kort fragment met een herkenbaar refrein.')),
     music.el,
     h('label', { class: 'check' }, soundOnly, 'Alleen geluid: geen speler in beeld bij de vraag'),
     h('label', {}, '🎧 Intro raden: speel maar … seconden', introSecs,
