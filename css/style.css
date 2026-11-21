@@ -1078,3 +1078,14 @@ body.pv-with-phone .stage { width: min(calc(100vw - 340px), calc((100dvh - 64px)
 .b-section-fold[open] > summary::after { transform: rotate(180deg); }
 .b-section-fold > .stack { padding: 0 16px 16px; }
 .b-subblock { padding-top: 12px; border-top: 1px dashed var(--b-border); }
+
+/* Wachtruimte: naam groot en gecentreerd bovenaan */
+.lobby-brand { position: absolute; top: 5cqh; left: 0; right: 0; z-index: 2; display: flex; justify-content: center; pointer-events: none; }
+.lobby-brand .brand-lobby { align-items: center; text-align: center; }
+.lobby-brand .brand-lobby .brand-script { font-size: max(80px, 11cqw); }
+.screen-hero .lobby { padding-top: 22cqh; }
+/* Muziek bij start en einde: speelt door, maar zonder speler in beeld (bijna onzichtbaar achter het beeld) */
+.bg-music.bg-music-on {
+  visibility: visible; opacity: .01; pointer-events: none; z-index: -1;
+  bottom: auto; top: 50%; transform: translate(-50%, -50%);
+}

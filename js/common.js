@@ -565,7 +565,7 @@ function musicDebug() {
 // ---------- Versie (altijd de nieuwste versie laden) ----------
 
 // Bij elke nieuwe versie ophogen, samen met version.txt en de ?v=… in index.html en de imports.
-export const APP_VERSION = '51';
+export const APP_VERSION = '52';
 
 /**
  * GitHub Pages en Safari bewaren bestanden een tijd in de cache. Is er een nieuwere
@@ -596,13 +596,15 @@ export async function checkVersion() {
 
 // ---------- Naam van de quiz ----------
 
-export const QUIZ_NAME = 'Kerstquiz B&S';
+export const QUIZ_NAME = 'Kerstquiz';
+/** Optionele ondertitel onder de naam (bijv. de naam van de groep). Leeg = geen. */
+export const QUIZ_SUBTITLE = '';
 
-/** Titel "Kerstquiz B&S": sierlijk schrift met "B&S" in goud eronder. */
+/** Titel "Kerstquiz" in sierlijk schrift, met eventueel een ondertitel in goud eronder. */
 export function brandTitle(extraClass = '') {
   return h('h1', { class: `brand ${extraClass}`, 'aria-label': QUIZ_NAME },
     h('span', { class: 'brand-script', 'aria-hidden': 'true' }, 'Kerstquiz'),
-    h('span', { class: 'brand-bs', 'aria-hidden': 'true' }, 'B&S'));
+    QUIZ_SUBTITLE && h('span', { class: 'brand-bs', 'aria-hidden': 'true' }, QUIZ_SUBTITLE));
 }
 
 /** Fijne gouden sierlijn met een sterretje. */
