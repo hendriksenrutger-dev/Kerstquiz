@@ -4,12 +4,12 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer, inScarePhase, serverNow, SCARE_SECONDS,
-} from './common.js?v=57';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=57';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=57';
+} from './common.js?v=61';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=61';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=61';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking, fastestWinners,
-} from './scoring.js?v=57';
+} from './scoring.js?v=61';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -102,6 +102,7 @@ async function afterLogin() {
 function renderHome(savedGame) {
   stopLive();
   bgMusic(null);
+  setTimeout(refreshPlayers, 500);  // na de pauze; daarna zijn ze weer vers
   const n = state.questions.length;
   const running = savedGame && savedGame.status !== 'tree' ? savedGame : null;
   const content = h('div', { class: 'home-center home' },
@@ -116,11 +117,26 @@ function renderHome(savedGame) {
     ),
     h('div', { class: 'row home-links' },
       fullscreenButton(),
+      h('button', { class: 'link', onclick: showRemoteQr }, '📱 Afstandsbediening'),
       h('button', { class: 'link', onclick: logout }, 'Uitloggen'),
       h('span', { class: 'version' }, `versie ${APP_VERSION}`),
     ),
   );
   mount(stage('screen-free', heroLayout(content)));
+}
+
+/** QR-code om de afstandsbediening (#afstand) op je telefoon te openen. */
+function showRemoteQr() {
+  const url = `${location.href.split('#')[0]}#afstand`;
+  const close = () => box.remove();
+  const box = h('div', { class: 'remote-qr', onclick: close },
+    h('div', { class: 'remote-qr-card', onclick: (e) => e.stopPropagation() },
+      h('h2', { class: 'serif' }, '📱 Afstandsbediening'),
+      h('div', { class: 'qr' }, qrSvg(url)),
+      h('p', {}, 'Scan met je telefoon en log in met je beheer-account. Start daarna hier de quiz; met ◀ en ▶ op je telefoon bedien je de tablet.'),
+      h('p', { class: 'muted small' }, url),
+      h('button', { class: 'btn btn-gold', onclick: close }, 'Sluiten')));
+  document.body.append(box);
 }
 
 async function newGame() {
@@ -144,7 +160,7 @@ async function openGame(game) {
   stopLive();
   state.game = game;
   save(TV_GAME_KEY, game.id);
-  await Promise.all([loadPlayers(), loadAnswered(), loadKeys()]);
+  await Promise.all([loadPlayers(), loadAnswered(), loadKeys(), reloadQuestions()]);
   preloadDeck();
   render();
 
@@ -155,8 +171,10 @@ async function openGame(game) {
       { event: '*', table: 'games', filter: `id=eq.${game.id}` },
       { event: '*', table: 'players', filter: `game_id=eq.${game.id}` },
       { event: '*', table: 'answers', filter: `game_id=eq.${game.id}` },
+      { event: 'INSERT', table: 'remote_commands', filter: `game_id=eq.${game.id}` },
     ],
     (payload) => {
+      if (payload.table === 'remote_commands') { handleRemote(payload.new); return; }
       if (payload.table === 'games' && payload.new?.id) {
         const changedScreen = screenKey(payload.new) !== screenKey(state.game);
         state.game = payload.new;
@@ -169,6 +187,22 @@ async function openGame(game) {
   );
 
   state.tick = setInterval(updateTimer, 250);
+}
+
+/**
+ * Opdracht van de afstandsbediening (#afstand op de telefoon van de quizmaster):
+ * tik op dezelfde knop als de quizmaster zou doen. Oude opdrachten (na herladen) negeren.
+ */
+function handleRemote(cmd) {
+  if (!cmd || serverNow() - new Date(cmd.created_at).getTime() > 20000) return;
+  if (cmd.action === 'next') {
+    const welcome = document.querySelector('.welcome-tap');
+    if (welcome) return welcome.click();
+    const btn = [...document.querySelectorAll('#app .btn-gold')].filter((b) => !b.disabled).pop();
+    if (btn) btn.click(); else toast('Nog even wachten: de tijd loopt nog');
+  } else if (cmd.action === 'prev') {
+    document.querySelector('#app .q-foot .btn-ghost, #app .btn-ghost')?.click();
+  }
 }
 
 function stopLive() {
@@ -441,6 +475,7 @@ function renderLobby() {
 function beginQuiz() {
   const secs = state.countdownSecs;
   if (!secs) return next();
+  fxAudio();  // geluid voor de overgang alvast vrijgeven (binnen deze tik)
   state.countdown = { until: Date.now() + secs * 1000 };
   if (state.music?.countdown) { bgMusic(state.music.countdown); playMusic(state.music.countdown); } // binnen de tik
   else bgMusic(null);
@@ -455,7 +490,74 @@ function stopCountdown() {
 function finishCountdown() {
   if (!state.countdown) return;
   stopCountdown();
-  next();  // eerste vraag (de muziek van het aftellen stopt daar vanzelf)
+  playTransition();
+  // Eerste vraag pas tonen als de flits het scherm bedekt (de muziek van het aftellen stopt daar vanzelf)
+  setTimeout(next, 550);
+}
+
+// ---------------------------------------------------------------- overgang aftellen → eerste vraag
+
+let fxCtx = null;
+/** Geluidskanaal voor de overgang; binnen een tik aanroepen, dan mag het later geluid maken. */
+function fxAudio() {
+  try {
+    if (!fxCtx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      fxCtx = new AC();
+    }
+    if (fxCtx.state === 'suspended') fxCtx.resume();
+  } catch { /* geen geluid */ }
+  return fxCtx;
+}
+
+/** Zware dreun met een "woosh" (zelf opgebouwd, geen geluidsbestand nodig). */
+function boomSound() {
+  const ctx = fxAudio();
+  if (!ctx) return;
+  try {
+    const t = ctx.currentTime + 0.03;
+    const out = ctx.createDynamicsCompressor();
+    out.connect(ctx.destination);
+    // diepe dreun die wegzakt
+    [[95, 26, 1.0, 'sine'], [58, 20, 0.7, 'triangle']].forEach(([f0, f1, vol, type]) => {
+      const o = ctx.createOscillator(); o.type = type;
+      o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + 1.8);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.04); g.gain.exponentialRampToValueAtTime(0.0001, t + 2.2);
+      o.connect(g); g.connect(out); o.start(t); o.stop(t + 2.3);
+    });
+    // woosh: ruis door een filter dat open en weer dicht gaat
+    const len = Math.floor(ctx.sampleRate * 1.4);
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    const n = ctx.createBufferSource(); n.buffer = buf;
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 1.5;
+    lp.frequency.setValueAtTime(180, t - 0.02); lp.frequency.exponentialRampToValueAtTime(2600, t + 0.35); lp.frequency.exponentialRampToValueAtTime(160, t + 1.3);
+    const ng = ctx.createGain();
+    ng.gain.setValueAtTime(0.0001, t); ng.gain.exponentialRampToValueAtTime(0.35, t + 0.3); ng.gain.exponentialRampToValueAtTime(0.0001, t + 1.35);
+    n.connect(lp); lp.connect(ng); ng.connect(out); n.start(t); n.stop(t + 1.4);
+    // korte klap bij de inslag
+    const hit = ctx.createBufferSource(); hit.buffer = buf;
+    const hp = ctx.createBiquadFilter(); hp.type = 'bandpass'; hp.frequency.value = 900; hp.Q.value = 0.8;
+    const hg = ctx.createGain(); hg.gain.setValueAtTime(0.6, t); hg.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+    hit.connect(hp); hp.connect(hg); hg.connect(out); hit.start(t); hit.stop(t + 0.15);
+    // daarna het geluidskanaal weer dicht (laat Spotify ongestoord)
+    setTimeout(() => { try { ctx.suspend(); } catch { /* */ } }, 2600);
+  } catch { /* geen geluid */ }
+}
+
+/** Gouden flits die vanuit het midden het scherm overneemt; daarna verschijnt de vraag vanuit een waas. */
+function playTransition() {
+  boomSound();
+  document.querySelector('.countdown-num')?.classList.add('morph-out');
+  const fx = h('div', { class: 'morph', 'aria-hidden': 'true' },
+    h('div', { class: 'morph-veil' }), h('div', { class: 'morph-burst' }));
+  document.body.append(fx);
+  document.body.classList.add('morph-enter');
+  setTimeout(() => fx.remove(), 1700);
+  setTimeout(() => document.body.classList.remove('morph-enter'), 2600);
 }
 
 function renderCountdown() {
@@ -468,7 +570,7 @@ function renderCountdown() {
       ornament()),
     h('footer', { class: 'q-foot' },
       h('button', { class: 'btn btn-ghost', onclick: () => { stopCountdown(); bgMusic(state.music?.start); renderRules(); } }, '◀ Terug'),
-      h('button', { class: 'btn btn-gold btn-lg', onclick: finishCountdown }, 'Nu beginnen ▶'),
+      h('button', { class: 'btn btn-gold btn-lg btn-arrow', onclick: finishCountdown, 'aria-label': 'Nu beginnen', title: 'Nu beginnen' }, '▶'),
     ),
   );
   mount(stage('screen-hero', heroLayout(), view));
@@ -509,7 +611,7 @@ function renderRules() {
     h('footer', { class: 'q-foot' },
       h('button', { class: 'btn btn-ghost', onclick: previous }, '◀ Vorige'),
       h('span', { class: 'muted rules-count' }, `${qs.length} vragen · ${playersCountText().toLowerCase()}`),
-      h('button', { class: 'btn btn-gold btn-lg', onclick: beginQuiz }, state.countdownSecs ? 'Aftellen ▶' : 'Eerste vraag ▶'),
+      h('button', { class: 'btn btn-gold btn-lg btn-arrow', onclick: beginQuiz, 'aria-label': state.countdownSecs ? 'Aftellen' : 'Eerste vraag', title: state.countdownSecs ? 'Aftellen' : 'Eerste vraag' }, '▶'),
     ),
   );
   mount(stage('screen-plain', view));
@@ -592,8 +694,7 @@ function renderQuestion() {
       q.audio_path && h('button', {
         class: 'btn btn-ghost intro-again', onclick: () => playClip(q.audio_path, Boolean(q.audio_reverse)),
       }, q.audio_reverse ? '⏪ Nog een keer' : '🔊 Nog een keer'),
-      h('button', { class: 'btn btn-gold btn-lg', id: 'next-btn', onclick: next },
-        isLast ? 'Einde vragenronde ▶' : 'Volgende vraag ▶'),
+      h('button', { class: 'btn btn-gold btn-lg btn-arrow', id: 'next-btn', onclick: next, 'aria-label': isLast ? 'Einde vragenronde' : 'Volgende vraag', title: isLast ? 'Einde vragenronde' : 'Volgende vraag' }, '▶'),
     ),
   );
 
@@ -633,8 +734,7 @@ function renderScareQuestion(q, i) {
     ),
     h('footer', { class: 'q-foot' },
       h('button', { class: 'btn btn-ghost', onclick: previous }, '◀ Vorige'),
-      h('button', { class: 'btn btn-gold btn-lg', id: 'next-btn', onclick: next },
-        i === state.questions.length - 1 ? 'Einde vragenronde ▶' : 'Volgende vraag ▶'),
+      h('button', { class: 'btn btn-gold btn-lg btn-arrow', id: 'next-btn', onclick: next, 'aria-label': 'Volgende vraag', title: 'Volgende vraag' }, '▶'),
     ),
   );
   mount(stage('screen-plain', bgLayer(i, Boolean(photo)), view));
@@ -654,10 +754,14 @@ function renderAnswersIntro() {
     h('p', { class: 'lead' }, 'Alle vragen nog een keer, nu met het goede antwoord.'),
     h('div', { class: 'row' },
       h('button', { class: 'btn btn-ghost btn-lg', onclick: previous }, '◀ Terug naar de laatste vraag'),
-      h('button', { class: 'btn btn-gold btn-lg', onclick: next }, 'Toon de antwoorden ▶'),
+      h('button', { class: 'btn btn-gold btn-lg btn-arrow', onclick: next, 'aria-label': 'Toon de antwoorden', title: 'Toon de antwoorden' }, '▶'),
     ),
   );
   mount(stage('screen-hero', heroLayout(content), cornerMenu()));
+  // Antwoorden (en antwoordmuziek/-filmpjes) opnieuw ophalen: misschien is er in beheer
+  // nog iets aangepast nadat de quiz is geopend. Spelers alvast laden, zodat ze bij de tik starten.
+  loadKeys().then(preloadDeck).catch(() => {});
+  setTimeout(refreshPlayers, 500);
 }
 
 // ---------------------------------------------------------------- eindstand en mooiste boom
@@ -784,6 +888,7 @@ function podium(info, pts) {
 // ---------------------------------------------------------------- tussenstand
 
 async function renderInterim() {
+  setTimeout(refreshPlayers, 500);
   const i = currentIndex();
   loadingScreen('Tussenstand berekenen…');
   let top = [];
@@ -808,7 +913,7 @@ async function renderInterim() {
     h('p', { class: 'muted small' }, 'Open vragen tellen hier met het automatische oordeel; de eindstand kan nog iets anders uitvallen.'),
     h('footer', { class: 'q-foot' },
       h('button', { class: 'btn btn-ghost', onclick: previous }, '◀ Vorige'),
-      h('button', { class: 'btn btn-gold btn-lg', onclick: next }, 'Volgende vraag ▶'),
+      h('button', { class: 'btn btn-gold btn-lg btn-arrow', onclick: next, 'aria-label': 'Volgende vraag', title: 'Volgende vraag' }, '▶'),
     ),
   );
   mount(stage('screen-plain', view));
@@ -1036,7 +1141,7 @@ async function renderReveal() {
       clipFor('answers', q) && h('button', {
         class: 'btn btn-ghost intro-again', onclick: () => playClip(q.audio_path, false),
       }, '▶ Vooruit afspelen'),
-      h('button', { class: 'btn btn-gold btn-lg', onclick: () => { if (isLast) playMusic(state.music?.end); next(); } }, isLast ? 'Einde antwoordenronde ▶' : 'Volgende antwoord ▶'),
+      h('button', { class: 'btn btn-gold btn-lg btn-arrow', onclick: () => { if (isLast) playMusic(state.music?.end); next(); }, 'aria-label': isLast ? 'Einde antwoordenronde' : 'Volgende antwoord', title: isLast ? 'Einde antwoordenronde' : 'Volgende antwoord' }, '▶'),
     ),
   );
   mount(stage('screen-plain', bgLayer(i, Boolean(photo)), view));
@@ -1247,6 +1352,15 @@ function playMusic(link) {
   if (p) p.play();
 }
 
+/**
+ * Spotify-spelers die al lang bestaan en nu niet spelen, vernieuwen (op een rustig moment).
+ * Een speler die lang heeft stilgestaan, reageert soms niet meer tot je de pagina ververst.
+ */
+function refreshPlayers() {
+  for (const p of deck.values()) p.refreshIfOld?.();
+  for (const p of musicPlayers.values()) p.refreshIfOld?.();
+}
+
 /** Spelers alvast laden, zodat ze bij een tik meteen kunnen starten. */
 function preloadMusic() {
   musicPlayer(state.music?.start);
@@ -1389,6 +1503,16 @@ function startQuestion() { showPreview(); }
  */
 const deck = new Map(); // link → deckPlayer
 let deckBox = null;
+
+/** Vragen opnieuw ophalen (misschien is er in beheer iets aangepast sinds het inloggen). */
+async function reloadQuestions() {
+  try {
+    const all = await fetchQuestions();
+    state.questions = all.filter((q) => !q.tiebreak);
+    state.tiebreaks = all.filter((q) => q.tiebreak);
+    prepareScareAudio(state.questions);
+  } catch { /* oude lijst houden */ }
+}
 
 async function loadKeys() {
   const { data } = await sb.from('question_answers').select('*');
