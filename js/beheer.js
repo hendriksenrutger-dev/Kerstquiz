@@ -2,9 +2,9 @@
 // spelinstellingen en een spel starten. Licht thema; werkt op iPad en iPhone.
 import {
   sb, h, mount, toast, LETTERS, errorText, loginForm, parseSpotify, cleanSpotifyLink, spotifyPlayer, SCARE_SECONDS,
-} from './common.js?v=62';
-import { parseNumber, formatNumber } from './scoring.js?v=62';
-import { addTestPlayers } from './proef.js?v=62';
+} from './common.js?v=63';
+import { parseNumber, formatNumber } from './scoring.js?v=63';
+import { addTestPlayers } from './proef.js?v=63';
 
 const TREE_CATEGORY = 'Van wie is deze kerstboom?';
 // Drie soorten muziekvragen (zie renderMusicForm)
@@ -26,6 +26,17 @@ const REVEAL_EFFECTS = [
   { value: 'inzoomen', label: 'Langzaam uitzoomen (begint heel dichtbij)' },
   { value: 'puzzel', label: 'Puzzelstukjes die één voor één wegvallen' },
 ];
+/** "1:05" of "65" → 65 seconden; leeg → null; ongeldig → false. */
+function parseTime(v) {
+  const t = String(v || '').trim();
+  if (!t) return null;
+  const m = t.match(/^(\d{1,3})(?::([0-5]?\d))?$/);
+  if (!m) return false;
+  return m[2] != null ? Number(m[1]) * 60 + Number(m[2]) : Number(m[1]);
+}
+const formatTime = (sec) => (sec ? `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}` : '');
+const timeInput = (sec) => h('input', { type: 'text', inputmode: 'numeric', value: formatTime(sec), placeholder: '0:00', class: 'input-short', maxlength: '6' });
+
 const KINDS = [
   { value: 'meerkeuze', label: 'Meerkeuze' },
   { value: 'open', label: 'Open' },
@@ -344,6 +355,7 @@ function questionItem(q, i) {
         q.audio_path && h('span', { class: 'muted' }, q.audio_reverse ? '⏪ geluid achterstevoren' : '🔊 geluid'),
         q.reveal_effect && h('span', { class: 'muted' }, `🧩 ${q.reveal_effect === 'puzzel' ? 'puzzelstukjes' : q.reveal_effect === 'inzoomen' ? 'uitzoomen' : 'wazig → scherp'}`),
         q.media_seconds && h('span', { class: 'muted' }, `🎧 intro ${q.media_seconds} s`),
+        q.media_start && h('span', { class: 'muted' }, `⏩ vanaf ${formatTime(q.media_start)}`),
         q.fastest_count && h('span', { class: 'muted' }, `⚡ ${q.fastest_count} snelsten`),
         ans?.answer_video_path && h('span', { class: 'muted' }, '🎬 antwoordfilmpje'),
         q.media_url && h('span', { class: 'b-music' }, q.media_mode === 'verbergen' ? '♪ Spotify (afgedekt)' : q.media_mode === 'alleen_tv' ? '♪ Spotify (alleen tv)' : q.media_mode === 'alleen_geluid' ? '♪ Spotify (alleen geluid)' : '♪ Spotify'),
@@ -491,6 +503,7 @@ function settingsCard() {
   const hasCountdown = 'countdown_seconds' in state.settings;
   const cdSecs = h('input', { type: 'number', inputmode: 'numeric', min: '3', max: '600', step: '1', value: state.settings.countdown_seconds ? String(state.settings.countdown_seconds) : '', placeholder: 'geen', class: 'input-short' });
   const cdMusic = spotifyField(state.settings.countdown_music || '', { label: 'Muziek tijdens het aftellen (optioneel)' });
+  const cdStart = timeInput(state.settings.countdown_music_start);
   const cdBtn = h('button', { class: 'btn btn-green', type: 'submit' }, 'Aftellen opslaan');
 
   return h('section', { class: 'b-section' },
@@ -548,17 +561,23 @@ function settingsCard() {
             if (secs != null && !(secs >= 3 && secs <= 600)) return toast('Kies 3 tot 600 seconden, of laat het leeg.');
             const link = cdMusic.value();
             if (link === false) return toast('De Spotify-link wordt niet herkend.');
+            const st = parseTime(cdStart.value);
+            if (st === false) return toast('Vul het beginpunt in als minuten:seconden, bijvoorbeeld 1:05.');
+            const row = { countdown_seconds: secs, countdown_music: link };
+            if (st || state.settings.countdown_music_start) row.countdown_music_start = st || null;
             cdBtn.disabled = true;
-            const { error } = await sb.from('settings').update({ countdown_seconds: secs, countdown_music: link }).eq('id', 1);
+            const { error } = await sb.from('settings').update(row).eq('id', 1);
             cdBtn.disabled = false;
             if (error) return toast(errorText(error));
-            Object.assign(state.settings, { countdown_seconds: secs, countdown_music: link });
+            Object.assign(state.settings, row);
             toast('Aftellen opgeslagen');
           },
         },
           h('label', {}, '⏱ Aftellen na "Zo werkt het": aantal seconden', cdSecs,
             h('span', { class: 'hint' }, 'Op de tv staat dan "Quiz begint in" met grote aftellende seconden; bij 0 start de eerste vraag vanzelf. Leeg = geen aftelscherm.')),
           cdMusic.el,
+          h('label', {}, '⏩ Muziek begint bij (minuten:seconden)', cdStart,
+            h('span', { class: 'hint' }, 'Bijvoorbeeld 0:45. Leeg = vanaf het begin.')),
           cdBtn,
         )
         : h('p', { class: 'b-card b-warning' }, 'Voer supabase/019_aftellen.sql uit in Supabase om het aftellen in te stellen.'),
@@ -680,6 +699,8 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
   const music = spotifyField(q?.media_url || '');
   const answerMusic = spotifyField(ans?.answer_media_url || '', { label: 'Spotify-link bij het antwoord (optioneel)' });
   const answerSoundOnly = h('input', { type: 'checkbox', checked: Boolean(ans?.answer_media_hidden) });
+  const mediaStart = timeInput(q?.media_start);
+  const answerMediaStart = timeInput(ans?.answer_media_start);
   // Standaard afdekken: de speler toont titel en artiest en zou het antwoord kunnen verraden.
   const currentMode = q?.media_url ? (q.media_mode || 'tonen') : 'verbergen';
   // "Alleen geluid" is een apart vinkje; de keuzelijst bevat de andere standen.
@@ -725,6 +746,12 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
       if (answerLink === false) return (err.textContent = 'De Spotify-link bij het antwoord wordt niet herkend.');
       const answerRow = { correct_option: null, correct_texts: null, correct_value: null };
       if (answerSoundOnly.checked || ans?.answer_media_hidden) answerRow.answer_media_hidden = answerSoundOnly.checked;
+      // Beginpunt van de nummers (alleen meesturen als ingesteld of eerder ingesteld; werkt dan ook zonder 022).
+      const ms = parseTime(mediaStart.value);
+      const ams = parseTime(answerMediaStart.value);
+      if (ms === false || ams === false) return (err.textContent = 'Vul het beginpunt in als minuten:seconden, bijvoorbeeld 1:05.');
+      if (ms || q?.media_start) row.media_start = ms || null;
+      if (ams || ans?.answer_media_start) answerRow.answer_media_start = ams || null;
       // Alleen meesturen als ingesteld of eerder ingesteld (werkt dan ook zonder 017_antwoordfoto_onthullen.sql).
       if (answerFx.value || ans?.answer_reveal_effect) answerRow.answer_reveal_effect = answerFx.value || null;
       // Alleen meesturen als het aan staat of stond (dan werkt het ook zonder 013_antwoord_alleen_foto.sql).
@@ -830,7 +857,9 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
     // ---- 3. Muziek en geluid bij de vraag
     formSection('🎵 Muziek of geluid bij de vraag', Boolean(q?.media_url || q?.audio_path),
       music.el,
-      h('label', { class: 'check' }, soundOnly, 'Alleen geluid: geen speler in beeld bij de vraag'),
+      h('label', {}, '⏩ Begin bij (minuten:seconden)', mediaStart,
+      h('span', { class: 'hint' }, 'Bijvoorbeeld 1:05 om meteen bij het refrein te beginnen. Leeg = vanaf het begin. Werkt alleen als je in Chrome bij Spotify bent ingelogd (anders speelt Spotify een eigen fragment).')),
+    h('label', { class: 'check' }, soundOnly, 'Alleen geluid: geen speler in beeld bij de vraag'),
       modeField,
       h('label', {}, '🎧 Intro raden: speel maar … seconden', introSecs,
         h('span', { class: 'hint' }, 'Leeg = het hele fragment. Met een getal speelt de tv alleen het begin en stopt dan vanzelf; op de tv staat een knop "Nog een keer". Telefoons spelen het nummer dan niet.')),
@@ -852,6 +881,7 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
       h('div', { class: 'stack-tight b-subblock' },
         answerMusic.el,
         h('span', { class: 'hint' }, 'Dit nummer speelt in de antwoordenronde, bijvoorbeeld het nummer van het antwoord.'),
+        h('label', {}, '⏩ Begin bij (minuten:seconden)', answerMediaStart),
         h('label', { class: 'check' }, answerSoundOnly, 'Alleen geluid: geen speler in beeld bij het antwoord'))),
 
     // ---- 5. Extra's
