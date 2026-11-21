@@ -4,12 +4,12 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer, inScarePhase, serverNow, SCARE_SECONDS,
-} from './common.js?v=63';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=63';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=63';
+} from './common.js?v=64';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=64';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=64';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking, fastestWinners,
-} from './scoring.js?v=63';
+} from './scoring.js?v=64';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -1507,8 +1507,17 @@ function startQuestion() { showPreview(); }
 const deck = new Map(); // link → deckPlayer
 let deckBox = null;
 
-/** Vragen opnieuw ophalen (misschien is er in beheer iets aangepast sinds het inloggen). */
+/** Vragen en spelinstellingen opnieuw ophalen (misschien is er in beheer iets aangepast sinds het inloggen). */
 async function reloadQuestions() {
+  try {
+    const { data: st } = await sb.from('settings').select('*').eq('id', 1).maybeSingle();
+    if (st) {
+      state.music = { start: st.start_music || null, end: st.end_music || null, countdown: st.countdown_music || null };
+      state.countdownSecs = st.countdown_seconds || 0;
+      state.countdownStart = st.countdown_music_start || 0;
+      preloadMusic();
+    }
+  } catch { /* oude instellingen houden */ }
   try {
     const all = await fetchQuestions();
     state.questions = all.filter((q) => !q.tiebreak);
