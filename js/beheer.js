@@ -2,9 +2,9 @@
 // spelinstellingen en een spel starten. Licht thema; werkt op iPad en iPhone.
 import {
   sb, h, mount, toast, LETTERS, errorText, loginForm, parseSpotify, cleanSpotifyLink, spotifyPlayer, SCARE_SECONDS,
-} from './common.js?v=50';
-import { parseNumber, formatNumber } from './scoring.js?v=50';
-import { addTestPlayers } from './proef.js?v=50';
+} from './common.js?v=51';
+import { parseNumber, formatNumber } from './scoring.js?v=51';
+import { addTestPlayers } from './proef.js?v=51';
 
 const TREE_CATEGORY = 'Van wie is deze kerstboom?';
 // Drie soorten muziekvragen (zie renderMusicForm)
@@ -782,53 +782,64 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
       }
     },
   },
+    // ---- 1. De vraag en het goede antwoord (altijd open)
     h('label', {}, 'Rubriek', category, datalist),
     scareOnly && h('label', {}, 'Tekst vóór de schrik', scareText,
       h('span', { class: 'hint' }, 'Op de tv en de telefoons staat eerst alleen deze tekst. Na het ingestelde aantal seconden komt het schrikbeeld met een gil, en daarna de echte vraag hieronder.')),
     h('div', { class: 'stack-tight' }, h('span', { class: 'field-label' }, 'Soort'), h('div', { class: 'segmented' }, kindButtons)),
     h('label', {}, scareOnly ? 'Vraag (verschijnt na de schrik)' : 'Vraag', text),
-    h('div', { class: 'stack-tight' }, h('span', { class: 'field-label' }, 'Foto (optioneel)'), photo.el,
-      h('label', {}, 'Foto onthullen', revealFx,
-        h('span', { class: 'hint' }, 'De foto wordt tijdens de vraag langzaam zichtbaar op de tv (na ongeveer 85% van de tijd helemaal). Op de telefoons staat de foto dan niet.'))),
-    h('div', { class: 'stack-tight' },
-      h('span', { class: 'field-label' }, 'Foto bij het antwoord (optioneel)'),
-      h('span', { class: 'hint' }, 'De tv toont deze foto in de antwoordenronde in plaats van de vraagfoto. Spelers zien hem pas dan.'),
-      answerPhoto.el,
-      h('label', { class: 'check' }, hideText, 'Alleen de foto of het filmpje tonen, zonder antwoordtekst'),
-      h('label', {}, 'Antwoordfoto onthullen', answerFx,
-        h('span', { class: 'hint' }, `De antwoordfoto wordt in ${8} seconden langzaam zichtbaar zodra het antwoord op de tv komt.`)),
-      h('span', { class: 'hint' }, 'Voor open vragen en meerkeuze, als de foto het antwoord al laat zien. Bij een schatting blijft het getal staan.')),
-    video.el,
-    !scareOnly && h('div', { class: 'stack-tight' },
-      answerVideo.el,
-      h('span', { class: 'hint' }, 'Een filmpje start vanzelf met geluid op de tv en de telefoons, op de plek van de foto. Maximaal 50 MB (ongeveer een halve tot een hele minuut).')),
-    h('div', { class: 'stack-tight' },
-      audioPick.el,
-      h('label', { class: 'check' }, audioReverse, '⏪ Achterstevoren afspelen bij de vraag (bij het antwoord gewoon vooruit)'),
-      h('span', { class: 'hint' }, 'Alleen op de tv, zonder speler in beeld. Op de tv staat een knop "Nog een keer". Is het een filmpje en staat "achterstevoren" aan, dan speelt bij het antwoord het hele filmpje met beeld (op tv en telefoons). Tip: kies een kort fragment met een herkenbaar refrein.')),
-    music.el,
-    h('label', { class: 'check' }, soundOnly, 'Alleen geluid: geen speler in beeld bij de vraag'),
-    h('label', {}, '🎧 Intro raden: speel maar … seconden', introSecs,
-      h('span', { class: 'hint' }, 'Leeg = het hele fragment. Met een getal speelt de tv alleen het begin en stopt dan vanzelf; op de tv staat een knop "Nog een keer". Telefoons spelen het nummer dan niet.')),
-    modeField,
-    h('div', { class: 'stack-tight' },
-      answerMusic.el,
-      h('span', { class: 'hint' }, 'Dit nummer speelt in de antwoordenronde, bijvoorbeeld het nummer van het antwoord.'),
-      h('label', { class: 'check' }, answerSoundOnly, 'Alleen geluid: geen speler in beeld bij het antwoord')),
     mcBlock, openBlock, estBlock,
     h('label', {}, scareOnly ? 'Tijd om te antwoorden (na de schrik), in seconden' : 'Tijd in seconden', time),
-    h('fieldset', { class: 'b-fieldset' },
-      h('legend', {}, scareOnly ? '👻 Schrik' : '👻 Schrikeffect (optioneel)'),
-      h('label', {}, 'Na … seconden', scare),
-      h('span', { class: 'hint' }, scareOnly
-        ? 'Na zoveel seconden (vanaf het begin van de vraag) verschijnt op de tv en op de telefoons plotseling het schrikbeeld met een gil.'
-        : 'Na zoveel seconden verschijnt op de tv en op de telefoons plotseling het schrikbeeld met een gil. Leeg = geen schrik.'),
-      h('span', { class: 'field-label' }, 'Schrikbeeld (foto of bewegende GIF)'),
-      h('span', { class: 'hint' }, 'Zonder schrikbeeld komt er een getekende geest.'),
-      scarePhoto.el),
-    h('label', { class: 'check' }, fastest, '⚡ Alleen de 3 snelste goede antwoorden krijgen een punt'),
-    h('span', { class: 'hint' }, 'Voor meerkeuze en open vragen, bijvoorbeeld bij puzzelstukjes. Telt het moment van het laatst ingestuurde antwoord; de tv toont wie de snelsten waren.'),
-    !scareOnly && h('label', { class: 'check' }, rate, 'Spelers geven deze boom een cijfer'),
+
+    // ---- 2. Beeld bij de vraag
+    formSection('📷 Foto of filmpje bij de vraag', Boolean(q?.photo_path || q?.video_path || q?.reveal_effect),
+      h('div', { class: 'stack-tight' }, h('span', { class: 'field-label' }, 'Foto'), photo.el),
+      h('label', {}, 'Foto onthullen', revealFx,
+        h('span', { class: 'hint' }, 'De foto wordt tijdens de vraag langzaam zichtbaar op de tv (na ongeveer 85% van de tijd helemaal). Op de telefoons staat de foto dan niet.')),
+      video.el,
+      h('span', { class: 'hint' }, 'Een filmpje start vanzelf met geluid op de tv en de telefoons, op de plek van de foto. Maximaal 50 MB.')),
+
+    // ---- 3. Muziek en geluid bij de vraag
+    formSection('🎵 Muziek of geluid bij de vraag', Boolean(q?.media_url || q?.audio_path),
+      music.el,
+      h('label', { class: 'check' }, soundOnly, 'Alleen geluid: geen speler in beeld bij de vraag'),
+      modeField,
+      h('label', {}, '🎧 Intro raden: speel maar … seconden', introSecs,
+        h('span', { class: 'hint' }, 'Leeg = het hele fragment. Met een getal speelt de tv alleen het begin en stopt dan vanzelf; op de tv staat een knop "Nog een keer". Telefoons spelen het nummer dan niet.')),
+      h('div', { class: 'stack-tight b-subblock' },
+        audioPick.el,
+        h('label', { class: 'check' }, audioReverse, '⏪ Achterstevoren afspelen bij de vraag (bij het antwoord gewoon vooruit)'),
+        h('span', { class: 'hint' }, 'Eigen geluid, alleen op de tv. Is het een filmpje en staat "achterstevoren" aan, dan speelt bij het antwoord het hele filmpje met beeld.'))),
+
+    // ---- 4. Wat er bij het antwoord te zien en te horen is
+    formSection('✅ Bij het antwoord', Boolean(ans?.answer_photo_path || ans?.answer_video_path || ans?.answer_media_url || ans?.hide_answer_text || ans?.answer_reveal_effect),
+      h('div', { class: 'stack-tight' },
+        h('span', { class: 'field-label' }, 'Foto bij het antwoord'),
+        h('span', { class: 'hint' }, 'De tv toont deze foto in de antwoordenronde in plaats van de vraagfoto. Spelers zien hem pas dan.'),
+        answerPhoto.el),
+      h('label', { class: 'check' }, hideText, 'Alleen de foto of het filmpje tonen, zonder antwoordtekst'),
+      h('label', {}, 'Antwoordfoto onthullen', answerFx,
+        h('span', { class: 'hint' }, 'De antwoordfoto wordt in 8 seconden langzaam zichtbaar zodra het antwoord op de tv komt.')),
+      answerVideo.el,
+      h('div', { class: 'stack-tight b-subblock' },
+        answerMusic.el,
+        h('span', { class: 'hint' }, 'Dit nummer speelt in de antwoordenronde, bijvoorbeeld het nummer van het antwoord.'),
+        h('label', { class: 'check' }, answerSoundOnly, 'Alleen geluid: geen speler in beeld bij het antwoord'))),
+
+    // ---- 5. Extra's
+    formSection('✨ Extra: snelsten, schrik, kerstboom', Boolean(q?.fastest_count || (q?.scare_after && !scareOnly) || q?.rate_tree) || scareOnly,
+      h('label', { class: 'check' }, fastest, '⚡ Alleen de 3 snelste goede antwoorden krijgen een punt'),
+      h('span', { class: 'hint' }, 'Voor meerkeuze en open vragen, bijvoorbeeld bij puzzelstukjes. Telt het moment van het laatst ingestuurde antwoord.'),
+      h('fieldset', { class: 'b-fieldset' },
+        h('legend', {}, scareOnly ? '👻 Schrik' : '👻 Schrikeffect'),
+        h('label', {}, 'Na … seconden', scare),
+        h('span', { class: 'hint' }, scareOnly
+          ? 'Na zoveel seconden (vanaf het begin van de vraag) verschijnt op de tv en op de telefoons plotseling het schrikbeeld met een gil.'
+          : 'Na zoveel seconden verschijnt op de tv en op de telefoons plotseling het schrikbeeld met een gil. Leeg = geen schrik.'),
+        h('span', { class: 'field-label' }, 'Schrikbeeld (foto of bewegende GIF)'),
+        h('span', { class: 'hint' }, 'Zonder schrikbeeld komt er een getekende geest.'),
+        scarePhoto.el),
+      !scareOnly && h('label', { class: 'check' }, rate, 'Spelers geven deze boom een cijfer')),
     err,
     h('div', { class: 'row' },
       saveBtn,
@@ -847,6 +858,13 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
     h('h1', { class: 'serif' }, scareOnly ? (isNew ? 'Schrikvraag toevoegen' : 'Schrikvraag bewerken') : isNew ? 'Nieuwe vraag' : 'Vraag bewerken'),
     h('div', { class: 'b-card' }, form),
   ));
+}
+
+/** Inklapbaar blok in het bewerkformulier; staat open als er al iets in is ingesteld. */
+function formSection(title, open, ...children) {
+  return h('details', { class: 'b-section-fold', open: open || undefined },
+    h('summary', {}, title),
+    h('div', { class: 'stack' }, children));
 }
 
 /** Vraag + juiste antwoord opslaan, inclusief foto-upload. */
