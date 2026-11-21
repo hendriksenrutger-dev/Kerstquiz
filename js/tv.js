@@ -4,12 +4,12 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer, inScarePhase, serverNow, SCARE_SECONDS,
-} from './common.js?v=46';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=46';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=46';
+} from './common.js?v=47';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=47';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=47';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking, fastestWinners,
-} from './scoring.js?v=46';
+} from './scoring.js?v=47';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -1196,8 +1196,10 @@ async function startPreview(id) {
   state.players = [];
   clearInterval(state.tick);
   state.tick = setInterval(updateTimer, 250);
-  // Filmpje van de eerste vraag alvast starten (zonder tik mogelijk zonder geluid)
+  // Muziek en filmpje van de eerste vraag meteen starten (de tik op 👁 Voorbeeld telt als tik)
   const first = preview.list[preview.index];
+  const link = first && !first.tiebreak ? mediaLinkFor('question', first) : null;
+  if (link) playMedia(link, { seconds: introSeconds('question', first) });
   const vp = first && !first.tiebreak ? videoPathFor('question', first) : null;
   if (vp) playVideo(vp);
   await showPreview();
