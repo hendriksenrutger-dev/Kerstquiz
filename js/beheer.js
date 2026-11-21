@@ -2,9 +2,9 @@
 // spelinstellingen en een spel starten. Licht thema; werkt op iPad en iPhone.
 import {
   sb, h, mount, toast, LETTERS, errorText, loginForm, parseSpotify, cleanSpotifyLink, spotifyPlayer, SCARE_SECONDS,
-} from './common.js?v=42';
-import { parseNumber, formatNumber } from './scoring.js?v=42';
-import { addTestPlayers } from './proef.js?v=42';
+} from './common.js?v=43';
+import { parseNumber, formatNumber } from './scoring.js?v=43';
+import { addTestPlayers } from './proef.js?v=43';
 
 const TREE_CATEGORY = 'Van wie is deze kerstboom?';
 // Drie soorten muziekvragen (zie renderMusicForm)
@@ -323,6 +323,7 @@ function questionItem(q, i) {
         q.video_path && h('span', { class: 'muted' }, '🎬 filmpje'),
         q.reveal_effect && h('span', { class: 'muted' }, `🧩 ${q.reveal_effect === 'puzzel' ? 'puzzelstukjes' : q.reveal_effect === 'inzoomen' ? 'uitzoomen' : 'wazig → scherp'}`),
         q.media_seconds && h('span', { class: 'muted' }, `🎧 intro ${q.media_seconds} s`),
+        q.fastest_count && h('span', { class: 'muted' }, `⚡ ${q.fastest_count} snelsten`),
         ans?.answer_video_path && h('span', { class: 'muted' }, '🎬 antwoordfilmpje'),
         q.media_url && h('span', { class: 'b-music' }, q.media_mode === 'verbergen' ? '♪ Spotify (afgedekt)' : q.media_mode === 'alleen_tv' ? '♪ Spotify (alleen tv)' : q.media_mode === 'alleen_geluid' ? '♪ Spotify (alleen geluid)' : '♪ Spotify'),
       ),
@@ -565,6 +566,7 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
   const answerTime = q?.scare_only ? q.time_limit - (q.scare_after || 0) - SCARE_SECONDS : q?.time_limit;
   const time = h('input', { type: 'number', inputmode: 'numeric', min: '5', max: '600', step: '1', value: String(answerTime >= 5 && answerTime <= 120 ? answerTime : 20), class: 'input-short' });
   const rate = h('input', { type: 'checkbox', checked: Boolean(q?.rate_tree) });
+  const fastest = h('input', { type: 'checkbox', checked: Boolean(q?.fastest_count) });
   const scare = h('input', { type: 'number', inputmode: 'numeric', min: '1', max: '600', step: '1', value: q?.scare_after ? String(q.scare_after) : (scareOnly ? '5' : ''), placeholder: 'geen', class: 'input-short' });
 
   let kind = q?.kind || 'meerkeuze';
@@ -675,6 +677,8 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
       if (hideText.checked || ans?.hide_answer_text) answerRow.hide_answer_text = hideText.checked;
 
       if (!row.text) return (err.textContent = 'Vul de vraag in.');
+      // Alleen meesturen als het aan staat of stond (werkt dan ook zonder 016_snelsten.sql).
+      if (fastest.checked || q?.fastest_count) row.fastest_count = fastest.checked ? 3 : null;
       if (scareOnly) {
         // Eerst de tekst vóór de schrik, dan de schrik, daarna de echte vraag met de ingestelde tijd.
         const secs = parseInt(scare.value, 10);
@@ -783,6 +787,8 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
       h('span', { class: 'field-label' }, 'Schrikbeeld (foto of bewegende GIF)'),
       h('span', { class: 'hint' }, 'Zonder schrikbeeld komt er een getekende geest.'),
       scarePhoto.el),
+    h('label', { class: 'check' }, fastest, '⚡ Alleen de 3 snelste goede antwoorden krijgen een punt'),
+    h('span', { class: 'hint' }, 'Voor meerkeuze en open vragen, bijvoorbeeld bij puzzelstukjes. Telt het moment van het laatst ingestuurde antwoord; de tv toont wie de snelsten waren.'),
     !scareOnly && h('label', { class: 'check' }, rate, 'Spelers geven deze boom een cijfer'),
     err,
     h('div', { class: 'row' },

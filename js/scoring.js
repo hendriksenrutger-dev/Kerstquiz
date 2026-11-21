@@ -140,6 +140,25 @@ export function choiceWinners(answers, correctOption) {
  * @returns Set van player_id's met 1 punt
  */
 export function winnersFor(question, key, answers, overrides) {
+  return fastestWinners(question, baseWinners(question, key, answers, overrides), answers);
+}
+
+/**
+ * "De snelsten": bij een vraag met fastest_count krijgen alleen de N snelste goede
+ * antwoorden een punt (op tijdstip van het laatst ingestuurde antwoord). Bij precies
+ * dezelfde tijd krijgen ze het allebei. Bij een schatting telt dit niet.
+ */
+export function fastestWinners(question, winners, answers) {
+  const n = question?.fastest_count;
+  if (!n || question.kind === 'schatting' || winners.size <= n) return winners;
+  const times = answers.filter((a) => winners.has(a.player_id))
+    .map((a) => ({ id: a.player_id, t: new Date(a.answered_at || 0).getTime() }))
+    .sort((a, b) => a.t - b.t);
+  const cutoff = times[n - 1]?.t;
+  return new Set(times.filter((x) => x.t <= cutoff).map((x) => x.id));
+}
+
+function baseWinners(question, key, answers, overrides) {
   if (!key) return new Set();
   if (question.kind === 'meerkeuze') return choiceWinners(answers, key.correct_option);
   if (question.kind === 'open') {
