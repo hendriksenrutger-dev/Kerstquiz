@@ -1,7 +1,7 @@
 // Tests voor js/scoring.js. Uitvoeren: node tests/scoring.test.mjs
 import assert from 'node:assert/strict';
 import {
-  normalize, levenshtein, judgeOpen, estimateWinners, choiceWinners, scoreboard, parseNumber,
+  normalize, levenshtein, judgeOpen, estimateWinners, choiceWinners, scoreboard, parseNumber, winnersFor,
 } from '../js/scoring.js';
 
 let passed = 0;
@@ -198,3 +198,25 @@ import { interimTop, finalRanking } from '../js/scoring.js';
   assert.deepEqual(r.winners.map((w) => `${w.name}${w.place}`), ['A1', 'B1', 'C2', 'D3', 'E3']);
   console.log('✓ tussenstand, schifting en winnaars');
 }
+
+test('alleen de 3 snelsten', () => {
+  const t = (s) => new Date(Date.UTC(2026, 11, 24, 20, 0, s)).toISOString();
+  const q = { id: 'p', kind: 'meerkeuze', fastest_count: 3 };
+  const answers = [
+    { player_id: 'a', choice: 1, answered_at: t(9) },
+    { player_id: 'b', choice: 1, answered_at: t(3) },
+    { player_id: 'c', choice: 0, answered_at: t(1) },  // fout, ook al snelst
+    { player_id: 'd', choice: 1, answered_at: t(5) },
+    { player_id: 'e', choice: 1, answered_at: t(4) },
+  ];
+  assert.deepEqual([...winnersFor(q, { correct_option: 1 }, answers, new Map())].sort(), ['b', 'd', 'e']);
+  // zonder instelling: iedereen met het goede antwoord
+  assert.deepEqual([...winnersFor({ ...q, fastest_count: null }, { correct_option: 1 }, answers, new Map())].sort(), ['a', 'b', 'd', 'e']);
+  // precies dezelfde tijd op plek 3: allebei een punt
+  const tie = [...answers, { player_id: 'f', choice: 1, answered_at: t(5) }];
+  assert.deepEqual([...winnersFor(q, { correct_option: 1 }, tie, new Map())].sort(), ['b', 'd', 'e', 'f']);
+  // schatting: telt niet
+  const est = { id: 's', kind: 'schatting', fastest_count: 3 };
+  assert.equal(winnersFor(est, { correct_value: 10 }, [{ player_id: 'x', number_answer: 10, answered_at: t(1) }], new Map()).size, 1);
+});
+console.log(`${passed} tests geslaagd`);

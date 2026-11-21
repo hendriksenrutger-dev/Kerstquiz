@@ -4,12 +4,12 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer, inScarePhase, serverNow, SCARE_SECONDS,
-} from './common.js?v=42';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=42';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=42';
+} from './common.js?v=43';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=43';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=43';
 import {
-  judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking,
-} from './scoring.js?v=42';
+  judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking, fastestWinners,
+} from './scoring.js?v=43';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -496,6 +496,7 @@ function renderQuestion() {
       h('div', { class: 'q-meta' },
         q.category && h('span', { class: 'label' }, q.category),
         h('span', { class: 'muted q-count' }, `Vraag ${i + 1} van ${state.questions.length}`),
+        q.fastest_count && q.kind !== 'schatting' && h('span', { class: 'fast-badge' }, `⚡ Alleen de ${q.fastest_count} snelsten krijgen een punt`),
       ),
       h('div', { class: 'q-status' },
         h('span', { class: 'answered', id: 'answered' }, answeredText()),
@@ -601,7 +602,7 @@ async function fetchAll(build) {
 async function loadResults() {
   const g = state.game;
   const [answers, keys, overrides] = await Promise.all([
-    fetchAll(() => sb.from('answers').select('player_id, question_id, choice, text_answer, number_answer, rating')
+    fetchAll(() => sb.from('answers').select('player_id, question_id, choice, text_answer, number_answer, rating, answered_at')
       .eq('game_id', g.id).order('id')),
     fetchAll(() => sb.from('question_answers').select('*').order('question_id')),
     fetchAll(() => sb.from('overrides').select('question_id, normalized, correct').eq('game_id', g.id).order('normalized')),
@@ -880,7 +881,7 @@ async function renderTree() {
 async function loadReveal(qid) {
   const g = state.game;
   const [ans, key, ov] = await Promise.all([
-    sb.from('answers').select('player_id, choice, text_answer, number_answer').eq('game_id', g.id).eq('question_id', qid),
+    sb.from('answers').select('player_id, choice, text_answer, number_answer, answered_at').eq('game_id', g.id).eq('question_id', qid),
     sb.from('question_answers').select('*').eq('question_id', qid).maybeSingle(),
     sb.from('overrides').select('normalized, correct').eq('game_id', g.id).eq('question_id', qid),
   ]);
@@ -917,11 +918,11 @@ async function renderReveal() {
     winners = new Set();
     body = h('p', { class: 'lead muted' }, 'Bij deze vraag is nog geen goed antwoord ingevuld in beheer.');
   } else if (q.kind === 'meerkeuze') {
-    winners = choiceWinners(r.answers, r.key.correct_option);
+    winners = fastestWinners(q, choiceWinners(r.answers, r.key.correct_option), r.answers);
     body = photoOnly ? null : revealChoice(q, r.key.correct_option);
   } else if (q.kind === 'open') {
     const groups = judgeOpen(r.answers, r.key.correct_texts, r.overrides);
-    winners = new Set(groups.filter((g) => g.correct).flatMap((g) => g.playerIds));
+    winners = fastestWinners(q, new Set(groups.filter((g) => g.correct).flatMap((g) => g.playerIds)), r.answers);
     body = revealOpen(q, r.key, groups, photoOnly);
   } else {
     winners = estimateWinners(r.answers, r.key.correct_value);
@@ -929,6 +930,13 @@ async function renderReveal() {
   }
 
   const n = state.players.length;
+  if (q.fastest_count && r.key && q.kind !== 'schatting') {
+    const names = new Map(state.players.map((p) => [p.id, p.name]));
+    const order = r.answers.filter((a) => winners.has(a.player_id))
+      .sort((a, b) => new Date(a.answered_at) - new Date(b.answered_at)).map((a) => names.get(a.player_id)).filter(Boolean);
+    body = [body, h('p', { class: 'fast-list' }, `⚡ Punt voor de ${q.fastest_count} snelsten: `,
+      order.length ? order.join(' · ') : 'niemand had het goed')];
+  }
   const mediaLink = r.key?.answer_media_url || null;  // alleen het nummer dat bij het antwoord is ingevuld
   const view = h('div', { class: `question reveal reveal-${q.kind} ${photo || vpath ? 'has-photo' : q.kind === 'open' ? 'reveal-center' : ''} ${photoOnly ? 'photo-only' : ''}` },
     h('header', { class: 'q-head' },

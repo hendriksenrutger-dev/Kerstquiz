@@ -2,9 +2,9 @@
 import {
   sb, h, mount, toast, load, save, LETTERS, syncClock, secondsLeft,
   fetchQuestions, fetchGame, errorText, liveSync, spotifyPlayer, hiddenSpotifyPlayer, brandTitle, inScarePhase,
-} from './common.js?v=42';
-import { parseNumber, formatNumber } from './scoring.js?v=42';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=42';
+} from './common.js?v=43';
+import { parseNumber, formatNumber } from './scoring.js?v=43';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=43';
 
 // Telefoon: geluid voor een eventuele schrik bij de eerste tik vrijgeven (één keer)
 prepareScareAudio([{ scare_after: 1 }]);
@@ -235,6 +235,7 @@ function renderQuestion(q) {
     topBar(q),
     h('div', { class: 'phone-body stack' },
       q.category && h('span', { class: 'label' }, q.category),
+      q.fastest_count && q.kind !== 'schatting' && h('p', { class: 'p-fast' }, `⚡ Snel zijn! Alleen de ${q.fastest_count} snelsten met het goede antwoord krijgen een punt. Wijzigen telt als later.`),
       h('h2', { class: 'p-question' }, q.text),
       state.game.video_url ? phoneVideo(state.game.video_url)
         : photo && !q.reveal_effect && h('img', { class: 'p-photo', src: photo, alt: '' }),

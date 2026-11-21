@@ -1056,3 +1056,11 @@ body.pv-with-phone .stage { width: min(calc(100vw - 340px), calc((100dvh - 64px)
 }
 @keyframes fx-tile-out { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(.4) rotate(8deg); } }
 .intro-again { font-size: max(18px, 1.3cqw); }
+
+/* De snelsten krijgen een punt */
+.fast-badge {
+  padding: .3em .8em; border-radius: 999px; font-weight: 600; font-size: max(16px, 1.15cqw);
+  background: rgba(var(--gold-rgb), .16); color: var(--gold-light); border: 1px solid rgba(var(--gold-rgb), .5);
+}
+.fast-list { font-size: max(20px, 1.5cqw); color: var(--gold-light); }
+.p-fast { margin: 0; padding: 8px 12px; border-radius: 10px; background: rgba(205, 163, 73, .15); color: var(--gold-light); font-weight: 600; font-size: 15px; }
