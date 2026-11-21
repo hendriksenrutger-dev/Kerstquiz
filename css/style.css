@@ -150,17 +150,15 @@ body.tv { background: #000; overflow: hidden; }
 }
 
 .stage {
+  /* Het tv-beeld vult het hele scherm (ook op een tablet die minder breed is dan 16:9) */
   position: relative; overflow: hidden;
-  width: min(100vw, calc(100dvh * 16 / 9));
-  aspect-ratio: 16 / 9;
-  max-height: 100dvh;
+  width: 100vw; height: 100vh; height: 100dvh;
   background: var(--bg);
   container-type: size;
   font-size: max(20px, 1.5cqw);
 }
 @supports not (height: 100dvh) {
   .tv-frame { height: 100vh; }
-  .stage { width: min(100vw, calc(100vh * 16 / 9)); max-height: 100vh; }
 }
 
 /* Inloggen en beginscherm: geen vaste 16:9, zodat het ook op een telefoon past */
@@ -1107,3 +1105,19 @@ body.pv-with-phone .stage { width: min(calc(100vw - 340px), calc((100dvh - 64px)
 .screen-hero.welcome .hero-bg { filter: none; }
 .welcome .corner { z-index: 3; }
 @keyframes welcome-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+/* Aftellen vóór de eerste vraag */
+.countdown {
+  position: absolute; inset: 0; z-index: 1; display: grid; grid-template-rows: 1fr auto;
+  padding: 3cqh 3cqw; background: rgba(15, 42, 29, .6);
+}
+.countdown-center { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.5cqh; }
+.countdown-title { margin: 0; font-family: var(--serif); font-weight: 700; font-size: max(40px, 4.6cqw); color: var(--text); }
+.countdown-num {
+  font: 700 min(44cqh, 32cqw)/1 var(--serif); color: var(--gold);
+  font-variant-numeric: lining-nums tabular-nums; font-feature-settings: 'lnum' 1;
+  text-shadow: 0 6px 40px rgba(0, 0, 0, .45);
+}
+.countdown-num.tick { animation: countdown-tick .5s ease-out; }
+.countdown .ornament { width: min(520px, 40cqw); }
+@keyframes countdown-tick { from { transform: scale(1.18); opacity: .5; } to { transform: none; opacity: 1; } }

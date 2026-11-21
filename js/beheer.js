@@ -2,9 +2,9 @@
 // spelinstellingen en een spel starten. Licht thema; werkt op iPad en iPhone.
 import {
   sb, h, mount, toast, LETTERS, errorText, loginForm, parseSpotify, cleanSpotifyLink, spotifyPlayer, SCARE_SECONDS,
-} from './common.js?v=55';
-import { parseNumber, formatNumber } from './scoring.js?v=55';
-import { addTestPlayers } from './proef.js?v=55';
+} from './common.js?v=57';
+import { parseNumber, formatNumber } from './scoring.js?v=57';
+import { addTestPlayers } from './proef.js?v=57';
 
 const TREE_CATEGORY = 'Van wie is deze kerstboom?';
 // Drie soorten muziekvragen (zie renderMusicForm)
@@ -487,6 +487,10 @@ function settingsCard() {
   const startMusic = spotifyField(state.settings.start_music || '', { label: 'Muziek bij de start (wachtruimte en "Zo werkt het")' });
   const endMusic = spotifyField(state.settings.end_music || '', { label: 'Muziek bij het einde (eindstand en mooiste kerstboom)' });
   const musicBtn = h('button', { class: 'btn btn-green', type: 'submit' }, 'Muziek opslaan');
+  const hasCountdown = 'countdown_seconds' in state.settings;
+  const cdSecs = h('input', { type: 'number', inputmode: 'numeric', min: '3', max: '600', step: '1', value: state.settings.countdown_seconds ? String(state.settings.countdown_seconds) : '', placeholder: 'geen', class: 'input-short' });
+  const cdMusic = spotifyField(state.settings.countdown_music || '', { label: 'Muziek tijdens het aftellen (optioneel)' });
+  const cdBtn = h('button', { class: 'btn btn-green', type: 'submit' }, 'Aftellen opslaan');
 
   return h('section', { class: 'b-section' },
     h('h2', { class: 'serif' }, 'Spelinstellingen'),
@@ -534,6 +538,29 @@ function settingsCard() {
           musicBtn,
         )
         : h('p', { class: 'b-card b-warning' }, 'Voer supabase/005_muziek_start_einde.sql uit in Supabase om muziek bij de start en het einde in te stellen.'),
+      hasCountdown
+        ? h('form', {
+          class: 'b-card stack',
+          onsubmit: async (e) => {
+            e.preventDefault();
+            const secs = cdSecs.value.trim() ? parseInt(cdSecs.value, 10) : null;
+            if (secs != null && !(secs >= 3 && secs <= 600)) return toast('Kies 3 tot 600 seconden, of laat het leeg.');
+            const link = cdMusic.value();
+            if (link === false) return toast('De Spotify-link wordt niet herkend.');
+            cdBtn.disabled = true;
+            const { error } = await sb.from('settings').update({ countdown_seconds: secs, countdown_music: link }).eq('id', 1);
+            cdBtn.disabled = false;
+            if (error) return toast(errorText(error));
+            Object.assign(state.settings, { countdown_seconds: secs, countdown_music: link });
+            toast('Aftellen opgeslagen');
+          },
+        },
+          h('label', {}, '⏱ Aftellen na "Zo werkt het": aantal seconden', cdSecs,
+            h('span', { class: 'hint' }, 'Op de tv staat dan "Quiz begint in" met grote aftellende seconden; bij 0 start de eerste vraag vanzelf. Leeg = geen aftelscherm.')),
+          cdMusic.el,
+          cdBtn,
+        )
+        : h('p', { class: 'b-card b-warning' }, 'Voer supabase/019_aftellen.sql uit in Supabase om het aftellen in te stellen.'),
       ],
   );
 }
