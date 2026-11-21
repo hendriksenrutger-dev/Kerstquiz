@@ -565,7 +565,7 @@ function musicDebug() {
 // ---------- Versie (altijd de nieuwste versie laden) ----------
 
 // Bij elke nieuwe versie ophogen, samen met version.txt en de ?v=… in index.html en de imports.
-export const APP_VERSION = '43';
+export const APP_VERSION = '44';
 
 /**
  * GitHub Pages en Safari bewaren bestanden een tijd in de cache. Is er een nieuwere
@@ -628,6 +628,7 @@ export function deckPlayer(link, { height = 152 } = {}) {
   let startedAt = 0;     // tijdstip van de laatste start door de app
   let kicks = 0;         // hoe vaak we het nummer na een onverwachte stop opnieuw hebben aangezet
   let limitMs = null;    // intro raden: na zoveel ms vanzelf stoppen
+  let rewind = false;    // zodra het speelt, terug naar het begin
   let limitTimer = null;
   const listeners = [];
 
@@ -651,6 +652,12 @@ export function deckPlayer(link, { height = 152 } = {}) {
         ctrl = c;
         c.addListener('playback_update', (e) => {
           const nowPlaying = !e.data.isPaused;
+          // Speelt het, maar niet vanaf het begin (verder waar het gebleven was)?
+          // Dan nu pas terugspoelen: vóór het afspelen spoelen gaf op de iPad haperingen.
+          if (rewind && nowPlaying) {
+            rewind = false;
+            if (e.data.position > 800 && typeof ctrl.seek === 'function') { ctrl.seek(0); playing = true; return; }
+          }
           // Intro raden: genoeg gehoord? Dan stoppen.
           if (limitMs != null && nowPlaying && e.data.position >= limitMs) { limitMs = null; api.pause(); return; }
           // Stopt het vlak na de start uit zichzelf? Dan nog een duwtje geven.
@@ -673,8 +680,9 @@ export function deckPlayer(link, { height = 152 } = {}) {
       wanted = true;
       clearTimeout(limitTimer);
       limitMs = seconds ? seconds * 1000 : null;
+      rewind = true;  // altijd vanaf het begin (een vooraf geladen nummer gaat anders verder waar het was)
       // vangnet als Spotify de positie niet (op tijd) doorgeeft
-      if (seconds) limitTimer = setTimeout(() => { if (limitMs != null) { limitMs = null; api.pause(); } }, seconds * 1000 + 2500);
+      if (seconds) limitTimer = setTimeout(() => { if (limitMs != null) { limitMs = null; api.pause(); } }, seconds * 1000 + 3500);
       start();
     },
     pause() {
