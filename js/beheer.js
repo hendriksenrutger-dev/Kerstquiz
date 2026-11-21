@@ -157,10 +157,11 @@ async function uploadPhoto(blob) {
   return path;
 }
 
-const AUDIO_TYPES = { mp3: 'audio/mpeg', m4a: 'audio/mp4', aac: 'audio/aac', wav: 'audio/wav', ogg: 'audio/ogg' };
+// Ook een filmpje (bijv. een schermopname) mag: de tv gebruikt alleen het geluid ervan.
+const AUDIO_TYPES = { mp3: 'audio/mpeg', m4a: 'audio/mp4', aac: 'audio/aac', wav: 'audio/wav', ogg: 'audio/ogg', mp4: 'video/mp4', webm: 'video/webm' };
 async function uploadAudio(file) {
   const ext = (file.name.split('.').pop() || '').toLowerCase();
-  const type = AUDIO_TYPES[ext] || (file.type && file.type.startsWith('audio/') ? file.type : 'audio/mpeg');
+  const type = AUDIO_TYPES[ext] || (file.type && /^(audio|video)\//.test(file.type) ? file.type : 'audio/mpeg');
   const path = `geluid/${crypto.randomUUID()}.${AUDIO_TYPES[ext] ? ext : 'mp3'}`;
   const { error } = await sb.storage.from('fotos').upload(path, file, { contentType: type, upsert: false });
   if (error) throw error;
@@ -185,7 +186,7 @@ function videoPicker(currentUrl, label, { audio = false } = {}) {
     ? h('audio', { class: 'audio-preview', controls: true, preload: 'metadata' })
     : h('video', { class: 'video-preview', controls: true, playsinline: true, preload: 'metadata' });
   const status = h('p', { class: 'hint' });
-  const input = h('input', { type: 'file', accept: audio ? 'audio/*,.mp3,.m4a' : 'video/*', class: 'sr-only' });
+  const input = h('input', { type: 'file', accept: audio ? 'audio/*,.mp3,.m4a,video/mp4,video/webm' : 'video/*', class: 'sr-only' });
   const removeBtn = h('button', { type: 'button', class: 'btn btn-light btn-small' }, `${audio ? 'Geluid' : 'Filmpje'} verwijderen`);
   const show = (url) => {
     preview.hidden = !url;
@@ -642,7 +643,7 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
   const scarePhoto = photoPicker(q?.scare_path ? state.thumbs.get(q.scare_path) : null);
   const video = videoPicker(q?.video_path ? state.thumbs.get(q.video_path) : null, '🎬 Filmpje bij de vraag (optioneel)');
   const answerVideo = videoPicker(ans?.answer_video_path ? state.thumbs.get(ans.answer_video_path) : null, '🎬 Filmpje bij het antwoord (optioneel)');
-  const audioPick = videoPicker(q?.audio_path ? state.thumbs.get(q.audio_path) : null, '🔊 Geluidsfragment bij de vraag (mp3 of m4a, optioneel)', { audio: true });
+  const audioPick = videoPicker(q?.audio_path ? state.thumbs.get(q.audio_path) : null, '🔊 Geluidsfragment bij de vraag (mp3, m4a of een filmpje/schermopname, optioneel)', { audio: true });
   const audioReverse = h('input', { type: 'checkbox', checked: Boolean(q?.audio_reverse) });
   const music = spotifyField(q?.media_url || '');
   const answerMusic = spotifyField(ans?.answer_media_url || '', { label: 'Spotify-link bij het antwoord (optioneel)' });
