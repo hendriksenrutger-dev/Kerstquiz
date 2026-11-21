@@ -1038,3 +1038,21 @@ body.pv-with-phone .stage { width: min(calc(100vw - 340px), calc((100dvh - 64px)
 
 /* Antwoord naast een foto: tekst iets meer naar rechts voor een betere spreiding */
 .question.reveal.has-photo .q-main { padding-left: 4cqw; padding-right: 2cqw; }
+
+/* Foto langzaam onthullen (tv) */
+.photo.photo-fx {
+  position: relative; overflow: hidden; align-self: stretch;
+  border: 4px solid var(--gold); border-radius: var(--radius); background: #000;
+}
+.photo.photo-fx img { width: 100%; height: 100%; max-width: none; max-height: none; object-fit: cover; border: 0; border-radius: 0; }
+.fx-vervagen img { animation-name: fx-blur; animation-timing-function: linear; animation-fill-mode: both; }
+.fx-inzoomen img { animation-name: fx-zoom; animation-timing-function: cubic-bezier(.3, 0, .2, 1); animation-fill-mode: both; }
+@keyframes fx-blur { from { filter: blur(48px) saturate(.6); transform: scale(1.15); } to { filter: blur(0) saturate(1); transform: scale(1); } }
+@keyframes fx-zoom { from { transform: scale(7); } to { transform: scale(1); } }
+.fx-tiles { position: absolute; inset: 0; display: grid; grid-auto-rows: 1fr; }
+.fx-tile {
+  background: linear-gradient(135deg, #1d4a35, #123222); border: 1px solid rgba(var(--gold-rgb), .35);
+  animation: fx-tile-out .7s ease-in both;
+}
+@keyframes fx-tile-out { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(.4) rotate(8deg); } }
+.intro-again { font-size: max(18px, 1.3cqw); }

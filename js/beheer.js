@@ -2,9 +2,9 @@
 // spelinstellingen en een spel starten. Licht thema; werkt op iPad en iPhone.
 import {
   sb, h, mount, toast, LETTERS, errorText, loginForm, parseSpotify, cleanSpotifyLink, spotifyPlayer, SCARE_SECONDS,
-} from './common.js?v=41';
-import { parseNumber, formatNumber } from './scoring.js?v=41';
-import { addTestPlayers } from './proef.js?v=41';
+} from './common.js?v=42';
+import { parseNumber, formatNumber } from './scoring.js?v=42';
+import { addTestPlayers } from './proef.js?v=42';
 
 const TREE_CATEGORY = 'Van wie is deze kerstboom?';
 // Drie soorten muziekvragen (zie renderMusicForm)
@@ -20,6 +20,12 @@ const MEDIA_MODES = [
   { value: 'alleen_geluid', label: 'Alleen geluid: geen speler in beeld (muziek via de tv)' },
 ];
 const DEFAULT_CATEGORIES = [TREE_CATEGORY, ...Object.values(MUSIC).map((m) => m.category), 'In welke stad staat deze kerstboom?', 'Kerstfeitje'];
+const REVEAL_EFFECTS = [
+  { value: '', label: 'Gewoon tonen' },
+  { value: 'vervagen', label: 'Langzaam scherper (begint wazig)' },
+  { value: 'inzoomen', label: 'Langzaam uitzoomen (begint heel dichtbij)' },
+  { value: 'puzzel', label: 'Puzzelstukjes die één voor één wegvallen' },
+];
 const KINDS = [
   { value: 'meerkeuze', label: 'Meerkeuze' },
   { value: 'open', label: 'Open' },
@@ -315,6 +321,8 @@ function questionItem(q, i) {
         ans?.answer_photo_path && h('span', { class: 'muted' }, '📷 antwoordfoto'),
         ans?.answer_media_url && h('span', { class: 'muted' }, '♪ antwoordnummer'),
         q.video_path && h('span', { class: 'muted' }, '🎬 filmpje'),
+        q.reveal_effect && h('span', { class: 'muted' }, `🧩 ${q.reveal_effect === 'puzzel' ? 'puzzelstukjes' : q.reveal_effect === 'inzoomen' ? 'uitzoomen' : 'wazig → scherp'}`),
+        q.media_seconds && h('span', { class: 'muted' }, `🎧 intro ${q.media_seconds} s`),
         ans?.answer_video_path && h('span', { class: 'muted' }, '🎬 antwoordfilmpje'),
         q.media_url && h('span', { class: 'b-music' }, q.media_mode === 'verbergen' ? '♪ Spotify (afgedekt)' : q.media_mode === 'alleen_tv' ? '♪ Spotify (alleen tv)' : q.media_mode === 'alleen_geluid' ? '♪ Spotify (alleen geluid)' : '♪ Spotify'),
       ),
@@ -622,6 +630,8 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
   const currentMode = q?.media_url ? (q.media_mode || 'tonen') : 'verbergen';
   // "Alleen geluid" is een apart vinkje; de keuzelijst bevat de andere standen.
   const soundOnly = h('input', { type: 'checkbox', checked: currentMode === 'alleen_geluid' });
+  const introSecs = h('input', { type: 'number', inputmode: 'numeric', min: '1', max: '30', step: '1', value: q?.media_seconds ? String(q.media_seconds) : '', placeholder: 'heel', class: 'input-short' });
+  const revealFx = h('select', { class: 'b-select' }, REVEAL_EFFECTS.map((r) => h('option', { value: r.value, selected: (q?.reveal_effect || '') === r.value }, r.label)));
   const modeSelect = h('select', { class: 'b-select' }, MEDIA_MODES.filter((m) => m.value !== 'alleen_geluid')
     .map((m) => h('option', { value: m.value, selected: currentMode === m.value }, m.label)));
   const modeField = h('label', { hidden: currentMode === 'alleen_geluid' }, 'Speler tijdens de vraag', modeSelect, h('span', { class: 'hint' }, 'De Spotify-speler toont titel en artiest. Kies "tonen" alleen als dat het antwoord niet verraadt. In de antwoordenronde speelt alleen de Spotify-link bij het antwoord (als je die invult).'));
@@ -651,6 +661,12 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
       // Alleen meesturen als er een link is of was (dan werkt het ook zonder 003_muziek.sql).
       if (link || q?.media_url) row.media_url = link;
       if (link) row.media_mode = soundOnly.checked ? 'alleen_geluid' : modeSelect.value;
+      // Intro raden en foto onthullen: alleen meesturen als ingesteld of eerder ingesteld (werkt dan ook zonder 015).
+      const secs = introSecs.value.trim() ? parseInt(introSecs.value, 10) : null;
+      if (secs != null && !(secs >= 1 && secs <= 30)) return (err.textContent = 'Intro raden: kies 1 tot 30 seconden (of laat het leeg).');
+      if (link && (secs != null || q?.media_seconds)) row.media_seconds = secs;
+      if (!link && q?.media_seconds) row.media_seconds = null;
+      if (revealFx.value || q?.reveal_effect) row.reveal_effect = revealFx.value || null;
       const answerLink = answerMusic.value();
       if (answerLink === false) return (err.textContent = 'De Spotify-link bij het antwoord wordt niet herkend.');
       const answerRow = { correct_option: null, correct_texts: null, correct_value: null };
@@ -734,7 +750,9 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
       h('span', { class: 'hint' }, 'Op de tv en de telefoons staat eerst alleen deze tekst. Na het ingestelde aantal seconden komt het schrikbeeld met een gil, en daarna de echte vraag hieronder.')),
     h('div', { class: 'stack-tight' }, h('span', { class: 'field-label' }, 'Soort'), h('div', { class: 'segmented' }, kindButtons)),
     h('label', {}, scareOnly ? 'Vraag (verschijnt na de schrik)' : 'Vraag', text),
-    h('div', { class: 'stack-tight' }, h('span', { class: 'field-label' }, 'Foto (optioneel)'), photo.el),
+    h('div', { class: 'stack-tight' }, h('span', { class: 'field-label' }, 'Foto (optioneel)'), photo.el,
+      h('label', {}, 'Foto onthullen', revealFx,
+        h('span', { class: 'hint' }, 'De foto wordt tijdens de vraag langzaam zichtbaar op de tv (na ongeveer 85% van de tijd helemaal). Op de telefoons staat de foto dan niet.'))),
     h('div', { class: 'stack-tight' },
       h('span', { class: 'field-label' }, 'Foto bij het antwoord (optioneel)'),
       h('span', { class: 'hint' }, 'De tv toont deze foto in de antwoordenronde in plaats van de vraagfoto. Spelers zien hem pas dan.'),
@@ -747,6 +765,8 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
       h('span', { class: 'hint' }, 'Een filmpje start vanzelf met geluid op de tv en de telefoons, op de plek van de foto. Maximaal 50 MB (ongeveer een halve tot een hele minuut).')),
     music.el,
     h('label', { class: 'check' }, soundOnly, 'Alleen geluid: geen speler in beeld bij de vraag'),
+    h('label', {}, '🎧 Intro raden: speel maar … seconden', introSecs,
+      h('span', { class: 'hint' }, 'Leeg = het hele fragment. Met een getal speelt de tv alleen het begin en stopt dan vanzelf; op de tv staat een knop "Nog een keer". Telefoons spelen het nummer dan niet.')),
     modeField,
     h('div', { class: 'stack-tight' },
       answerMusic.el,

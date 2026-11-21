@@ -2,9 +2,9 @@
 import {
   sb, h, mount, toast, load, save, LETTERS, syncClock, secondsLeft,
   fetchQuestions, fetchGame, errorText, liveSync, spotifyPlayer, hiddenSpotifyPlayer, brandTitle, inScarePhase,
-} from './common.js?v=41';
-import { parseNumber, formatNumber } from './scoring.js?v=41';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=41';
+} from './common.js?v=42';
+import { parseNumber, formatNumber } from './scoring.js?v=42';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=42';
 
 // Telefoon: geluid voor een eventuele schrik bij de eerste tik vrijgeven (één keer)
 prepareScareAudio([{ scare_after: 1 }]);
@@ -236,8 +236,12 @@ function renderQuestion(q) {
     h('div', { class: 'phone-body stack' },
       q.category && h('span', { class: 'label' }, q.category),
       h('h2', { class: 'p-question' }, q.text),
-      state.game.video_url ? phoneVideo(state.game.video_url) : photo && h('img', { class: 'p-photo', src: photo, alt: '' }),
-      q.media_url && q.media_mode !== 'alleen_geluid' && phonePlayer(q),
+      state.game.video_url ? phoneVideo(state.game.video_url)
+        : photo && !q.reveal_effect && h('img', { class: 'p-photo', src: photo, alt: '' }),
+      // Foto met onthul-effect of intro raden: alleen op het grote scherm
+      q.media_url && q.media_mode !== 'alleen_geluid' && (q.media_seconds
+        ? h('p', { class: 'p-listen' }, '♪ Luister naar het grote scherm') : phonePlayer(q)),
+      photo && q.reveal_effect && h('p', { class: 'p-listen' }, '👀 Kijk naar het grote scherm'),
       twoStep(q)
         ? [h('div', { id: 'p-step1' }, answerArea), ratingStep(q)]
         : [answerArea, q.rate_tree && ratingArea(q)],
