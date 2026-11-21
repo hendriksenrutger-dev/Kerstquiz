@@ -1163,3 +1163,8 @@ body.pv-with-phone .stage { width: min(calc(100vw - 340px), calc((100dvh - 64px)
 .remote-qr-card { background: var(--surface); border: 1px solid var(--gold); border-radius: 18px; padding: 22px; max-width: 420px; display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
 .remote-qr-card .qr { width: 220px; }
 .remote-qr-card p { margin: 0; overflow-wrap: anywhere; }
+.remote-again {
+  border: 2px solid var(--gold); border-radius: 16px; background: rgba(205, 163, 73, .15); color: var(--gold-light);
+  font: 700 22px var(--sans); padding: 14px; cursor: pointer; touch-action: manipulation;
+}
+.remote-again[hidden] { display: none; }

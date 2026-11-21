@@ -4,12 +4,12 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer, inScarePhase, serverNow, SCARE_SECONDS,
-} from './common.js?v=61';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=61';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=61';
+} from './common.js?v=62';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=62';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=62';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking, fastestWinners,
-} from './scoring.js?v=61';
+} from './scoring.js?v=62';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -202,6 +202,8 @@ function handleRemote(cmd) {
     if (btn) btn.click(); else toast('Nog even wachten: de tijd loopt nog');
   } else if (cmd.action === 'prev') {
     document.querySelector('#app .q-foot .btn-ghost, #app .btn-ghost')?.click();
+  } else if (cmd.action === 'replay') {
+    document.querySelector('#app .intro-again')?.click();  // intro of geluidsfragment nog een keer
   }
 }
 

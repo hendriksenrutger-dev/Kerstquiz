@@ -1,7 +1,7 @@
 // Afstandsbediening (#afstand): de telefoon van de quizmaster bedient de tv (tablet).
 // Ingelogd als beheerder. Een tik zet "volgende" of "vorige" in remote_commands;
 // de tv ziet dat direct en tikt zelf op zijn ▶- of ◀-knop.
-import { sb, h, mount, toast, loginForm, errorText, fetchQuestions, liveSync } from './common.js?v=61';
+import { sb, h, mount, toast, loginForm, errorText, fetchQuestions, liveSync } from './common.js?v=62';
 
 const state = { game: null, questions: [], stop: null };
 
@@ -69,9 +69,19 @@ function statusText() {
   }
 }
 
+/** Heeft de huidige vraag iets om nog een keer af te spelen (intro raden of eigen geluid)? */
+function canReplay() {
+  const g = state.game;
+  if (!g || g.status !== 'question') return false;
+  const q = state.questions.find((x) => x.id === g.current_question_id);
+  return Boolean(q && ((q.media_url && q.media_seconds) || q.audio_path));
+}
+
 function updateStatus() {
   const el = document.getElementById('remote-status');
   if (el) el.textContent = statusText();
+  const r = document.getElementById('remote-replay');
+  if (r) r.hidden = !canReplay();
 }
 
 async function send(action, btn) {
@@ -85,13 +95,16 @@ async function send(action, btn) {
 function render() {
   const prev = h('button', { class: 'remote-btn remote-prev', 'aria-label': 'Vorige' }, '◀');
   const nxt = h('button', { class: 'remote-btn remote-next', 'aria-label': 'Volgende' }, '▶');
+  const again = h('button', { class: 'remote-again', id: 'remote-replay', hidden: !canReplay() }, '♪ Nog een keer');
   prev.addEventListener('click', () => send('prev', prev));
   nxt.addEventListener('click', () => send('next', nxt));
+  again.addEventListener('click', () => send('replay', again));
   mount(h('div', { class: 'phone-page remote' },
     h('header', { class: 'remote-head' },
       h('span', { class: 'muted' }, `Kamercode ${state.game.code}`),
       h('button', { class: 'link', onclick: afterLogin }, 'Vernieuwen')),
     h('p', { class: 'remote-status', id: 'remote-status' }, statusText()),
+    again,
     h('div', { class: 'remote-buttons' }, nxt, prev),
     h('p', { class: 'muted small center' }, '▶ doet hetzelfde als de gouden knop op de tablet, ◀ hetzelfde als "Vorige".'),
   ));
