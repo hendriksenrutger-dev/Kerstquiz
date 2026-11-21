@@ -4,12 +4,12 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer, inScarePhase, serverNow, SCARE_SECONDS,
-} from './common.js?v=51';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=51';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=51';
+} from './common.js?v=53';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=53';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=53';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking, fastestWinners,
-} from './scoring.js?v=51';
+} from './scoring.js?v=53';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -124,6 +124,7 @@ function renderHome(savedGame) {
 
 async function newGame() {
   playMusic(state.music?.start); // binnen de tik starten
+  state.welcome = true;          // eerst een rustig welkomstscherm, pas na een tik de QR-code
   const { data, error } = await sb.rpc('create_game');
   if (error) return toast(errorText(error));
   openGame(data);
@@ -381,14 +382,25 @@ function render() {
   return renderScoreboard();
 }
 
+/** Welkomstscherm: alleen de naam, de sfeerfoto en de muziek. Tik ergens → wachtruimte met QR-code. */
+function renderWelcome() {
+  const go = () => { state.welcome = false; playMusic(state.music?.start); renderLobby(); };
+  mount(stage('screen-hero welcome',
+    heroLayout(),
+    h('button', { class: 'welcome-tap', 'aria-label': 'Verder naar de kamercode', onclick: go },
+      h('div', { class: 'welcome-brand' }, brandTitle('brand-welcome'), ornament()),
+      h('span', { class: 'welcome-hint' }, 'tik om te beginnen')),
+    cornerMenu()));
+}
+
 function renderLobby() {
+  if (state.welcome) return renderWelcome();
   const g = state.game;
   const url = joinUrl(g.code);
   const noQuestions = state.questions.length === 0;
 
   const content = h('div', { class: 'lobby' },
     h('div', { class: 'lobby-head' },
-      brandTitle('brand-lobby'),
       h('p', { class: 'lead' }, 'Pak je telefoon en doe mee!'),
     ),
     h('div', { class: 'join' },
@@ -400,7 +412,6 @@ function renderLobby() {
     ),
     h('div', { class: 'players-block' },
       h('div', { class: 'players-count', id: 'players-count' }, playersCountText()),
-      h('div', { class: 'chips', id: 'player-chips' }),
     ),
     h('div', { class: 'row' },
       h('button', {
@@ -411,8 +422,8 @@ function renderLobby() {
     ),
   );
 
-  mount(stage('screen-hero', heroLayout(content), cornerMenu()));
-  fitChips();
+  // Naam groot en gecentreerd bovenaan; geen namenlijst (loopt vol bij veel spelers)
+  mount(stage('screen-hero', heroLayout(content), h('div', { class: 'lobby-brand' }, brandTitle('brand-lobby')), cornerMenu()));
 }
 
 // ---------------------------------------------------------------- uitleg na de start
