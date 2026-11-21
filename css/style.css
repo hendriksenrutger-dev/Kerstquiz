@@ -1111,16 +1111,39 @@ body.pv-with-phone .stage { width: min(calc(100vw - 340px), calc((100dvh - 64px)
   position: absolute; inset: 0; z-index: 1; display: grid; grid-template-rows: 1fr auto;
   padding: 3cqh 3cqw; background: rgba(15, 42, 29, .6);
 }
-.countdown-center { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.5cqh; }
-.countdown-title { margin: 0; font-family: var(--serif); font-weight: 700; font-size: max(40px, 4.6cqw); color: var(--text); }
+.countdown-center { position: relative; display: flex; align-items: center; justify-content: center; min-height: 0; }
+.countdown-title {
+  position: absolute; top: 4cqh; left: 0; right: 0; text-align: center; margin: 0;
+  font-family: var(--serif); font-weight: 700; font-size: max(40px, 4.6cqw); color: var(--text);
+  animation: countdown-fade 1.4s ease forwards; animation-play-state: running;
+}
+.countdown-orn { position: absolute; bottom: 4cqh; left: 50%; transform: translateX(-50%); width: min(520px, 40cqw); animation: countdown-fade-orn 1.4s ease forwards; }
+@keyframes countdown-fade { from { opacity: 1; } to { opacity: 0; transform: translateY(-1.5cqh); } }
+@keyframes countdown-fade-orn { from { opacity: 1; } to { opacity: 0; } }
+.countdown-grow { transform: scale(.45); transition: transform .2s linear; will-change: transform; }
 .countdown-num {
-  font: 700 min(44cqh, 32cqw)/1 var(--serif); color: var(--gold);
+  font: 700 min(60cqh, 42cqw)/1 var(--serif); color: var(--gold);
   font-variant-numeric: lining-nums tabular-nums; font-feature-settings: 'lnum' 1;
   text-shadow: 0 6px 40px rgba(0, 0, 0, .45);
 }
 .countdown-num.tick { animation: countdown-tick .5s ease-out; }
-.countdown .ornament { width: min(520px, 40cqw); }
-@keyframes countdown-tick { from { transform: scale(1.18); opacity: .5; } to { transform: none; opacity: 1; } }
+.countdown-num.beat { animation: countdown-beat .9s cubic-bezier(.2, .9, .3, 1); }
+@keyframes countdown-tick { from { transform: scale(1.12); opacity: .6; } to { transform: none; opacity: 1; } }
+@keyframes countdown-beat {
+  0% { transform: scale(1.32); color: var(--gold-light); text-shadow: 0 0 60px rgba(255, 230, 160, .95), 0 0 140px rgba(205, 163, 73, .8); }
+  18% { transform: scale(.94); }
+  32% { transform: scale(1.12); }
+  100% { transform: none; color: var(--gold); text-shadow: 0 0 30px rgba(205, 163, 73, .45); }
+}
+/* laatste seconden: rand wordt donker, het midden gloeit */
+.countdown::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 1.5s ease;
+  background: radial-gradient(circle at 50% 48%, rgba(205, 163, 73, .16) 0%, rgba(8, 20, 14, .85) 58%, rgba(0, 0, 0, .96) 100%);
+}
+.countdown > * { position: relative; z-index: 1; }
+.countdown.countdown-final::before { opacity: 1; }
+.countdown .q-foot { transition: opacity 1s ease; }
+.countdown.countdown-final .q-foot { opacity: .3; }
 
 /* Knoppen met alleen een pijl */
 .btn.btn-arrow { min-width: max(104px, 7.5cqw); padding-inline: 1em; font-size: max(26px, 2cqw); line-height: 1; }
