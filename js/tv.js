@@ -4,12 +4,12 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer, inScarePhase, serverNow, SCARE_SECONDS,
-} from './common.js?v=59';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=59';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=59';
+} from './common.js?v=60';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=60';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=60';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking, fastestWinners,
-} from './scoring.js?v=59';
+} from './scoring.js?v=60';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -442,6 +442,7 @@ function renderLobby() {
 function beginQuiz() {
   const secs = state.countdownSecs;
   if (!secs) return next();
+  fxAudio();  // geluid voor de overgang alvast vrijgeven (binnen deze tik)
   state.countdown = { until: Date.now() + secs * 1000 };
   if (state.music?.countdown) { bgMusic(state.music.countdown); playMusic(state.music.countdown); } // binnen de tik
   else bgMusic(null);
@@ -456,7 +457,74 @@ function stopCountdown() {
 function finishCountdown() {
   if (!state.countdown) return;
   stopCountdown();
-  next();  // eerste vraag (de muziek van het aftellen stopt daar vanzelf)
+  playTransition();
+  // Eerste vraag pas tonen als de flits het scherm bedekt (de muziek van het aftellen stopt daar vanzelf)
+  setTimeout(next, 550);
+}
+
+// ---------------------------------------------------------------- overgang aftellen → eerste vraag
+
+let fxCtx = null;
+/** Geluidskanaal voor de overgang; binnen een tik aanroepen, dan mag het later geluid maken. */
+function fxAudio() {
+  try {
+    if (!fxCtx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      fxCtx = new AC();
+    }
+    if (fxCtx.state === 'suspended') fxCtx.resume();
+  } catch { /* geen geluid */ }
+  return fxCtx;
+}
+
+/** Zware dreun met een "woosh" (zelf opgebouwd, geen geluidsbestand nodig). */
+function boomSound() {
+  const ctx = fxAudio();
+  if (!ctx) return;
+  try {
+    const t = ctx.currentTime + 0.03;
+    const out = ctx.createDynamicsCompressor();
+    out.connect(ctx.destination);
+    // diepe dreun die wegzakt
+    [[95, 26, 1.0, 'sine'], [58, 20, 0.7, 'triangle']].forEach(([f0, f1, vol, type]) => {
+      const o = ctx.createOscillator(); o.type = type;
+      o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + 1.8);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.04); g.gain.exponentialRampToValueAtTime(0.0001, t + 2.2);
+      o.connect(g); g.connect(out); o.start(t); o.stop(t + 2.3);
+    });
+    // woosh: ruis door een filter dat open en weer dicht gaat
+    const len = Math.floor(ctx.sampleRate * 1.4);
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    const n = ctx.createBufferSource(); n.buffer = buf;
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 1.5;
+    lp.frequency.setValueAtTime(180, t - 0.02); lp.frequency.exponentialRampToValueAtTime(2600, t + 0.35); lp.frequency.exponentialRampToValueAtTime(160, t + 1.3);
+    const ng = ctx.createGain();
+    ng.gain.setValueAtTime(0.0001, t); ng.gain.exponentialRampToValueAtTime(0.35, t + 0.3); ng.gain.exponentialRampToValueAtTime(0.0001, t + 1.35);
+    n.connect(lp); lp.connect(ng); ng.connect(out); n.start(t); n.stop(t + 1.4);
+    // korte klap bij de inslag
+    const hit = ctx.createBufferSource(); hit.buffer = buf;
+    const hp = ctx.createBiquadFilter(); hp.type = 'bandpass'; hp.frequency.value = 900; hp.Q.value = 0.8;
+    const hg = ctx.createGain(); hg.gain.setValueAtTime(0.6, t); hg.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+    hit.connect(hp); hp.connect(hg); hg.connect(out); hit.start(t); hit.stop(t + 0.15);
+    // daarna het geluidskanaal weer dicht (laat Spotify ongestoord)
+    setTimeout(() => { try { ctx.suspend(); } catch { /* */ } }, 2600);
+  } catch { /* geen geluid */ }
+}
+
+/** Gouden flits die vanuit het midden het scherm overneemt; daarna verschijnt de vraag vanuit een waas. */
+function playTransition() {
+  boomSound();
+  document.querySelector('.countdown-num')?.classList.add('morph-out');
+  const fx = h('div', { class: 'morph', 'aria-hidden': 'true' },
+    h('div', { class: 'morph-veil' }), h('div', { class: 'morph-burst' }));
+  document.body.append(fx);
+  document.body.classList.add('morph-enter');
+  setTimeout(() => fx.remove(), 1700);
+  setTimeout(() => document.body.classList.remove('morph-enter'), 2600);
 }
 
 function renderCountdown() {
@@ -469,7 +537,7 @@ function renderCountdown() {
       ornament()),
     h('footer', { class: 'q-foot' },
       h('button', { class: 'btn btn-ghost', onclick: () => { stopCountdown(); bgMusic(state.music?.start); renderRules(); } }, '◀ Terug'),
-      h('button', { class: 'btn btn-gold btn-lg', onclick: finishCountdown }, 'Nu beginnen ▶'),
+      h('button', { class: 'btn btn-gold btn-lg btn-arrow', onclick: finishCountdown, 'aria-label': 'Nu beginnen', title: 'Nu beginnen' }, '▶'),
     ),
   );
   mount(stage('screen-hero', heroLayout(), view));
@@ -510,7 +578,7 @@ function renderRules() {
     h('footer', { class: 'q-foot' },
       h('button', { class: 'btn btn-ghost', onclick: previous }, '◀ Vorige'),
       h('span', { class: 'muted rules-count' }, `${qs.length} vragen · ${playersCountText().toLowerCase()}`),
-      h('button', { class: 'btn btn-gold btn-lg', onclick: beginQuiz }, state.countdownSecs ? 'Aftellen ▶' : 'Eerste vraag ▶'),
+      h('button', { class: 'btn btn-gold btn-lg btn-arrow', onclick: beginQuiz, 'aria-label': state.countdownSecs ? 'Aftellen' : 'Eerste vraag', title: state.countdownSecs ? 'Aftellen' : 'Eerste vraag' }, '▶'),
     ),
   );
   mount(stage('screen-plain', view));
@@ -593,8 +661,7 @@ function renderQuestion() {
       q.audio_path && h('button', {
         class: 'btn btn-ghost intro-again', onclick: () => playClip(q.audio_path, Boolean(q.audio_reverse)),
       }, q.audio_reverse ? '⏪ Nog een keer' : '🔊 Nog een keer'),
-      h('button', { class: 'btn btn-gold btn-lg', id: 'next-btn', onclick: next },
-        isLast ? 'Einde vragenronde ▶' : 'Volgende vraag ▶'),
+      h('button', { class: 'btn btn-gold btn-lg btn-arrow', id: 'next-btn', onclick: next, 'aria-label': isLast ? 'Einde vragenronde' : 'Volgende vraag', title: isLast ? 'Einde vragenronde' : 'Volgende vraag' }, '▶'),
     ),
   );
 
@@ -634,8 +701,7 @@ function renderScareQuestion(q, i) {
     ),
     h('footer', { class: 'q-foot' },
       h('button', { class: 'btn btn-ghost', onclick: previous }, '◀ Vorige'),
-      h('button', { class: 'btn btn-gold btn-lg', id: 'next-btn', onclick: next },
-        i === state.questions.length - 1 ? 'Einde vragenronde ▶' : 'Volgende vraag ▶'),
+      h('button', { class: 'btn btn-gold btn-lg btn-arrow', id: 'next-btn', onclick: next, 'aria-label': 'Volgende vraag', title: 'Volgende vraag' }, '▶'),
     ),
   );
   mount(stage('screen-plain', bgLayer(i, Boolean(photo)), view));
@@ -655,7 +721,7 @@ function renderAnswersIntro() {
     h('p', { class: 'lead' }, 'Alle vragen nog een keer, nu met het goede antwoord.'),
     h('div', { class: 'row' },
       h('button', { class: 'btn btn-ghost btn-lg', onclick: previous }, '◀ Terug naar de laatste vraag'),
-      h('button', { class: 'btn btn-gold btn-lg', onclick: next }, 'Toon de antwoorden ▶'),
+      h('button', { class: 'btn btn-gold btn-lg btn-arrow', onclick: next, 'aria-label': 'Toon de antwoorden', title: 'Toon de antwoorden' }, '▶'),
     ),
   );
   mount(stage('screen-hero', heroLayout(content), cornerMenu()));
@@ -814,7 +880,7 @@ async function renderInterim() {
     h('p', { class: 'muted small' }, 'Open vragen tellen hier met het automatische oordeel; de eindstand kan nog iets anders uitvallen.'),
     h('footer', { class: 'q-foot' },
       h('button', { class: 'btn btn-ghost', onclick: previous }, '◀ Vorige'),
-      h('button', { class: 'btn btn-gold btn-lg', onclick: next }, 'Volgende vraag ▶'),
+      h('button', { class: 'btn btn-gold btn-lg btn-arrow', onclick: next, 'aria-label': 'Volgende vraag', title: 'Volgende vraag' }, '▶'),
     ),
   );
   mount(stage('screen-plain', view));
@@ -1042,7 +1108,7 @@ async function renderReveal() {
       clipFor('answers', q) && h('button', {
         class: 'btn btn-ghost intro-again', onclick: () => playClip(q.audio_path, false),
       }, '▶ Vooruit afspelen'),
-      h('button', { class: 'btn btn-gold btn-lg', onclick: () => { if (isLast) playMusic(state.music?.end); next(); } }, isLast ? 'Einde antwoordenronde ▶' : 'Volgende antwoord ▶'),
+      h('button', { class: 'btn btn-gold btn-lg btn-arrow', onclick: () => { if (isLast) playMusic(state.music?.end); next(); }, 'aria-label': isLast ? 'Einde antwoordenronde' : 'Volgende antwoord', title: isLast ? 'Einde antwoordenronde' : 'Volgende antwoord' }, '▶'),
     ),
   );
   mount(stage('screen-plain', bgLayer(i, Boolean(photo)), view));

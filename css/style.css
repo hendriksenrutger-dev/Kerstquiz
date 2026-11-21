@@ -1121,3 +1121,26 @@ body.pv-with-phone .stage { width: min(calc(100vw - 340px), calc((100dvh - 64px)
 .countdown-num.tick { animation: countdown-tick .5s ease-out; }
 .countdown .ornament { width: min(520px, 40cqw); }
 @keyframes countdown-tick { from { transform: scale(1.18); opacity: .5; } to { transform: none; opacity: 1; } }
+
+/* Knoppen met alleen een pijl */
+.btn.btn-arrow { min-width: max(104px, 7.5cqw); padding-inline: 1em; font-size: max(26px, 2cqw); line-height: 1; }
+
+/* Overgang aftellen → eerste vraag */
+.countdown-num.morph-out { animation: morph-num .6s cubic-bezier(.5, 0, .7, .4) forwards; }
+@keyframes morph-num { to { transform: scale(2.6); opacity: 0; filter: blur(14px); } }
+.morph { position: fixed; inset: 0; z-index: 9000; pointer-events: none; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.morph-veil { position: absolute; inset: 0; background: #0F2A1D; opacity: 0; animation: morph-veil 1.7s ease forwards; }
+.morph-burst {
+  width: 42vmin; height: 42vmin; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 240, 190, 1) 0%, rgba(205, 163, 73, .95) 32%, rgba(205, 163, 73, .35) 55%, rgba(15, 42, 29, 0) 72%);
+  animation: morph-burst 1.7s cubic-bezier(.55, 0, .2, 1) forwards;
+}
+@keyframes morph-veil { 0% { opacity: 0; } 30% { opacity: .95; } 55% { opacity: .95; } 100% { opacity: 0; } }
+@keyframes morph-burst {
+  0% { transform: scale(.15); opacity: 0; filter: blur(0); }
+  25% { transform: scale(1.1); opacity: 1; }
+  55% { transform: scale(6); opacity: 1; filter: blur(6px); }
+  100% { transform: scale(9); opacity: 0; filter: blur(24px); }
+}
+.morph-enter #app .stage > * { animation: morph-in 1.3s cubic-bezier(.2, .7, .2, 1) both; }
+@keyframes morph-in { from { opacity: 0; transform: scale(1.08); filter: blur(16px); } to { opacity: 1; transform: none; filter: none; } }
