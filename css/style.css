@@ -1212,6 +1212,3 @@ body.pv-with-phone .stage { width: min(calc(100vw - 340px), calc((100dvh - 64px)
   font: 700 22px var(--sans); padding: 14px; cursor: pointer; touch-action: manipulation;
 }
 .remote-again[hidden] { display: none; }
-/* Ook het filmpje / de Spotify-speler komt na het aftellen uit het licht tevoorschijn */
-.morph-enter .deck-video.video-show, .morph-enter .deck-player.deck-show { animation: morph-media 1.6s cubic-bezier(.2, .8, .2, 1) .6s both; }
-@keyframes morph-media { from { opacity: 0; filter: blur(18px) brightness(1.8); } to { opacity: 1; filter: none; } }

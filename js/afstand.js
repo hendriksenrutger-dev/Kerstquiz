@@ -1,7 +1,7 @@
 // Afstandsbediening (#afstand): de telefoon van de quizmaster bedient de tv (tablet).
 // Ingelogd als beheerder. Een tik zet "volgende" of "vorige" in remote_commands;
 // de tv ziet dat direct en tikt zelf op zijn ▶- of ◀-knop.
-import { sb, h, mount, toast, loginForm, errorText, fetchQuestions, liveSync } from './common.js?v=75';
+import { sb, h, mount, toast, loginForm, errorText, fetchQuestions, liveSync } from './common.js?v=76';
 
 const state = { game: null, questions: [], stop: null };
 

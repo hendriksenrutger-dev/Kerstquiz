@@ -4,12 +4,12 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer, inScarePhase, serverNow, SCARE_SECONDS,
-} from './common.js?v=75';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=75';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=75';
+} from './common.js?v=76';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=76';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=76';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking, fastestWinners,
-} from './scoring.js?v=75';
+} from './scoring.js?v=76';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -411,16 +411,7 @@ function render() {
   if (g.status === 'question' && !g.current_question_id && state.countdown) bgMusic(state.music?.countdown || null);
   else if (g.status === 'lobby' || (g.status === 'question' && !g.current_question_id)) bgMusic(state.music?.start);
   else if (g.status === 'tree') bgMusic(state.music?.end);
-  else if (g.status !== 'final') {
-    // Vlak na het aftellen laat de aftelmuziek nog even doorklinken (vloeiende overgang), daarna stil
-    // (niet bij een Spotify-nummer: dat kan niet zacht beginnen, dan zouden twee nummers door elkaar klinken)
-    const cq = state.questions.find((x) => x.id === g.current_question_id);
-    const hold = cq?.media_url ? 0 : (state.holdMusicUntil || 0) - Date.now();
-    if (hold > 0) {
-      clearTimeout(state.holdMusicTimer);
-      state.holdMusicTimer = setTimeout(() => { if (state.game?.status !== 'final') bgMusic(null); }, hold);
-    } else bgMusic(null); // bij de eindstand beslist renderScoreboard
-  }
+  else if (g.status !== 'final') bgMusic(null); // bij de eindstand beslist renderScoreboard
   if (g.status === 'lobby') return renderLobby();
   if (g.status !== 'answers') state.reveal = null; // bij terugkomen opnieuw laden
   if (g.status === 'question') return g.current_question_id ? renderQuestion() : renderRules();
@@ -521,8 +512,6 @@ function stopCountdown() {
 function finishCountdown() {
   if (!state.countdown) return;
   stopCountdown();
-  state.holdMusicUntil = Date.now() + 2600;  // aftelmuziek loopt nog door tot de vraag in beeld staat
-  state.morphUntil = Date.now() + 2600;      // filmpje/geluid van de eerste vraag zacht laten aanzwellen
   playTransition();
   // Eerste vraag pas tonen als de flits het scherm bedekt (de muziek van het aftellen stopt daar vanzelf)
   setTimeout(next, 650);  // de vraag komt eronder klaar terwijl het licht het scherm vult
@@ -1751,13 +1740,7 @@ function playClip(path, reverse) {
     if (clipSrc !== token) return;                // intussen alweer gestopt of iets anders gestart
     const src = ctx.createBufferSource();
     src.buffer = reverse ? rev : fwd;
-    // Direct na het aftellen: rustig laten aanzwellen (overvloeien met de aftelmuziek)
-    const gain = ctx.createGain();
-    if ((state.morphUntil || 0) > Date.now()) {
-      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(1, ctx.currentTime + 2.5);
-    }
-    src.connect(gain); gain.connect(ctx.destination);
+    src.connect(ctx.destination);
     src.onended = () => {
       if (clipSrc !== token) return;
       clipSrc = null;
@@ -1888,34 +1871,18 @@ function preloadVideos() {
 
 /** Starten met geluid (binnen een tik); lukt dat niet, dan zonder geluid (via de knop aanzetten). */
 function playVideo(path) {
-  for (const [p, o] of videos) if (p !== path) { o.token = null; clearTimeout(o.delay); o.el.pause(); }
+  for (const [p, v] of videos) if (p !== path) v.el.pause();
   const v = videoFor(path);
   if (!v) return;
   const el = v.el;
   el.muted = false;
   try { el.currentTime = 0; } catch { /* nog niet geladen */ }
-  // Direct na het aftellen: pas starten als het filmpje uit het licht zichtbaar wordt, met een fade-in
-  clearInterval(v.fade); clearTimeout(v.delay);
-  const morphing = (state.morphUntil || 0) > Date.now();
-  const fadeMs = morphing ? 1800 : 400;   // altijd een korte fade-in, na het aftellen een langere
-  const token = (v.token = {});
-  const go = () => {
-    if (v.token !== token) return;          // intussen alweer iets anders gestart
-    el.volume = 0;
-    const t0 = Date.now();
-    v.fade = setInterval(() => {
-      const f = Math.min(1, (Date.now() - t0) / fadeMs);
-      el.volume = f * f;
-      if (f >= 1) clearInterval(v.fade);
-    }, 40);
-    el.play()?.catch(() => { el.muted = true; el.play()?.catch(() => {}); });
-  };
-  const start = () => (morphing ? (v.delay = setTimeout(go, 900)) : go());
-  if (el.src) start(); else v.ready.then(start);
+  const go = () => el.play()?.catch(() => { el.muted = true; el.play()?.catch(() => {}); });
+  if (el.src) go(); else v.ready.then(go);
 }
 
 function stopVideos() {
-  for (const v of videos.values()) { v.token = null; clearTimeout(v.delay); clearInterval(v.fade); v.el.pause(); }
+  for (const v of videos.values()) v.el.pause();
 }
 
 /** Vak voor het filmpje (op de plek van de foto); het filmpje zelf wordt erboven gelegd. */
