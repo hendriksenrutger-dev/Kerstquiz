@@ -570,6 +570,7 @@ export function loopingSpotifyPlayer(link) {
 
   // Speler opnieuw opbouwen (zie deckPlayer): na lang stilstaan reageert hij soms niet meer.
   const rebuild = () => {
+    try { ctrl?.pause?.(); ctrl?.destroy?.(); } catch { /* */ }
     ctrl = null;
     createdAt = Date.now();
     last = { position: 0, duration: 0, isPaused: true };
@@ -608,7 +609,8 @@ export function loopingSpotifyPlayer(link) {
       wanted = false;
       clearTimeout(restartTimer);
       clearTimeout(watchdog);
-      if (ctrl && !last.isPaused) { if (typeof ctrl.pause === 'function') ctrl.pause(); else ctrl.togglePlay(); }
+      onPlaying = null;
+      if (ctrl) { if (typeof ctrl.pause === 'function') ctrl.pause(); else if (!last.isPaused) ctrl.togglePlay(); }
     },
   };
 }
@@ -621,7 +623,7 @@ function musicDebug() {
 // ---------- Versie (altijd de nieuwste versie laden) ----------
 
 // Bij elke nieuwe versie ophogen, samen met version.txt en de ?v=… in index.html en de imports.
-export const APP_VERSION = '71';
+export const APP_VERSION = '72';
 
 /**
  * GitHub Pages en Safari bewaren bestanden een tijd in de cache. Is er een nieuwere
@@ -751,6 +753,8 @@ export function deckPlayer(link, { height = 152 } = {}) {
    * meer (na verversen werkte het weer); een verse speler lost dat op.
    */
   const rebuild = () => {
+    // oude speler eerst stoppen en opruimen, zodat er nooit twee tegelijk spelen
+    try { ctrl?.pause?.(); ctrl?.destroy?.(); } catch { /* */ }
     ctrl = null;
     playing = false;
     createdAt = Date.now();
@@ -802,7 +806,9 @@ export function deckPlayer(link, { height = 152 } = {}) {
       wanted = false;
       clearTimeout(limitTimer);
       clearTimeout(watchdog);
-      if (ctrl && playing) { if (typeof ctrl.pause === 'function') ctrl.pause(); else ctrl.togglePlay(); }
+      clearTimeout(earlySeek1); clearTimeout(earlySeek2);
+      // altijd pauzeren als het misschien speelt (de app kan het verkeerd denken); togglePlay alleen als het zeker speelt
+      if (ctrl) { if (typeof ctrl.pause === 'function') ctrl.pause(); else if (playing) ctrl.togglePlay(); }
     },
     toggle() {
       if (playing) { api.pause(); return; }
