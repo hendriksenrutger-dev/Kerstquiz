@@ -4,12 +4,12 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer, inScarePhase, serverNow, SCARE_SECONDS,
-} from './common.js?v=72';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=72';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=72';
+} from './common.js?v=73';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=73';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=73';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking, fastestWinners,
-} from './scoring.js?v=72';
+} from './scoring.js?v=73';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -411,7 +411,16 @@ function render() {
   if (g.status === 'question' && !g.current_question_id && state.countdown) bgMusic(state.music?.countdown || null);
   else if (g.status === 'lobby' || (g.status === 'question' && !g.current_question_id)) bgMusic(state.music?.start);
   else if (g.status === 'tree') bgMusic(state.music?.end);
-  else if (g.status !== 'final') bgMusic(null); // bij de eindstand beslist renderScoreboard
+  else if (g.status !== 'final') {
+    // Vlak na het aftellen laat de aftelmuziek nog even doorklinken (vloeiende overgang), daarna stil
+    // (niet bij een Spotify-nummer of eigen geluid: dan zouden twee nummers door elkaar spelen)
+    const cq = state.questions.find((x) => x.id === g.current_question_id);
+    const hold = cq?.media_url || cq?.audio_path ? 0 : (state.holdMusicUntil || 0) - Date.now();
+    if (hold > 0) {
+      clearTimeout(state.holdMusicTimer);
+      state.holdMusicTimer = setTimeout(() => { if (state.game?.status !== 'final') bgMusic(null); }, hold);
+    } else bgMusic(null); // bij de eindstand beslist renderScoreboard
+  }
   if (g.status === 'lobby') return renderLobby();
   if (g.status !== 'answers') state.reveal = null; // bij terugkomen opnieuw laden
   if (g.status === 'question') return g.current_question_id ? renderQuestion() : renderRules();
@@ -512,6 +521,8 @@ function stopCountdown() {
 function finishCountdown() {
   if (!state.countdown) return;
   stopCountdown();
+  state.holdMusicUntil = Date.now() + 2600;  // aftelmuziek loopt nog door tot de vraag in beeld staat
+  state.morphUntil = Date.now() + 2600;      // filmpje/geluid van de eerste vraag zacht laten aanzwellen
   playTransition();
   // Eerste vraag pas tonen als de flits het scherm bedekt (de muziek van het aftellen stopt daar vanzelf)
   setTimeout(next, 650);  // de vraag komt eronder klaar terwijl het licht het scherm vult
@@ -1877,6 +1888,17 @@ function playVideo(path) {
   const el = v.el;
   el.muted = false;
   try { el.currentTime = 0; } catch { /* nog niet geladen */ }
+  // Direct na het aftellen: het geluid van het filmpje rustig laten aanzwellen (overvloeien)
+  clearInterval(v.fade);
+  if ((state.morphUntil || 0) > Date.now()) {
+    el.volume = 0;
+    const t0 = Date.now();
+    v.fade = setInterval(() => {
+      const f = Math.min(1, (Date.now() - t0) / 2500);
+      el.volume = f * f;
+      if (f >= 1) clearInterval(v.fade);
+    }, 50);
+  } else el.volume = 1;
   const go = () => el.play()?.catch(() => { el.muted = true; el.play()?.catch(() => {}); });
   if (el.src) go(); else v.ready.then(go);
 }
