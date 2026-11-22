@@ -4,12 +4,12 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer, inScarePhase, serverNow, SCARE_SECONDS,
-} from './common.js?v=74';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=74';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=74';
+} from './common.js?v=75';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=75';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=75';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking, fastestWinners,
-} from './scoring.js?v=74';
+} from './scoring.js?v=75';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -1888,29 +1888,34 @@ function preloadVideos() {
 
 /** Starten met geluid (binnen een tik); lukt dat niet, dan zonder geluid (via de knop aanzetten). */
 function playVideo(path) {
-  for (const [p, v] of videos) if (p !== path) v.el.pause();
+  for (const [p, o] of videos) if (p !== path) { o.token = null; clearTimeout(o.delay); o.el.pause(); }
   const v = videoFor(path);
   if (!v) return;
   const el = v.el;
   el.muted = false;
   try { el.currentTime = 0; } catch { /* nog niet geladen */ }
-  // Direct na het aftellen: het geluid van het filmpje rustig laten aanzwellen (overvloeien)
-  clearInterval(v.fade);
-  if ((state.morphUntil || 0) > Date.now()) {
+  // Direct na het aftellen: pas starten als het filmpje uit het licht zichtbaar wordt, met een fade-in
+  clearInterval(v.fade); clearTimeout(v.delay);
+  const morphing = (state.morphUntil || 0) > Date.now();
+  const fadeMs = morphing ? 1800 : 400;   // altijd een korte fade-in, na het aftellen een langere
+  const token = (v.token = {});
+  const go = () => {
+    if (v.token !== token) return;          // intussen alweer iets anders gestart
     el.volume = 0;
     const t0 = Date.now();
     v.fade = setInterval(() => {
-      const f = Math.min(1, (Date.now() - t0) / 2500);
+      const f = Math.min(1, (Date.now() - t0) / fadeMs);
       el.volume = f * f;
       if (f >= 1) clearInterval(v.fade);
-    }, 50);
-  } else el.volume = 1;
-  const go = () => el.play()?.catch(() => { el.muted = true; el.play()?.catch(() => {}); });
-  if (el.src) go(); else v.ready.then(go);
+    }, 40);
+    el.play()?.catch(() => { el.muted = true; el.play()?.catch(() => {}); });
+  };
+  const start = () => (morphing ? (v.delay = setTimeout(go, 900)) : go());
+  if (el.src) start(); else v.ready.then(start);
 }
 
 function stopVideos() {
-  for (const v of videos.values()) v.el.pause();
+  for (const v of videos.values()) { v.token = null; clearTimeout(v.delay); clearInterval(v.fade); v.el.pause(); }
 }
 
 /** Vak voor het filmpje (op de plek van de foto); het filmpje zelf wordt erboven gelegd. */
