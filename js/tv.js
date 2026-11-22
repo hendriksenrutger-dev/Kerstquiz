@@ -4,12 +4,12 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer, inScarePhase, serverNow, SCARE_SECONDS,
-} from './common.js?v=69';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=69';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=69';
+} from './common.js?v=70';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=70';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=70';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking, fastestWinners,
-} from './scoring.js?v=69';
+} from './scoring.js?v=70';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -513,7 +513,7 @@ function finishCountdown() {
   stopCountdown();
   playTransition();
   // Eerste vraag pas tonen als de flits het scherm bedekt (de muziek van het aftellen stopt daar vanzelf)
-  setTimeout(next, 550);
+  setTimeout(next, 650);  // de vraag komt eronder klaar terwijl het licht het scherm vult
 }
 
 // ---------------------------------------------------------------- overgang aftellen → eerste vraag
@@ -572,13 +572,17 @@ function boomSound() {
 /** Gouden flits die vanuit het midden het scherm overneemt; daarna verschijnt de vraag vanuit een waas. */
 function playTransition() {
   boomSound();
+  // 1. het laatste getal vliegt naar je toe en lost op in licht; het beeld eromheen wordt donker
   document.querySelector('.countdown-num')?.classList.add('morph-out');
+  document.querySelector('.countdown')?.classList.add('countdown-collapse');
+  // 2. gouden licht zwelt aan tot een witte flits en ebt weer weg
   const fx = h('div', { class: 'morph', 'aria-hidden': 'true' },
-    h('div', { class: 'morph-veil' }), h('div', { class: 'morph-burst' }));
+    h('div', { class: 'morph-veil' }), h('div', { class: 'morph-burst' }), h('div', { class: 'morph-flash' }));
   document.body.append(fx);
+  // 3. de vraag komt uit het licht tevoorschijn, onderdeel voor onderdeel
   document.body.classList.add('morph-enter');
-  setTimeout(() => fx.remove(), 1700);
-  setTimeout(() => document.body.classList.remove('morph-enter'), 2600);
+  setTimeout(() => fx.remove(), 2300);
+  setTimeout(() => document.body.classList.remove('morph-enter'), 3600);
 }
 
 function renderCountdown() {
@@ -607,6 +611,8 @@ function renderCountdown() {
     const progress = 1 - msLeft() / cd.total;
     grow.style.transform = `scale(${(0.45 + progress * 0.95).toFixed(3)})`;
     const n = left();
+    // Bij 0 geen "0" tonen: het laatste getal lost op in de overgang
+    if (n <= 0 && cd.until != null) { finishCountdown(); return; }
     if (num.textContent !== String(n)) {
       num.textContent = String(n);
       const final = n > 0 && n <= 5;
