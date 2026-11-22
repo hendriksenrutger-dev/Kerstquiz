@@ -4,12 +4,12 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer, inScarePhase, serverNow, SCARE_SECONDS,
-} from './common.js?v=68';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=68';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=68';
+} from './common.js?v=69';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=69';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=69';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking, fastestWinners,
-} from './scoring.js?v=68';
+} from './scoring.js?v=69';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -79,6 +79,7 @@ async function afterLogin() {
     state.music = { start: settings?.start_music || null, end: settings?.end_music || null, countdown: settings?.countdown_music || null };
     state.countdownSecs = settings?.countdown_seconds || 0;  // 0 = geen aftelscherm
     state.countdownStart = settings?.countdown_music_start || 0;
+    state.countdownBpm = settings?.countdown_bpm || 0;
     preloadMusic();
   } catch (e) {
     return renderLogin(errorText(e));
@@ -479,10 +480,27 @@ function beginQuiz() {
   const secs = state.countdownSecs;
   if (!secs) return next();
   fxAudio();  // geluid voor de overgang alvast vrijgeven (binnen deze tik)
-  state.countdown = { until: Date.now() + secs * 1000, total: secs * 1000 };
-  if (state.music?.countdown) { bgMusic(state.music.countdown); musicPlayer(state.music.countdown)?.play({ start: state.countdownStart }); } // binnen de tik
-  else bgMusic(null);
+  // Met een BPM tikt de klok op de beat (bijv. 126 bpm: elke 2 tellen = 0,95 s) in plaats van elke seconde.
+  const tick = countdownTickMs(state.countdownBpm);
+  const total = secs * tick;
+  const cd = { until: null, total, tick, count: secs };
+  state.countdown = cd;
+  const begin = (offsetMs = 0) => { if (state.countdown === cd && cd.until == null) cd.until = Date.now() + total - offsetMs; };
+  if (state.music?.countdown) {
+    bgMusic(state.music.countdown);
+    // De klok start pas als de muziek echt speelt, zodat beat en getal gelijk lopen (anders na 3 s toch).
+    musicPlayer(state.music.countdown)?.play({ start: state.countdownStart, playing: (off) => begin(Math.max(0, Math.min(off, 1500))) }); // binnen de tik
+    setTimeout(() => begin(0), 3000);
+  } else { bgMusic(null); begin(0); }
   renderCountdown();
+}
+
+/** Lengte van één "seconde" van het aftellen: zonder BPM 1 s, met BPM het aantal tellen dat het dichtst bij 1 s ligt. */
+function countdownTickMs(bpm) {
+  if (!bpm) return 1000;
+  const beat = 60000 / bpm;
+  const k = Math.max(1, Math.round(1000 / beat));
+  return beat * k;
 }
 
 function stopCountdown() {
@@ -565,13 +583,14 @@ function playTransition() {
 
 function renderCountdown() {
   const cd = state.countdown;
-  const msLeft = () => Math.max(0, cd.until - Date.now());
-  const left = () => Math.ceil(msLeft() / 1000);
+  // Tot de muziek echt speelt (until nog leeg) staat de klok stil op het beginaantal.
+  const msLeft = () => (cd.until == null ? cd.total : Math.max(0, cd.until - Date.now()));
+  const left = () => Math.ceil(msLeft() / cd.tick);
   const elapsed = (cd.total - msLeft()) / 1000;
   const num = h('div', { class: 'countdown-num', 'aria-live': 'polite' }, String(left()));
   const grow = h('div', { class: 'countdown-grow' }, num);
   // "Quiz begint in" en het sierlijntje verdwijnen na een paar seconden; daarna alleen het getal
-  const fadeDelay = `${Math.min(3, cd.total / 3000) - elapsed}s`;
+  const fadeDelay = `${Math.min(3, cd.total / 3000) - elapsed + (cd.until == null ? 0.5 : 0)}s`;
   const title = h('p', { class: 'countdown-title', style: { animationDelay: fadeDelay } }, 'Quiz begint in');
   const orn = ornament(); orn.classList.add('countdown-orn'); orn.style.animationDelay = fadeDelay;
   const view = h('div', { class: 'countdown' },
@@ -596,10 +615,10 @@ function renderCountdown() {
       num.classList.remove('tick', 'beat'); void num.offsetWidth; num.classList.add(final ? 'beat' : 'tick');
       if (final) heartbeat(n);
     }
-    if (n <= 0) finishCountdown();
+    if (n <= 0 && cd.until != null) finishCountdown();
   };
   clearInterval(state.countdownTimer);
-  state.countdownTimer = setInterval(update, 100);
+  state.countdownTimer = setInterval(update, 20);  // vaak kijken, zodat elke tel precies op tijd valt
   update();
 }
 
@@ -1548,6 +1567,7 @@ async function reloadQuestions() {
       state.music = { start: st.start_music || null, end: st.end_music || null, countdown: st.countdown_music || null };
       state.countdownSecs = st.countdown_seconds || 0;
       state.countdownStart = st.countdown_music_start || 0;
+      state.countdownBpm = st.countdown_bpm || 0;
       preloadMusic();
     }
   } catch { /* oude instellingen houden */ }

@@ -487,6 +487,7 @@ export function loopingSpotifyPlayer(link) {
   let jump = false;            // zodra het speelt naar het beginpunt springen
   let jumpAt = 0;
   let jumpTries = 0;
+  let onPlaying = null;        // één keer melden zodra het echt vanaf het beginpunt speelt (aftellen op de beat)
 
   const startPlayback = () => {
     if (!ctrl) return;
@@ -525,6 +526,10 @@ export function loopingSpotifyPlayer(link) {
           const wasPlaying = !last.isPaused;
           lastUpdate = Date.now();
           if (!d.isPaused) heard = Date.now();
+          if (onPlaying && !d.isPaused && !jump && Math.abs((d.position || 0) - startMs) <= 1500) {
+            const cb = onPlaying; onPlaying = null;
+            cb((d.position || 0) - startMs);
+          }
           if (jump && !d.isPaused) {
             // Naar het beginpunt springen; Spotify negeert een sprong soms tijdens het laden, dus zo nodig opnieuw.
             if (Math.abs((d.position || 0) - startMs) <= 1500) jump = false;
@@ -583,8 +588,9 @@ export function loopingSpotifyPlayer(link) {
   return {
     el,
     /** Afspelen; met `start` (seconden) vanaf dat moment (zodra het speelt wordt er gesprongen). */
-    play({ start: from = null } = {}) {
+    play({ start: from = null, playing = null } = {}) {
       if (from != null) { startMs = Math.max(0, from * 1000); jump = startMs > 0; jumpTries = 0; jumpAt = 0; }
+      onPlaying = playing;
       wanted = true; lastUpdate = Date.now(); startPlayback(); watch();
     },
     refreshIfOld(maxAgeMs = 20 * 60 * 1000) {
@@ -609,7 +615,7 @@ function musicDebug() {
 // ---------- Versie (altijd de nieuwste versie laden) ----------
 
 // Bij elke nieuwe versie ophogen, samen met version.txt en de ?v=… in index.html en de imports.
-export const APP_VERSION = '68';
+export const APP_VERSION = '69';
 
 /**
  * GitHub Pages en Safari bewaren bestanden een tijd in de cache. Is er een nieuwere
