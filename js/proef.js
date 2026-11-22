@@ -1,6 +1,6 @@
 // Proefmodus (#tv): 30 testspelers die zelf willekeurig antwoorden, om de app
 // vooraf te testen. Alleen voor de ingelogde beheerder.
-import { sb, load, save } from './common.js?v=72';
+import { sb, load, save } from './common.js?v=74';
 
 const COUNT = 30;
 const key = (gameId) => `kerstquiz_proef_${gameId}`;
