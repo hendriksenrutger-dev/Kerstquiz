@@ -4,12 +4,12 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer, inScarePhase, serverNow, SCARE_SECONDS,
-} from './common.js?v=71';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=71';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=71';
+} from './common.js?v=72';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=72';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=72';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking, fastestWinners,
-} from './scoring.js?v=71';
+} from './scoring.js?v=72';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -486,6 +486,7 @@ function beginQuiz() {
   const cd = { until: null, total, tick, count: secs };
   state.countdown = cd;
   const begin = (offsetMs = 0) => { if (state.countdown === cd && cd.until == null) cd.until = Date.now() + total - offsetMs; };
+  stopMedia(); stopVideos(); stopClip();  // niets anders mag doorspelen tijdens het aftellen
   if (state.music?.countdown) {
     bgMusic(state.music.countdown);
     // De klok start pas als de muziek echt speelt, zodat beat en getal gelijk lopen (anders na 3 s toch).
