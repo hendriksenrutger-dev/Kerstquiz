@@ -2,9 +2,9 @@
 // spelinstellingen en een spel starten. Licht thema; werkt op iPad en iPhone.
 import {
   sb, h, mount, toast, LETTERS, errorText, loginForm, parseSpotify, cleanSpotifyLink, spotifyPlayer, SCARE_SECONDS,
-} from './common.js?v=68';
-import { parseNumber, formatNumber } from './scoring.js?v=68';
-import { addTestPlayers } from './proef.js?v=68';
+} from './common.js?v=69';
+import { parseNumber, formatNumber } from './scoring.js?v=69';
+import { addTestPlayers } from './proef.js?v=69';
 
 const TREE_CATEGORY = 'Van wie is deze kerstboom?';
 // Drie soorten muziekvragen (zie renderMusicForm)
@@ -499,6 +499,23 @@ function settingsCard() {
   const cdSecs = h('input', { type: 'number', inputmode: 'numeric', min: '3', max: '600', step: '1', value: state.settings.countdown_seconds ? String(state.settings.countdown_seconds) : '', placeholder: 'geen', class: 'input-short' });
   const cdMusic = spotifyField(state.settings.countdown_music || '', { label: 'Muziek tijdens het aftellen (optioneel)' });
   const cdStart = timeInput(state.settings.countdown_music_start);
+  const cdBpm = h('input', { type: 'number', inputmode: 'numeric', min: '40', max: '240', step: '1', value: state.settings.countdown_bpm ? String(state.settings.countdown_bpm) : '', placeholder: 'geen', class: 'input-short' });
+  const cdInfo = h('p', { class: 'hint' });
+  /** Laat zien hoe lang het aftellen echt duurt en wanneer de drop moet vallen. */
+  const updateCdInfo = () => {
+    const secs = parseInt(cdSecs.value, 10);
+    const bpm = parseInt(cdBpm.value, 10);
+    if (!(secs >= 3)) { cdInfo.textContent = ''; return; }
+    let tick = 1;
+    if (bpm >= 40) { const beat = 60 / bpm; tick = beat * Math.max(1, Math.round(1 / beat)); }
+    const dur = secs * tick;
+    const st = parseTime(cdStart.value);
+    const fmt = (x) => `${Math.floor(x / 60)}:${(x % 60).toFixed(1).padStart(4, '0').replace('.', ',')}`;
+    cdInfo.textContent = `Het aftellen duurt ${dur.toFixed(1).replace('.', ',')} s${bpm >= 40 ? ` (elke tel ${tick.toFixed(3).replace('.', ',')} s = ${Math.round(tick / (60 / bpm))} beat${Math.round(tick / (60 / bpm)) > 1 ? 's' : ''})` : ''}.`
+      + (st ? ` De muziek begint op ${formatTime(st)}, dus bij 0 is het nummer op ${fmt(st + dur)}: zet daar de drop.` : ' Tip: beginpunt = moment van de drop min deze duur.');
+  };
+  [cdSecs, cdBpm, cdStart].forEach((el) => el.addEventListener('input', updateCdInfo));
+  updateCdInfo();
   const cdBtn = h('button', { class: 'btn btn-green', type: 'submit' }, 'Aftellen opslaan');
 
   return h('section', { class: 'b-section' },
@@ -560,6 +577,9 @@ function settingsCard() {
             if (st === false) return toast('Vul het beginpunt in als minuten:seconden, bijvoorbeeld 1:05.');
             const row = { countdown_seconds: secs, countdown_music: link };
             if (st || state.settings.countdown_music_start) row.countdown_music_start = st || null;
+            const bpm = cdBpm.value.trim() ? parseInt(cdBpm.value, 10) : null;
+            if (bpm != null && !(bpm >= 40 && bpm <= 240)) return toast('BPM: kies 40 tot 240, of laat het leeg.');
+            if (bpm || state.settings.countdown_bpm) row.countdown_bpm = bpm || null;
             cdBtn.disabled = true;
             const { error } = await sb.from('settings').update(row).eq('id', 1);
             cdBtn.disabled = false;
@@ -573,6 +593,9 @@ function settingsCard() {
           cdMusic.el,
           h('label', {}, '⏩ Muziek begint bij (minuten:seconden)', cdStart,
             h('span', { class: 'hint' }, 'Bijvoorbeeld 0:45. Leeg = vanaf het begin.')),
+          h('label', {}, '🥁 BPM van het nummer (optioneel)', cdBpm,
+            h('span', { class: 'hint' }, 'Dan tikt de klok op de beat in plaats van precies elke seconde (bijv. 126 bpm: elke 2 tellen). Op te zoeken via songbpm.com.')),
+          cdInfo,
           cdBtn,
         )
         : h('p', { class: 'b-card b-warning' }, 'Voer supabase/019_aftellen.sql uit in Supabase om het aftellen in te stellen.'),
