@@ -592,6 +592,12 @@ export function loopingSpotifyPlayer(link) {
       if (from != null) { startMs = Math.max(0, from * 1000); jump = startMs > 0; jumpTries = 0; jumpAt = 0; }
       onPlaying = playing;
       wanted = true; lastUpdate = Date.now(); startPlayback(); watch();
+      if (jump) {
+        // meteen na het starten al naar het beginpunt springen (niet wachten op de eerste melding)
+        const early = () => { if (jump && ctrl && typeof ctrl.seek === 'function') { jumpAt = Date.now(); jumpTries++; ctrl.seek(startMs / 1000); } };
+        setTimeout(early, 150);
+        setTimeout(early, 600);
+      }
     },
     refreshIfOld(maxAgeMs = 20 * 60 * 1000) {
       if (!wanted && last.isPaused && Date.now() - createdAt > maxAgeMs) { rebuilds = 0; rebuild(); }
@@ -615,7 +621,7 @@ function musicDebug() {
 // ---------- Versie (altijd de nieuwste versie laden) ----------
 
 // Bij elke nieuwe versie ophogen, samen met version.txt en de ?v=… in index.html en de imports.
-export const APP_VERSION = '70';
+export const APP_VERSION = '71';
 
 /**
  * GitHub Pages en Safari bewaren bestanden een tijd in de cache. Is er een nieuwere
@@ -688,6 +694,8 @@ export function deckPlayer(link, { height = 152 } = {}) {
   let startMs = 0;       // beginpunt (in ms) van het nummer, in beheer in te stellen
   let rewindAt = 0;
   let rewindTries = 0;
+  let earlySeek1 = null;
+  let earlySeek2 = null;
   let limitTimer = null;
   const listeners = [];
 
@@ -771,12 +779,24 @@ export function deckPlayer(link, { height = 152 } = {}) {
       clearTimeout(limitTimer);
       startMs = Math.max(0, (from || 0) * 1000);
       rewindAt = 0; rewindTries = 0;
+      clearTimeout(earlySeek1); clearTimeout(earlySeek2);
       limitMs = seconds ? seconds * 1000 : null;
       rewind = true;  // altijd vanaf het begin (een vooraf geladen nummer gaat anders verder waar het was)
       // vangnet als Spotify de positie niet (op tijd) doorgeeft
       if (seconds) limitTimer = setTimeout(() => { if (limitMs != null) { limitMs = null; api.pause(); } }, seconds * 1000 + 3500);
       start();
       watch();
+      // Met een beginpunt: niet wachten op Spotify's eerste melding (die komt soms pas na 1 s),
+      // maar vlak na het starten al springen, en voor de zekerheid nog een keer.
+      if (startMs > 800) {
+        const early = () => {
+          if (!rewind || !ctrl || typeof ctrl.seek !== 'function') return;
+          rewindAt = Date.now(); rewindTries++;
+          ctrl.seek(startMs / 1000);
+        };
+        earlySeek1 = setTimeout(early, 150);
+        earlySeek2 = setTimeout(early, 600);
+      }
     },
     pause() {
       wanted = false;
