@@ -4,12 +4,12 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer, inScarePhase, serverNow, SCARE_SECONDS,
-} from './common.js?v=73';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=73';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=73';
+} from './common.js?v=74';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=74';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=74';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking, fastestWinners,
-} from './scoring.js?v=73';
+} from './scoring.js?v=74';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -413,9 +413,9 @@ function render() {
   else if (g.status === 'tree') bgMusic(state.music?.end);
   else if (g.status !== 'final') {
     // Vlak na het aftellen laat de aftelmuziek nog even doorklinken (vloeiende overgang), daarna stil
-    // (niet bij een Spotify-nummer of eigen geluid: dan zouden twee nummers door elkaar spelen)
+    // (niet bij een Spotify-nummer: dat kan niet zacht beginnen, dan zouden twee nummers door elkaar klinken)
     const cq = state.questions.find((x) => x.id === g.current_question_id);
-    const hold = cq?.media_url || cq?.audio_path ? 0 : (state.holdMusicUntil || 0) - Date.now();
+    const hold = cq?.media_url ? 0 : (state.holdMusicUntil || 0) - Date.now();
     if (hold > 0) {
       clearTimeout(state.holdMusicTimer);
       state.holdMusicTimer = setTimeout(() => { if (state.game?.status !== 'final') bgMusic(null); }, hold);
@@ -1751,7 +1751,13 @@ function playClip(path, reverse) {
     if (clipSrc !== token) return;                // intussen alweer gestopt of iets anders gestart
     const src = ctx.createBufferSource();
     src.buffer = reverse ? rev : fwd;
-    src.connect(ctx.destination);
+    // Direct na het aftellen: rustig laten aanzwellen (overvloeien met de aftelmuziek)
+    const gain = ctx.createGain();
+    if ((state.morphUntil || 0) > Date.now()) {
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(1, ctx.currentTime + 2.5);
+    }
+    src.connect(gain); gain.connect(ctx.destination);
     src.onended = () => {
       if (clipSrc !== token) return;
       clipSrc = null;
