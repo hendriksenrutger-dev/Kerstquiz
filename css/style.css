@@ -1212,3 +1212,9 @@ body.pv-with-phone .stage { width: min(calc(100vw - 340px), calc((100dvh - 64px)
   font: 700 22px var(--sans); padding: 14px; cursor: pointer; touch-action: manipulation;
 }
 .remote-again[hidden] { display: none; }
+
+/* Beheer: vraag wel/niet in de quiz */
+.q-active { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; font-size: .85em; font-weight: 600; cursor: pointer; padding: 2px 10px 2px 6px; border-radius: 999px; background: #E5EFE8; color: var(--b-green-2); }
+.q-active input { width: 18px; height: 18px; margin: 0; }
+.q-item.q-off { opacity: .55; }
+.q-item.q-off .q-active { background: #F3E3E0; color: #9a3b2c; opacity: 1; }

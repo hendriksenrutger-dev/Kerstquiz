@@ -105,14 +105,15 @@ export function secondsLeft(game, question) {
 
 // ---------- Data ----------
 
-export async function fetchQuestions() {
+/** Vragen ophalen; standaard alleen die "in de quiz" staan (beheer: vinkje). Met all: ook de uitgezette. */
+export async function fetchQuestions({ all = false } = {}) {
   const { data, error } = await sb
     .from('questions')
     .select('*')
     .order('position', { ascending: true })
     .order('created_at', { ascending: true });
   if (error) throw error;
-  return data || [];
+  return all ? (data || []) : (data || []).filter((q) => q.active !== false);
 }
 
 export async function fetchGame(id) {
@@ -623,7 +624,7 @@ function musicDebug() {
 // ---------- Versie (altijd de nieuwste versie laden) ----------
 
 // Bij elke nieuwe versie ophogen, samen met version.txt en de ?v=… in index.html en de imports.
-export const APP_VERSION = '76';
+export const APP_VERSION = '77';
 
 /**
  * GitHub Pages en Safari bewaren bestanden een tijd in de cache. Is er een nieuwere

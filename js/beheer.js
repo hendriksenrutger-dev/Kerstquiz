@@ -2,11 +2,12 @@
 // spelinstellingen en een spel starten. Licht thema; werkt op iPad en iPhone.
 import {
   sb, h, mount, toast, LETTERS, errorText, loginForm, parseSpotify, cleanSpotifyLink, spotifyPlayer, SCARE_SECONDS,
-} from './common.js?v=76';
-import { parseNumber, formatNumber } from './scoring.js?v=76';
-import { addTestPlayers } from './proef.js?v=76';
+} from './common.js?v=77';
+import { parseNumber, formatNumber } from './scoring.js?v=77';
+import { addTestPlayers } from './proef.js?v=77';
 
 const TREE_CATEGORY = 'Van wie is deze kerstboom?';
+const WHO_CATEGORY = 'Wie is dit?';
 // Drie soorten muziekvragen (zie renderMusicForm)
 const MUSIC = {
   // Spotify speelt alleen op de tv: met speler in beeld, of alleen geluid (als de speler het antwoord zou verraden)
@@ -14,7 +15,7 @@ const MUSIC = {
   artiest: { category: 'Van wie is dit nummer?', mode: 'alleen_geluid' },
   zin: { category: 'Maak de zin af', mode: 'alleen_tv' },
 };
-const DEFAULT_CATEGORIES = [TREE_CATEGORY, ...Object.values(MUSIC).map((m) => m.category), 'In welke stad staat deze kerstboom?', 'Kerstfeitje'];
+const DEFAULT_CATEGORIES = [TREE_CATEGORY, WHO_CATEGORY, ...Object.values(MUSIC).map((m) => m.category), 'In welke stad staat deze kerstboom?', 'Kerstfeitje'];
 const REVEAL_EFFECTS = [
   { value: '', label: 'Gewoon tonen' },
   { value: 'vervagen', label: 'Langzaam scherper (begint wazig)' },
@@ -72,6 +73,7 @@ async function afterLogin(params) {
     return renderLogin(params, errorText(e));
   }
   if (params?.get('scherm') === 'boom') return renderTreeForm();
+  if (params?.get('scherm') === 'wie') return renderTreeForm({ who: true });
   if (params?.get('scherm') === 'nummer') return renderMusicForm();
   renderList();
 }
@@ -115,12 +117,13 @@ function categorySuggestions() {
 
 function treeNameSuggestions() {
   const names = state.questions
-    .filter((q) => (q.category === TREE_CATEGORY || q.category === MUSIC.ingestuurd.category) && Array.isArray(q.options))
+    .filter((q) => [TREE_CATEGORY, WHO_CATEGORY, MUSIC.ingestuurd.category].includes(q.category) && Array.isArray(q.options))
     .flatMap((q) => q.options);
   return [...new Set(names.filter(Boolean))].sort((a, b) => a.localeCompare(b, 'nl'));
 }
 
 const treeCount = () => state.questions.filter((q) => q.category === TREE_CATEGORY).length;
+const whoCount = () => state.questions.filter((q) => q.category === WHO_CATEGORY).length;
 const musicCount = () => state.questions.filter((q) => q.media_url).length;
 
 function setScreen(scherm) {
@@ -294,7 +297,8 @@ function renderList() {
     header(),
     h('section', { class: 'b-card b-actions' },
       h('button', { class: 'btn btn-green btn-lg', onclick: startGame, disabled: state.questions.length === 0 }, 'Start quiz op dit scherm'),
-      h('button', { class: 'btn btn-light btn-lg', onclick: renderTreeForm }, '🎄 Kerstboom toevoegen'),
+      h('button', { class: 'btn btn-light btn-lg', onclick: () => renderTreeForm() }, '🎄 Kerstboom toevoegen'),
+      h('button', { class: 'btn btn-light btn-lg', onclick: () => renderTreeForm({ who: true }) }, '👶 Wie is dit? toevoegen'),
       h('button', { class: 'btn btn-light btn-lg', onclick: renderMusicForm }, '🎵 Nummer toevoegen'),
       h('button', { class: 'btn btn-light btn-lg', onclick: () => renderEdit(null, { scareOnly: true }) }, '👻 Schrikvraag toevoegen'),
       h('button', {
@@ -304,7 +308,7 @@ function renderList() {
     ),
     h('section', { class: 'b-section' },
       h('div', { class: 'b-section-head' },
-        h('h2', { class: 'serif' }, `Vragen (${state.questions.length})`),
+        h('h2', { class: 'serif' }, `Vragen (${state.questions.filter((q) => q.active !== false).length} in de quiz${state.questions.some((q) => q.active === false) ? ` van ${state.questions.length}` : ''})`),
         h('button', { class: 'btn btn-green', onclick: () => renderEdit(null) }, '+ Vraag toevoegen'),
       ),
       items.length
@@ -329,7 +333,8 @@ function header() {
 function questionItem(q, i) {
   const thumb = q.photo_path ? state.thumbs.get(q.photo_path) : null;
   const ans = state.answers.get(q.id);
-  return h('li', { class: 'q-item b-card', 'data-index': i },
+  const inQuiz = h('input', { type: 'checkbox', checked: q.active !== false, onchange: () => setActive(q, inQuiz.checked) });
+  return h('li', { class: `q-item b-card ${q.active === false ? 'q-off' : ''}`, 'data-index': i },
     h('button', {
       type: 'button', class: 'drag-handle', 'aria-label': 'Slepen om te verplaatsen', title: 'Vasthouden en slepen',
       onpointerdown: (e) => startDrag(e, i),
@@ -338,6 +343,7 @@ function questionItem(q, i) {
     thumb ? h('img', { class: 'q-thumb', src: thumb, alt: '' }) : h('div', { class: 'q-thumb q-thumb-empty', 'aria-hidden': 'true' }),
     h('div', { class: 'q-info' },
       h('div', { class: 'q-tags' },
+        h('label', { class: 'q-active', title: 'Vraag wel of niet meenemen in de quiz' }, inQuiz, q.active === false ? 'Niet in quiz' : 'In quiz'),
         q.category && h('span', { class: 'b-label' }, q.category),
         h('span', { class: 'b-kind' }, KIND_LABEL[q.kind] || q.kind),
         h('span', { class: 'muted' }, `${q.scare_only ? q.time_limit - (q.scare_after || 0) - SCARE_SECONDS : q.time_limit} s`),
@@ -465,6 +471,17 @@ async function moveTo(i, j) {
     await loadAll();
     renderList();
   }
+}
+
+/** Vraag wel of niet meenemen in de quiz (blijft bewaard). */
+async function setActive(q, on) {
+  const { error } = await sb.from('questions').update({ active: on }).eq('id', q.id);
+  if (error) {
+    toast(/active/.test(error.message || '') ? 'Voer eerst supabase/024_vraag_aan_uit.sql uit in Supabase.' : errorText(error));
+    return renderList();
+  }
+  q.active = on;
+  renderList();
 }
 
 async function removeQuestion(q) {
@@ -652,6 +669,7 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
   const answerTime = q?.scare_only ? q.time_limit - (q.scare_after || 0) - SCARE_SECONDS : q?.time_limit;
   const time = h('input', { type: 'number', inputmode: 'numeric', min: '5', max: '600', step: '1', value: String(answerTime >= 5 && answerTime <= 120 ? answerTime : 20), class: 'input-short' });
   const rate = h('input', { type: 'checkbox', checked: Boolean(q?.rate_tree) });
+  const activeBox = h('input', { type: 'checkbox', checked: q?.active !== false });
   const fastest = h('input', { type: 'checkbox', checked: Boolean(q?.fastest_count) });
   const scare = h('input', { type: 'number', inputmode: 'numeric', min: '1', max: '600', step: '1', value: q?.scare_after ? String(q.scare_after) : (scareOnly ? '5' : ''), placeholder: 'geen', class: 'input-short' });
 
@@ -773,6 +791,8 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
       if (hideText.checked || ans?.hide_answer_text) answerRow.hide_answer_text = hideText.checked;
 
       if (!row.text) return (err.textContent = 'Vul de vraag in.');
+      // Alleen meesturen als het uit staat of stond (werkt dan ook zonder 024_vraag_aan_uit.sql).
+      if (!activeBox.checked || q?.active === false) row.active = activeBox.checked;
       // Alleen meesturen als het aan staat of stond (werkt dan ook zonder 016_snelsten.sql).
       if (fastest.checked || q?.fastest_count) row.fastest_count = fastest.checked ? 3 : null;
       if (scareOnly) {
@@ -853,6 +873,7 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
     },
   },
     // ---- 1. De vraag en het goede antwoord (altijd open)
+    h('label', { class: 'check' }, activeBox, 'Deze vraag meenemen in de quiz'),
     h('label', {}, 'Rubriek', category, datalist),
     scareOnly && h('label', {}, 'Tekst vóór de schrik', scareText,
       h('span', { class: 'hint' }, 'Op de tv en de telefoons staat eerst alleen deze tekst. Na het ingestelde aantal seconden komt het schrikbeeld met een gil, en daarna de echte vraag hieronder.')),
@@ -987,18 +1008,22 @@ async function saveQuestion(existing, row, answerRow, photoChoice, answerPhotoCh
 
 // ---------------------------------------------------------------- snel een kerstboom (iPhone)
 
-function renderTreeForm() {
-  setScreen('boom');
+/** Snel invoeren: "Van wie is deze kerstboom?" of (who) "Wie is dit?" met een baby- of kinderfoto. */
+function renderTreeForm({ who = false } = {}) {
+  setScreen(who ? 'wie' : 'boom');
+  const category = who ? WHO_CATEGORY : TREE_CATEGORY;
+  const countText = () => (who ? `${whoCount()} ${whoCount() === 1 ? 'foto' : "foto's"}` : treeCountText());
   const listId = 'boomnamen';
   const names = h('datalist', { id: listId }, treeNameSuggestions().map((n) => h('option', { value: n })));
-  const owner = h('input', { type: 'text', list: listId, maxlength: '80', autocapitalize: 'words', placeholder: 'Naam van de eigenaar' });
+  const owner = h('input', { type: 'text', list: listId, maxlength: '80', autocapitalize: 'words', placeholder: who ? 'Wie staat er op de foto?' : 'Naam van de eigenaar' });
   const others = [1, 2, 3].map((n) => h('input', { type: 'text', list: listId, maxlength: '80', autocapitalize: 'words', placeholder: `Andere naam ${n}` }));
-  const rate = h('input', { type: 'checkbox', checked: true });
+  const rate = h('input', { type: 'checkbox', checked: !who });
   const photo = photoPicker(null, { big: true });
   const answerPhoto = photoPicker(null);
   const err = h('p', { class: 'form-error', role: 'alert' });
-  const count = h('span', { class: 'tree-count' }, treeCountText());
-  const saveBtn = h('button', { class: 'btn btn-green btn-lg btn-block', type: 'submit' }, 'Opslaan en volgende boom');
+  const count = h('span', { class: 'tree-count' }, countText());
+  const nextLabel = who ? 'Opslaan en volgende foto' : 'Opslaan en volgende boom';
+  const saveBtn = h('button', { class: 'btn btn-green btn-lg btn-block', type: 'submit' }, nextLabel);
 
   const form = h('form', {
     class: 'stack',
@@ -1012,7 +1037,7 @@ function renderTreeForm() {
       const otherNames = others.map((i) => i.value.trim());
       const { blob } = photo.get();
       if (!blob) return (err.textContent = 'Kies eerst een foto.');
-      if (!ownerName) return (err.textContent = 'Vul in van wie de boom is.');
+      if (!ownerName) return (err.textContent = who ? 'Vul in wie er op de foto staat.' : 'Vul in van wie de boom is.');
       if (otherNames.some((n) => !n)) return (err.textContent = 'Vul drie andere namen in.');
       const all = [ownerName, ...otherNames];
       if (new Set(all.map((n) => n.toLowerCase())).size < 4) return (err.textContent = 'Gebruik vier verschillende namen.');
@@ -1025,27 +1050,28 @@ function renderTreeForm() {
       saveBtn.textContent = 'Bezig met opslaan…';
       try {
         await saveQuestion(null, {
-          category: TREE_CATEGORY, kind: 'meerkeuze', text: TREE_CATEGORY,
-          time_limit: 20, rate_tree: rate.checked, options, unit: null,
+          category, kind: 'meerkeuze', text: category,
+          time_limit: 20, rate_tree: !who && rate.checked, options, unit: null,
         }, { correct_option: correct, correct_texts: null, correct_value: null }, { blob, removed: false }, answerPhoto.get());
-        toast(`Boom van ${ownerName} opgeslagen`);
+        toast(who ? `Foto van ${ownerName} opgeslagen` : `Boom van ${ownerName} opgeslagen`);
         // formulier leegmaken voor de volgende boom (cijfer-vinkje blijft staan)
         owner.value = '';
         others.forEach((i) => { i.value = ''; });
         photo.reset();
         answerPhoto.reset();
-        count.textContent = treeCountText();
+        count.textContent = countText();
         names.replaceChildren(...treeNameSuggestions().map((n) => h('option', { value: n })));
         window.scrollTo(0, 0);
       } catch (ex) {
         err.textContent = errorText(ex);
       }
       saveBtn.disabled = false;
-      saveBtn.textContent = 'Opslaan en volgende boom';
+      saveBtn.textContent = nextLabel;
     },
   },
     photo.el,
-    h('label', {}, 'Van wie is deze boom?', owner, h('span', { class: 'hint' }, 'Dit is het goede antwoord.')),
+    who && h('p', { class: 'hint' }, 'Kies een baby- of kinderfoto. De spelers raden wie het is (meerkeuze).'),
+    h('label', {}, who ? 'Wie is dit?' : 'Van wie is deze boom?', owner, h('span', { class: 'hint' }, 'Dit is het goede antwoord.')),
     h('fieldset', { class: 'b-fieldset' },
       h('legend', {}, 'Drie andere namen'),
       others,
@@ -1053,9 +1079,9 @@ function renderTreeForm() {
     names,
     h('div', { class: 'stack-tight' },
       h('span', { class: 'field-label' }, 'Foto bij het antwoord (optioneel)'),
-      h('span', { class: 'hint' }, 'Bijvoorbeeld de eigenaar bij de boom. De tv toont hem pas in de antwoordenronde.'),
+      h('span', { class: 'hint' }, who ? 'Bijvoorbeeld een foto van nu. De tv toont hem pas in de antwoordenronde.' : 'Bijvoorbeeld de eigenaar bij de boom. De tv toont hem pas in de antwoordenronde.'),
       answerPhoto.el),
-    h('label', { class: 'check' }, rate, 'Spelers geven deze boom een cijfer'),
+    !who && h('label', { class: 'check' }, rate, 'Spelers geven deze boom een cijfer'),
     err,
     saveBtn,
   );
@@ -1065,7 +1091,7 @@ function renderTreeForm() {
       h('button', { class: 'link', onclick: renderList }, '← Beheer'),
       count,
     ),
-    h('h1', { class: 'serif' }, 'Kerstboom toevoegen'),
+    h('h1', { class: 'serif' }, who ? 'Wie is dit? toevoegen' : 'Kerstboom toevoegen'),
     form,
   ));
 }
