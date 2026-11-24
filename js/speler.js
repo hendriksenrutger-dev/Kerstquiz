@@ -2,9 +2,9 @@
 import {
   sb, h, mount, toast, load, save, LETTERS, syncClock, secondsLeft,
   fetchQuestions, fetchGame, errorText, liveSync, brandTitle, inScarePhase,
-} from './common.js?v=76';
-import { parseNumber, formatNumber } from './scoring.js?v=76';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=76';
+} from './common.js?v=77';
+import { parseNumber, formatNumber } from './scoring.js?v=77';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=77';
 
 const PLAYER_KEY = 'kerstquiz_speler';
 
@@ -513,7 +513,7 @@ function renderWinner(place) {
 /** Telefoonweergave van één vraag, zonder spel: antwoorden worden niet opgeslagen. */
 async function startPreview(id) {
   state.preview = true;
-  state.questions = await fetchQuestions().catch(() => []);
+  state.questions = await fetchQuestions({ all: true }).catch(() => []);  // voorbeeld: ook uitgezette vragen
   const q = state.questions.find((x) => x.id === id);
   if (!q) return renderLookUp('?', 'Vraag niet gevonden');
   let photo = null;

@@ -4,12 +4,12 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer, inScarePhase, serverNow, SCARE_SECONDS,
-} from './common.js?v=76';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=76';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=76';
+} from './common.js?v=77';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=77';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=77';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking, fastestWinners,
-} from './scoring.js?v=76';
+} from './scoring.js?v=77';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -70,7 +70,8 @@ async function afterLogin() {
   await syncRealtimeAuth();
   syncClock();
   try {
-    const all = await fetchQuestions();
+    // in het voorbeeld (vanuit beheer) ook uitgezette vragen, zodat je die toch kunt bekijken
+    const all = await fetchQuestions({ all: Boolean(previewId) });
     state.questions = all.filter((q) => !q.tiebreak);
     state.tiebreaks = all.filter((q) => q.tiebreak);
     prepareScareAudio(state.questions);  // alleen als er een schrik in de quiz zit
