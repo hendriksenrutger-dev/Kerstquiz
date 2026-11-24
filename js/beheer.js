@@ -1018,6 +1018,21 @@ function renderTreeForm({ who = false } = {}) {
   const owner = h('input', { type: 'text', list: listId, maxlength: '80', autocapitalize: 'words', placeholder: who ? 'Wie staat er op de foto?' : 'Naam van de eigenaar' });
   const others = [1, 2, 3].map((n) => h('input', { type: 'text', list: listId, maxlength: '80', autocapitalize: 'words', placeholder: `Andere naam ${n}` }));
   const rate = h('input', { type: 'checkbox', checked: !who });
+  // "Wie is dit?": meerkeuze (vier namen) of open (spelers typen de naam)
+  let open = false;
+  const variants = h('textarea', { rows: '2', placeholder: 'Bijv. een bijnaam of alleen de voornaam (één per regel)' });
+  const othersBlock = h('fieldset', { class: 'b-fieldset' }, h('legend', {}, 'Drie andere namen'), others);
+  const variantsBlock = h('label', { hidden: true }, 'Andere schrijfwijzen die ook goed zijn (optioneel)', variants,
+    h('span', { class: 'hint' }, 'Kleine tikfouten worden al automatisch goed gerekend.'));
+  const kindBtns = [['Meerkeuze', false], ['Open', true]].map(([label, val]) => h('button', {
+    type: 'button', class: 'seg', 'aria-pressed': String(val === open),
+    onclick: () => {
+      open = val;
+      kindBtns.forEach((b, k) => b.setAttribute('aria-pressed', String(k === (open ? 1 : 0))));
+      othersBlock.hidden = open;
+      variantsBlock.hidden = !open;
+    },
+  }, label));
   const photo = photoPicker(null, { big: true });
   const answerPhoto = photoPicker(null);
   const err = h('p', { class: 'form-error', role: 'alert' });
@@ -1038,6 +1053,27 @@ function renderTreeForm({ who = false } = {}) {
       const { blob } = photo.get();
       if (!blob) return (err.textContent = 'Kies eerst een foto.');
       if (!ownerName) return (err.textContent = who ? 'Vul in wie er op de foto staat.' : 'Vul in van wie de boom is.');
+      if (who && open) {
+        // Open vraag: de naam plus eventuele andere schrijfwijzen zijn goed
+        const texts = [ownerName, ...variants.value.split('\n').map((l) => l.trim()).filter(Boolean)];
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Bezig met opslaan…';
+        try {
+          await saveQuestion(null, {
+            category, kind: 'open', text: category, time_limit: 25, rate_tree: false, options: null, unit: null,
+          }, { correct_option: null, correct_texts: [...new Set(texts)], correct_value: null }, { blob, removed: false }, answerPhoto.get());
+          toast(`Foto van ${ownerName} opgeslagen (open vraag)`);
+          owner.value = ''; variants.value = '';
+          photo.reset(); answerPhoto.reset();
+          count.textContent = countText();
+          window.scrollTo(0, 0);
+        } catch (ex) {
+          err.textContent = errorText(ex);
+        }
+        saveBtn.disabled = false;
+        saveBtn.textContent = nextLabel;
+        return;
+      }
       if (otherNames.some((n) => !n)) return (err.textContent = 'Vul drie andere namen in.');
       const all = [ownerName, ...otherNames];
       if (new Set(all.map((n) => n.toLowerCase())).size < 4) return (err.textContent = 'Gebruik vier verschillende namen.');
@@ -1070,12 +1106,11 @@ function renderTreeForm({ who = false } = {}) {
     },
   },
     photo.el,
-    who && h('p', { class: 'hint' }, 'Kies een baby- of kinderfoto. De spelers raden wie het is (meerkeuze).'),
+    who && h('p', { class: 'hint' }, 'Kies een baby- of kinderfoto. De spelers raden wie het is.'),
+    who && h('div', { class: 'stack-tight' }, h('span', { class: 'field-label' }, 'Soort vraag'), h('div', { class: 'segmented' }, kindBtns)),
     h('label', {}, who ? 'Wie is dit?' : 'Van wie is deze boom?', owner, h('span', { class: 'hint' }, 'Dit is het goede antwoord.')),
-    h('fieldset', { class: 'b-fieldset' },
-      h('legend', {}, 'Drie andere namen'),
-      others,
-    ),
+    othersBlock,
+    who && variantsBlock,
     names,
     h('div', { class: 'stack-tight' },
       h('span', { class: 'field-label' }, 'Foto bij het antwoord (optioneel)'),
