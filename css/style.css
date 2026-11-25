@@ -1157,14 +1157,32 @@ body.pv-with-phone .stage { width: min(calc(100vw - 340px), calc((100dvh - 64px)
 }
 .countdown.countdown-collapse .countdown-orn, .countdown.countdown-collapse .countdown-foot { opacity: 0; }
 .morph { position: fixed; inset: 0; z-index: 9000; pointer-events: none; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-.morph-veil { position: absolute; inset: 0; background: #07140e; opacity: 0; animation: morph-veil 2.3s cubic-bezier(.4, 0, .2, 1) forwards; }
+.morph-veil { position: absolute; inset: 0; background: #050a08; opacity: 0; animation: morph-veil 3.6s cubic-bezier(.4, 0, .2, 1) forwards; }
 .morph-burst {
   position: relative; width: 40vmin; height: 40vmin; border-radius: 50%;
   background: radial-gradient(circle, rgba(255, 248, 225, 1) 0%, rgba(240, 213, 140, .95) 22%, rgba(205, 163, 73, .7) 45%, rgba(205, 163, 73, .15) 65%, rgba(15, 42, 29, 0) 75%);
   animation: morph-burst 2.3s cubic-bezier(.65, 0, .25, 1) forwards;
 }
 .morph-flash { position: absolute; inset: 0; background: #fff8e6; opacity: 0; animation: morph-flash 2.3s ease forwards; }
-@keyframes morph-veil { 0% { opacity: 0; } 18% { opacity: .9; } 45% { opacity: .9; } 100% { opacity: 0; } }
+@keyframes morph-veil { 0% { opacity: 0; } 12% { opacity: .92; } 18%, 62% { opacity: 1; } 100% { opacity: 0; } }
+/* de kerstman: komt uit het witte licht, kijkt je even dreigend aan en lost dan op */
+.morph-santa {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 10%;
+  opacity: 0; will-change: transform, opacity, filter;
+  -webkit-mask-image: radial-gradient(ellipse 75% 85% at 50% 42%, #000 55%, transparent 100%);
+  mask-image: radial-gradient(ellipse 75% 85% at 50% 42%, #000 55%, transparent 100%);
+  animation: morph-santa 3.5s cubic-bezier(.3, 0, .3, 1) forwards;
+}
+@keyframes morph-santa {
+  0%, 14% { opacity: 0; transform: scale(1.18); filter: brightness(4) contrast(.6) blur(10px); }
+  22% { opacity: 1; transform: scale(1.1); filter: brightness(2.2) contrast(.8) blur(3px); }
+  34% { opacity: 1; transform: scale(1.06); filter: brightness(1) contrast(1.05) blur(0); }
+  40% { filter: brightness(1.25) contrast(1.1); }
+  43% { filter: brightness(.9) contrast(1.1); }
+  64% { opacity: 1; transform: scale(1.02); filter: brightness(1) contrast(1.1) blur(0); }
+  84% { opacity: 0; transform: scale(1); filter: brightness(.4) blur(14px); }
+  100% { opacity: 0; }
+}
 @keyframes morph-burst {
   0% { transform: scale(.05); opacity: 0; }
   12% { transform: scale(.5); opacity: 1; }

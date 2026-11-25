@@ -4,12 +4,12 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer, inScarePhase, serverNow, SCARE_SECONDS,
-} from './common.js?v=77';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=77';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=77';
+} from './common.js?v=78';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=78';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=78';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking, fastestWinners,
-} from './scoring.js?v=77';
+} from './scoring.js?v=78';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -481,6 +481,7 @@ function beginQuiz() {
   const secs = state.countdownSecs;
   if (!secs) return next();
   fxAudio();  // geluid voor de overgang alvast vrijgeven (binnen deze tik)
+  new Image().src = SANTA_IMG;  // kerstman alvast inladen voor de flits
   // Met een BPM tikt de klok op de beat (bijv. 126 bpm: elke 2 tellen = 0,95 s) in plaats van elke seconde.
   const tick = countdownTickMs(state.countdownBpm);
   const total = secs * tick;
@@ -515,7 +516,7 @@ function finishCountdown() {
   stopCountdown();
   playTransition();
   // Eerste vraag pas tonen als de flits het scherm bedekt (de muziek van het aftellen stopt daar vanzelf)
-  setTimeout(next, 650);  // de vraag komt eronder klaar terwijl het licht het scherm vult
+  setTimeout(next, 650 + SANTA_HOLD);  // de vraag komt eronder klaar terwijl de kerstman nog in beeld is
 }
 
 // ---------------------------------------------------------------- overgang aftellen → eerste vraag
@@ -534,57 +535,114 @@ function fxAudio() {
   return fxCtx;
 }
 
-/** Zware dreun met een "woosh" (zelf opgebouwd, geen geluidsbestand nodig). */
+/** Witte ruis (voor klap, rommel en nagalm). */
+function noiseBuffer(ctx, secs, channels = 1) {
+  const len = Math.floor(ctx.sampleRate * secs);
+  const buf = ctx.createBuffer(channels, len, ctx.sampleRate);
+  for (let c = 0; c < channels; c++) {
+    const d = buf.getChannelData(c);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  }
+  return buf;
+}
+
+/**
+ * Zware, lange ontploffing (zelf opgebouwd, geen geluidsbestand nodig):
+ * aanzwellende woosh → harde klap → diepe dreun → rommel die ~4 s wegrolt, met nagalm.
+ */
 function boomSound() {
   const ctx = fxAudio();
   if (!ctx) return;
   try {
     const t = ctx.currentTime + 0.03;
-    const out = ctx.createDynamicsCompressor();
-    out.connect(ctx.destination);
-    // diepe dreun die wegzakt
-    [[95, 26, 1.0, 'sine'], [58, 20, 0.7, 'triangle']].forEach(([f0, f1, vol, type]) => {
+    const comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -14; comp.ratio.value = 6; comp.attack.value = 0.003; comp.release.value = 0.4;
+    const master = ctx.createGain(); master.gain.value = 1.0;
+    comp.connect(master); master.connect(ctx.destination);
+
+    // nagalm: zelfgemaakte "grote ruimte" van 3 s
+    const ir = noiseBuffer(ctx, 3, 2);
+    for (let c = 0; c < 2; c++) {
+      const d = ir.getChannelData(c);
+      for (let i = 0; i < d.length; i++) d[i] *= Math.pow(1 - i / d.length, 3.2);
+    }
+    const verb = ctx.createConvolver(); verb.buffer = ir;
+    const wet = ctx.createGain(); wet.gain.value = 0.45;
+    verb.connect(wet); wet.connect(comp);
+
+    // vervorming voor een rauwe klap
+    const shaper = ctx.createWaveShaper();
+    const curve = new Float32Array(1024);
+    for (let i = 0; i < 1024; i++) { const x = (i / 1023) * 2 - 1; curve[i] = Math.tanh(3 * x); }
+    shaper.curve = curve;
+    shaper.connect(comp); shaper.connect(verb);
+
+    // 1. woosh: ruis die aanzwelt tot de inslag
+    const whoosh = ctx.createBufferSource(); whoosh.buffer = noiseBuffer(ctx, 1.2);
+    const wlp = ctx.createBiquadFilter(); wlp.type = 'lowpass'; wlp.Q.value = 1.5;
+    wlp.frequency.setValueAtTime(200, t); wlp.frequency.exponentialRampToValueAtTime(3000, t + 0.5); wlp.frequency.exponentialRampToValueAtTime(200, t + 1.1);
+    const wg = ctx.createGain();
+    wg.gain.setValueAtTime(0.0001, t); wg.gain.exponentialRampToValueAtTime(0.3, t + 0.45); wg.gain.exponentialRampToValueAtTime(0.0001, t + 1.15);
+    whoosh.connect(wlp); wlp.connect(wg); wg.connect(comp); whoosh.start(t); whoosh.stop(t + 1.2);
+
+    // de inslag valt samen met de witte flits
+    const hit = t + 0.55;
+
+    // 2. harde klap
+    const crack = ctx.createBufferSource(); crack.buffer = noiseBuffer(ctx, 0.5);
+    const cbp = ctx.createBiquadFilter(); cbp.type = 'bandpass'; cbp.frequency.value = 1100; cbp.Q.value = 0.6;
+    const cg = ctx.createGain();
+    cg.gain.setValueAtTime(0.0001, hit); cg.gain.exponentialRampToValueAtTime(1.0, hit + 0.005); cg.gain.exponentialRampToValueAtTime(0.0001, hit + 0.35);
+    crack.connect(cbp); cbp.connect(cg); cg.connect(shaper); crack.start(hit); crack.stop(hit + 0.5);
+
+    // 3. diepe dreun (sub) en een "lijf" erboven
+    [[72, 22, 1.0, 'sine', 3.8], [130, 32, 0.55, 'triangle', 1.6]].forEach(([f0, f1, vol, type, dur]) => {
       const o = ctx.createOscillator(); o.type = type;
-      o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + 1.8);
+      o.frequency.setValueAtTime(f0, hit); o.frequency.exponentialRampToValueAtTime(f1, hit + dur * 0.8);
       const g = ctx.createGain();
-      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.04); g.gain.exponentialRampToValueAtTime(0.0001, t + 2.2);
-      o.connect(g); g.connect(out); o.start(t); o.stop(t + 2.3);
+      g.gain.setValueAtTime(0.0001, hit); g.gain.exponentialRampToValueAtTime(vol, hit + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, hit + dur);
+      o.connect(g); g.connect(type === 'sine' ? comp : shaper); o.start(hit); o.stop(hit + dur + 0.05);
     });
-    // woosh: ruis door een filter dat open en weer dicht gaat
-    const len = Math.floor(ctx.sampleRate * 1.4);
-    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
-    const d = buf.getChannelData(0);
-    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
-    const n = ctx.createBufferSource(); n.buffer = buf;
-    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 1.5;
-    lp.frequency.setValueAtTime(180, t - 0.02); lp.frequency.exponentialRampToValueAtTime(2600, t + 0.35); lp.frequency.exponentialRampToValueAtTime(160, t + 1.3);
-    const ng = ctx.createGain();
-    ng.gain.setValueAtTime(0.0001, t); ng.gain.exponentialRampToValueAtTime(0.35, t + 0.3); ng.gain.exponentialRampToValueAtTime(0.0001, t + 1.35);
-    n.connect(lp); lp.connect(ng); ng.connect(out); n.start(t); n.stop(t + 1.4);
-    // korte klap bij de inslag
-    const hit = ctx.createBufferSource(); hit.buffer = buf;
-    const hp = ctx.createBiquadFilter(); hp.type = 'bandpass'; hp.frequency.value = 900; hp.Q.value = 0.8;
-    const hg = ctx.createGain(); hg.gain.setValueAtTime(0.6, t); hg.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
-    hit.connect(hp); hp.connect(hg); hg.connect(out); hit.start(t); hit.stop(t + 0.15);
-    // daarna het geluidskanaal weer dicht (laat Spotify ongestoord)
-    setTimeout(() => { try { ctx.suspend(); } catch { /* */ } }, 2600);
+
+    // 4. rommel: lage ruis die ~4 s naklinkt en rollend wegsterft
+    const rumble = ctx.createBufferSource(); rumble.buffer = noiseBuffer(ctx, 4.5);
+    const rlp = ctx.createBiquadFilter(); rlp.type = 'lowpass'; rlp.Q.value = 0.9;
+    rlp.frequency.setValueAtTime(600, hit); rlp.frequency.exponentialRampToValueAtTime(70, hit + 4.2);
+    const rg = ctx.createGain();
+    rg.gain.setValueAtTime(0.0001, hit); rg.gain.exponentialRampToValueAtTime(0.9, hit + 0.06);
+    rg.gain.exponentialRampToValueAtTime(0.35, hit + 1.5); rg.gain.exponentialRampToValueAtTime(0.0001, hit + 4.4);
+    const lfo = ctx.createOscillator(); lfo.frequency.value = 5.5;
+    const lfoGain = ctx.createGain(); lfoGain.gain.value = 0.25;
+    const roll = ctx.createGain(); roll.gain.value = 1;
+    lfo.connect(lfoGain); lfoGain.connect(roll.gain);
+    rumble.connect(rlp); rlp.connect(rg); rg.connect(roll); roll.connect(comp); roll.connect(verb);
+    rumble.start(hit); rumble.stop(hit + 4.5); lfo.start(hit); lfo.stop(hit + 4.5);
+
+    // daarna het geluidskanaal weer dicht (laat Spotify ongestoord), pas na de nagalm
+    setTimeout(() => { try { ctx.suspend(); } catch { /* */ } }, 6200);
   } catch { /* geen geluid */ }
 }
 
-/** Gouden flits die vanuit het midden het scherm overneemt; daarna verschijnt de vraag vanuit een waas. */
+const SANTA_IMG = 'assets/kerstman-flits.jpg?v=78';
+/** Zo lang blijft de kerstman extra in beeld voordat de eerste vraag eronder klaarstaat. */
+const SANTA_HOLD = 1300;
+
+/** Gouden flits; in het licht verschijnt de kerstman, die daarna oplost in de eerste vraag. */
 function playTransition() {
   boomSound();
   // 1. het laatste getal vliegt naar je toe en lost op in licht; het beeld eromheen wordt donker
   document.querySelector('.countdown-num')?.classList.add('morph-out');
   document.querySelector('.countdown')?.classList.add('countdown-collapse');
-  // 2. gouden licht zwelt aan tot een witte flits en ebt weer weg
+  // 2. gouden licht zwelt aan tot een witte flits; daaruit komt de kerstman tevoorschijn
   const fx = h('div', { class: 'morph', 'aria-hidden': 'true' },
-    h('div', { class: 'morph-veil' }), h('div', { class: 'morph-burst' }), h('div', { class: 'morph-flash' }));
+    h('div', { class: 'morph-veil' }), h('div', { class: 'morph-burst' }),
+    h('img', { class: 'morph-santa', src: SANTA_IMG, alt: '' }),
+    h('div', { class: 'morph-flash' }));
   document.body.append(fx);
-  // 3. de vraag komt uit het licht tevoorschijn, onderdeel voor onderdeel
+  // 3. de vraag komt daarna uit het donker tevoorschijn, onderdeel voor onderdeel
   document.body.classList.add('morph-enter');
-  setTimeout(() => fx.remove(), 2300);
-  setTimeout(() => document.body.classList.remove('morph-enter'), 3600);
+  setTimeout(() => fx.remove(), 3800);
+  setTimeout(() => document.body.classList.remove('morph-enter'), 3600 + SANTA_HOLD);
 }
 
 function renderCountdown() {
