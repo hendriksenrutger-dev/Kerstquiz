@@ -266,7 +266,10 @@ async function goTo(status, index) {
   const vpath = videoPathFor(status, q);
   const intro = takeSantaIntro();
   if (vpath && intro) santaIntoVideo(intro, vpath);
-  else if (vpath) playVideo(vpath); else stopVideos();
+  else {
+    endIntroVideo();
+    if (vpath) playVideo(vpath); else stopVideos();
+  }
   const clip = clipFor(status, q);
   if (clip) playClip(clip.path, clip.reverse); else stopClip();
   state.answerShownFor = null;  // onthul-effect van de antwoordfoto opnieuw laten beginnen
@@ -641,7 +644,11 @@ function playTransition() {
     h('img', { class: 'morph-santa', src: SANTA_IMG, alt: '' }),
     h('div', { class: 'morph-flash' }));
   document.body.append(fx);
-  santaIntro = { el: fx.querySelector('.morph-santa'), at: Date.now() };
+  // Begint de eerste vraag met een filmpje? Dan start dat al op de klap (geluid tijdens de dreun)
+  const q0 = state.questions[0];
+  const intro = { el: fx.querySelector('.morph-santa'), at: Date.now(), vpath: (q0 && videoPathFor('question', q0)) || null, video: null };
+  santaIntro = intro;
+  if (intro.vpath) setTimeout(() => startIntroVideo(intro), 580);
   // 3. de vraag komt daarna uit het donker tevoorschijn, onderdeel voor onderdeel
   document.body.classList.add('morph-enter');
   setTimeout(() => fx.remove(), 3800);
@@ -649,19 +656,59 @@ function playTransition() {
 }
 
 let santaIntro = null;
+/** Pad van het filmpje dat nu schermvullend uit de flits komt (placeVideos laat het dan met rust). */
+let flyingVideo = null;
+
 /** De kerstman uit de flits, als die nog in beeld is (maar één keer te gebruiken). */
 function takeSantaIntro() {
   const s = santaIntro;
   santaIntro = null;
-  return s && s.el.isConnected && Date.now() - s.at < 3000 ? s : null;
+  if (s && s.el.isConnected && Date.now() - s.at < 4000) return s;
+  endIntroVideo();
+  return null;
+}
+
+/** Filmpje van de eerste vraag schermvullend starten op de klap; zichtbaar zodra de flits is weggeëbd. */
+function startIntroVideo(intro) {
+  if (santaIntro !== intro) return;  // al doorgeklikt
+  const v = videoFor(intro.vpath);
+  if (!v) return;
+  const el = v.el;
+  flyingVideo = intro.vpath;
+  el.classList.remove('video-show');
+  el.classList.add('video-intro');
+  Object.assign(el.style, { left: '', top: '', width: '', height: '', transition: '' });
+  el.controls = false;
+  intro.video = el;
+  playVideo(intro.vpath);  // vanaf het begin, met geluid
+  const show = () => {
+    if (flyingVideo !== intro.vpath) return;
+    setTimeout(() => { if (flyingVideo === intro.vpath) el.classList.add('video-intro-on'); }, Math.max(0, 1250 - (Date.now() - intro.at)));
+  };
+  if (!el.paused && el.readyState >= 3) show(); else el.addEventListener('playing', show, { once: true });
+}
+
+/** Filmpje terug in zijn gewone vak (met rand en bediening). */
+function endIntroVideo() {
+  if (!flyingVideo) return;
+  const v = videos.get(flyingVideo);
+  flyingVideo = null;
+  if (v) {
+    v.el.classList.remove('video-intro', 'video-intro-on');
+    Object.assign(v.el.style, { transition: '', left: '', top: '', width: '', height: '' });
+    v.el.controls = true;
+  }
+  placeVideos();
 }
 
 /**
- * Eerste vraag met een filmpje dat met de kerstman begint: de kerstman schuift van het volledige
- * scherm naar het filmpjesvak en pas als hij daar landt, start het filmpje vanaf het begin.
+ * Eerste vraag met een filmpje dat met de kerstman begint: het filmpje (of, als het nog niet speelt,
+ * de kerstman-afbeelding) schuift van het volledige scherm naar het filmpjesvak.
  */
 function santaIntoVideo(intro, path) {
   const img = intro.el;
+  const v = videoFor(path);
+  const live = intro.vpath === path && intro.video && intro.video.classList.contains('video-intro-on');
   // de kerstman vasthouden zoals hij nu in beeld is (niet laten wegvagen)
   const r0 = img.getBoundingClientRect();
   Object.assign(img.style, {
@@ -669,32 +716,39 @@ function santaIntoVideo(intro, path) {
     opacity: '1', transform: 'none', filter: 'none', zIndex: '9001', borderRadius: '0',
   });
   document.body.append(img);  // los van de flits, die straks verdwijnt
-  // het filmpjesvak staat meteen stil op zijn plek (geen inzoom-animatie), zodat de kerstman er precies in landt
+  // het filmpjesvak staat meteen stil op zijn plek (geen inzoom-animatie), zodat het beeld er precies in landt
   document.body.classList.add('santa-video');
   setTimeout(() => document.body.classList.remove('santa-video'), 6000);
-  const v = videoFor(path);
-  try { v.el.pause(); v.el.currentTime = 0; } catch { /* nog niet geladen */ }
-  const startVideo = () => { playVideo(path); img.style.transition = 'opacity .35s ease'; img.style.opacity = '0'; setTimeout(() => img.remove(), 450); };
+  const mover = live ? v.el : img;
+  const land = () => {
+    if (intro.video && flyingVideo === path) endIntroVideo();  // speelt al: alleen op zijn plek zetten
+    else playVideo(path);
+    img.style.transition = 'opacity .35s ease'; img.style.opacity = '0'; setTimeout(() => img.remove(), 450);
+  };
   const t0 = Date.now();
   const fly = () => {
     const slot = document.querySelector(`.video-slot[data-path="${CSS.escape(path)}"]`);
-    if (!slot || !v.el.classList.contains('video-show')) {
-      if (Date.now() - t0 < 2500) { placeVideos(); return setTimeout(fly, 60); }
-      return startVideo();  // geen vak gevonden: gewoon starten
+    const r = slot?.getBoundingClientRect();
+    if (!r || !r.width) {
+      if (Date.now() - t0 < 2500) return setTimeout(fly, 60);
+      return land();  // geen vak gevonden: gewoon op zijn plek zetten
     }
-    // plek van het beeld binnen het filmpje (contain), daarbinnen de verhouding van de kerstman
-    const b = 4; const r = v.el.getBoundingClientRect();
+    // plek van het beeld binnen het filmpjesvak (binnen de rand, verhouding van het filmpje)
+    const b = 4;
     let box = { x: r.left + b, y: r.top + b, w: r.width - 2 * b, h: r.height - 2 * b };
     const fit = (aspect) => {
       const w = Math.min(box.w, box.h * aspect), hh = w / aspect;
       box = { x: box.x + (box.w - w) / 2, y: box.y + (box.h - hh) / 2, w, h: hh };
     };
     if (v.el.videoWidth && v.el.videoHeight) fit(v.el.videoWidth / v.el.videoHeight);
-    if (img.naturalWidth && img.naturalHeight) fit(img.naturalWidth / img.naturalHeight);
-    img.style.transition = 'left .9s cubic-bezier(.65,0,.25,1), top .9s cubic-bezier(.65,0,.25,1), width .9s cubic-bezier(.65,0,.25,1), height .9s cubic-bezier(.65,0,.25,1), border-radius .9s ease';
-    img.getBoundingClientRect();  // vertrekpunt vastleggen
-    Object.assign(img.style, { left: `${box.x}px`, top: `${box.y}px`, width: `${box.w}px`, height: `${box.h}px`, borderRadius: '6px' });
-    setTimeout(startVideo, 920);
+    if (!live && img.naturalWidth && img.naturalHeight) fit(img.naturalWidth / img.naturalHeight);
+    const m = mover.getBoundingClientRect();
+    Object.assign(mover.style, { left: `${m.left}px`, top: `${m.top}px`, width: `${m.width}px`, height: `${m.height}px` });
+    mover.getBoundingClientRect();  // vertrekpunt vastleggen
+    const ease = '.9s cubic-bezier(.65,0,.25,1)';
+    mover.style.transition = `left ${ease}, top ${ease}, width ${ease}, height ${ease}, border-radius .9s ease`;
+    Object.assign(mover.style, { left: `${box.x}px`, top: `${box.y}px`, width: `${box.w}px`, height: `${box.h}px`, borderRadius: '6px' });
+    setTimeout(land, 920);
   };
   setTimeout(fly, 150);
 }
@@ -2009,6 +2063,7 @@ function placeVideos() {
   const slot = document.querySelector('.video-slot');
   const r = slot ? slot.getBoundingClientRect() : null;
   for (const [p, v] of videos) {
+    if (p === flyingVideo) continue;  // komt net schermvullend uit de flits
     const on = slot && slot.dataset.path === p && r.width > 0;
     v.el.classList.toggle('video-show', Boolean(on));
     if (on) Object.assign(v.el.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });

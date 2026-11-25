@@ -1175,6 +1175,12 @@ body.pv-with-phone .stage { width: min(calc(100vw - 340px), calc((100dvh - 64px)
 }
 body > .morph-santa { -webkit-mask-image: none; mask-image: none; }
 .santa-video #app .stage .photo.video-slot { animation: none; }
+/* filmpje van de eerste vraag: komt schermvullend uit de flits, precies over de kerstman */
+.deck-video.video-intro {
+  left: 0; top: 0; width: 100vw; height: 100vh; transform: none; z-index: 9002; opacity: 0; pointer-events: none;
+  border: 0; border-radius: 0; object-fit: cover; object-position: 50% 10%; transition: opacity .35s ease;
+}
+.deck-video.video-intro.video-intro-on { opacity: 1; }
 @keyframes morph-santa {
   0%, 14% { opacity: 0; transform: scale(1.18); filter: brightness(4) contrast(.6) blur(10px); }
   22% { opacity: 1; transform: scale(1.1); filter: brightness(2.2) contrast(.8) blur(3px); }
