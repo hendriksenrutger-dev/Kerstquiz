@@ -264,7 +264,9 @@ async function goTo(status, index) {
   const link = mediaLinkFor(status, q);
   if (link) playMedia(link, { seconds: introSeconds(status, q), start: mediaStartFor(status, q) }); else stopMedia();
   const vpath = videoPathFor(status, q);
-  if (vpath) playVideo(vpath); else stopVideos();
+  const intro = takeSantaIntro();
+  if (vpath && intro) santaIntoVideo(intro, vpath);
+  else if (vpath) playVideo(vpath); else stopVideos();
   const clip = clipFor(status, q);
   if (clip) playClip(clip.path, clip.reverse); else stopClip();
   state.answerShownFor = null;  // onthul-effect van de antwoordfoto opnieuw laten beginnen
@@ -639,10 +641,62 @@ function playTransition() {
     h('img', { class: 'morph-santa', src: SANTA_IMG, alt: '' }),
     h('div', { class: 'morph-flash' }));
   document.body.append(fx);
+  santaIntro = { el: fx.querySelector('.morph-santa'), at: Date.now() };
   // 3. de vraag komt daarna uit het donker tevoorschijn, onderdeel voor onderdeel
   document.body.classList.add('morph-enter');
   setTimeout(() => fx.remove(), 3800);
   setTimeout(() => document.body.classList.remove('morph-enter'), 3600 + SANTA_HOLD);
+}
+
+let santaIntro = null;
+/** De kerstman uit de flits, als die nog in beeld is (maar één keer te gebruiken). */
+function takeSantaIntro() {
+  const s = santaIntro;
+  santaIntro = null;
+  return s && s.el.isConnected && Date.now() - s.at < 3000 ? s : null;
+}
+
+/**
+ * Eerste vraag met een filmpje dat met de kerstman begint: de kerstman schuift van het volledige
+ * scherm naar het filmpjesvak en pas als hij daar landt, start het filmpje vanaf het begin.
+ */
+function santaIntoVideo(intro, path) {
+  const img = intro.el;
+  // de kerstman vasthouden zoals hij nu in beeld is (niet laten wegvagen)
+  const r0 = img.getBoundingClientRect();
+  Object.assign(img.style, {
+    animation: 'none', position: 'fixed', left: `${r0.left}px`, top: `${r0.top}px`, width: `${r0.width}px`, height: `${r0.height}px`,
+    opacity: '1', transform: 'none', filter: 'none', zIndex: '9001', borderRadius: '0',
+  });
+  document.body.append(img);  // los van de flits, die straks verdwijnt
+  // het filmpjesvak staat meteen stil op zijn plek (geen inzoom-animatie), zodat de kerstman er precies in landt
+  document.body.classList.add('santa-video');
+  setTimeout(() => document.body.classList.remove('santa-video'), 6000);
+  const v = videoFor(path);
+  try { v.el.pause(); v.el.currentTime = 0; } catch { /* nog niet geladen */ }
+  const startVideo = () => { playVideo(path); img.style.transition = 'opacity .35s ease'; img.style.opacity = '0'; setTimeout(() => img.remove(), 450); };
+  const t0 = Date.now();
+  const fly = () => {
+    const slot = document.querySelector(`.video-slot[data-path="${CSS.escape(path)}"]`);
+    if (!slot || !v.el.classList.contains('video-show')) {
+      if (Date.now() - t0 < 2500) { placeVideos(); return setTimeout(fly, 60); }
+      return startVideo();  // geen vak gevonden: gewoon starten
+    }
+    // plek van het beeld binnen het filmpje (contain), daarbinnen de verhouding van de kerstman
+    const b = 4; const r = v.el.getBoundingClientRect();
+    let box = { x: r.left + b, y: r.top + b, w: r.width - 2 * b, h: r.height - 2 * b };
+    const fit = (aspect) => {
+      const w = Math.min(box.w, box.h * aspect), hh = w / aspect;
+      box = { x: box.x + (box.w - w) / 2, y: box.y + (box.h - hh) / 2, w, h: hh };
+    };
+    if (v.el.videoWidth && v.el.videoHeight) fit(v.el.videoWidth / v.el.videoHeight);
+    if (img.naturalWidth && img.naturalHeight) fit(img.naturalWidth / img.naturalHeight);
+    img.style.transition = 'left .9s cubic-bezier(.65,0,.25,1), top .9s cubic-bezier(.65,0,.25,1), width .9s cubic-bezier(.65,0,.25,1), height .9s cubic-bezier(.65,0,.25,1), border-radius .9s ease';
+    img.getBoundingClientRect();  // vertrekpunt vastleggen
+    Object.assign(img.style, { left: `${box.x}px`, top: `${box.y}px`, width: `${box.w}px`, height: `${box.h}px`, borderRadius: '6px' });
+    setTimeout(startVideo, 920);
+  };
+  setTimeout(fly, 150);
 }
 
 function renderCountdown() {

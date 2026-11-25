@@ -1173,6 +1173,8 @@ body.pv-with-phone .stage { width: min(calc(100vw - 340px), calc((100dvh - 64px)
   mask-image: radial-gradient(ellipse 75% 85% at 50% 42%, #000 55%, transparent 100%);
   animation: morph-santa 3.5s cubic-bezier(.3, 0, .3, 1) forwards;
 }
+body > .morph-santa { -webkit-mask-image: none; mask-image: none; }
+.santa-video #app .stage .photo.video-slot { animation: none; }
 @keyframes morph-santa {
   0%, 14% { opacity: 0; transform: scale(1.18); filter: brightness(4) contrast(.6) blur(10px); }
   22% { opacity: 1; transform: scale(1.1); filter: brightness(2.2) contrast(.8) blur(3px); }
