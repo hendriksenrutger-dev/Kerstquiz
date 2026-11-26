@@ -4,12 +4,12 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer, inScarePhase, serverNow, SCARE_SECONDS,
-} from './common.js?v=81';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=81';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=81';
+} from './common.js?v=82';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=82';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=82';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking, fastestWinners,
-} from './scoring.js?v=81';
+} from './scoring.js?v=82';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -517,9 +517,10 @@ function stopCountdown() {
 function finishCountdown() {
   if (!state.countdown) return;
   stopCountdown();
-  playTransition();
-  // Eerste vraag pas tonen als de flits het scherm bedekt (de muziek van het aftellen stopt daar vanzelf)
-  setTimeout(next, 650 + SANTA_HOLD);  // de vraag komt eronder klaar terwijl de kerstman nog in beeld is
+  const santa = playTransition();
+  // Eerste vraag pas tonen als de flits het scherm bedekt (de muziek van het aftellen stopt daar vanzelf);
+  // met de kerstman in beeld wat later, zodat hij eerst even blijft staan.
+  setTimeout(next, 650 + (santa ? SANTA_HOLD : 0));
 }
 
 // ---------------------------------------------------------------- overgang aftellen → eerste vraag
@@ -629,31 +630,34 @@ function boomSound() {
 /** Filmpje van de eerste vraag dat al tijdens de overgang speelt. */
 let earlyVideo = null;
 
-const SANTA_IMG = 'assets/kerstman-flits.jpg?v=81';
+const SANTA_IMG = 'assets/kerstman-flits.jpg?v=82';
 /** Zo lang blijft de kerstman extra in beeld voordat de eerste vraag eronder klaarstaat. */
 const SANTA_HOLD = 1300;
 
 /** Gouden flits; in het licht verschijnt de kerstman, die daarna oplost in het donker; dan komt de eerste vraag. */
 function playTransition() {
   boomSound();
+  // Begint de eerste vraag met een filmpje? Dan geen kerstmanfoto (het filmpje begint zelf al met hem).
+  // Het filmpje start (onzichtbaar) al op de klap, zodat het geluid tijdens de dreun begint;
+  // in beeld komt het in zijn eigen vak bij de eerste vraag.
+  const q0 = state.questions[0];
+  const vp0 = q0 ? videoPathFor('question', q0) : null;
+  const santa = !vp0;
   // 1. het laatste getal vliegt naar je toe en lost op in licht; het beeld eromheen wordt donker
   document.querySelector('.countdown-num')?.classList.add('morph-out');
   document.querySelector('.countdown')?.classList.add('countdown-collapse');
-  // 2. gouden licht zwelt aan tot een witte flits; daaruit komt de kerstman tevoorschijn
-  const fx = h('div', { class: 'morph', 'aria-hidden': 'true' },
+  // 2. gouden licht zwelt aan tot een witte flits (met de kerstman erin, als er geen filmpje volgt)
+  const fx = h('div', { class: santa ? 'morph' : 'morph morph-short', 'aria-hidden': 'true' },
     h('div', { class: 'morph-veil' }), h('div', { class: 'morph-burst' }),
-    h('img', { class: 'morph-santa', src: SANTA_IMG, alt: '' }),
+    santa && h('img', { class: 'morph-santa', src: SANTA_IMG, alt: '' }),
     h('div', { class: 'morph-flash' }));
   document.body.append(fx);
-  // Begint de eerste vraag met een filmpje? Dan start dat (onzichtbaar) al op de klap, zodat het
-  // geluid tijdens de dreun begint; in beeld komt het pas in zijn eigen vak bij de eerste vraag.
-  const q0 = state.questions[0];
-  const vp0 = q0 ? videoPathFor('question', q0) : null;
   if (vp0) setTimeout(() => { if (state.game?.status === 'question' && currentIndex() < 0) { earlyVideo = vp0; playVideo(vp0); } }, 580);
   // 3. de vraag komt daarna uit het donker tevoorschijn, onderdeel voor onderdeel
   document.body.classList.add('morph-enter');
-  setTimeout(() => fx.remove(), 3800);
-  setTimeout(() => document.body.classList.remove('morph-enter'), 3600 + SANTA_HOLD);
+  setTimeout(() => fx.remove(), santa ? 3800 : 2300);
+  setTimeout(() => document.body.classList.remove('morph-enter'), 3600 + (santa ? SANTA_HOLD : 0));
+  return santa;
 }
 
 function renderCountdown() {
