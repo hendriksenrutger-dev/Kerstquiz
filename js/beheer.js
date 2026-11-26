@@ -2,9 +2,9 @@
 // spelinstellingen en een spel starten. Licht thema; werkt op iPad en iPhone.
 import {
   sb, h, mount, toast, LETTERS, errorText, loginForm, parseSpotify, cleanSpotifyLink, spotifyPlayer, SCARE_SECONDS,
-} from './common.js?v=79';
-import { parseNumber, formatNumber } from './scoring.js?v=79';
-import { addTestPlayers } from './proef.js?v=79';
+} from './common.js?v=80';
+import { parseNumber, formatNumber } from './scoring.js?v=80';
+import { addTestPlayers } from './proef.js?v=80';
 
 const TREE_CATEGORY = 'Van wie is deze kerstboom?';
 const WHO_CATEGORY = 'Wie is dit?';
@@ -22,11 +22,12 @@ const REVEAL_EFFECTS = [
   { value: 'inzoomen', label: 'Langzaam uitzoomen (begint heel dichtbij)' },
   { value: 'puzzel', label: 'Puzzelstukjes die één voor één wegvallen' },
 ];
-/** "1:05" of "65" → 65 seconden; leeg → null; ongeldig → false. */
+/** "1:05", "1.05", "1,05", "1 05" of "65" → 65 seconden; leeg → null; ongeldig → false.
+ *  (Het cijfertoetsenbord op Android heeft geen dubbele punt, wel een punt en komma.) */
 function parseTime(v) {
   const t = String(v || '').trim();
   if (!t) return null;
-  const m = t.match(/^(\d{1,3})(?::([0-5]?\d))?$/);
+  const m = t.match(/^(\d{1,3})(?:\s*[:.,\s-]\s*([0-5]?\d))?$/);
   if (!m) return false;
   return m[2] != null ? Number(m[1]) * 60 + Number(m[2]) : Number(m[1]);
 }
@@ -591,7 +592,7 @@ function settingsCard() {
             const link = cdMusic.value();
             if (link === false) return toast('De Spotify-link wordt niet herkend.');
             const st = parseTime(cdStart.value);
-            if (st === false) return toast('Vul het beginpunt in als minuten:seconden, bijvoorbeeld 1:05.');
+            if (st === false) return toast('Vul het beginpunt in als minuten.seconden, bijvoorbeeld 1.05 (of alleen seconden: 65).');
             const row = { countdown_seconds: secs, countdown_music: link };
             if (st || state.settings.countdown_music_start) row.countdown_music_start = st || null;
             const bpm = cdBpm.value.trim() ? parseInt(cdBpm.value, 10) : null;
@@ -784,13 +785,13 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
       // Beginpunt van de nummers (alleen meesturen als ingesteld of eerder ingesteld; werkt dan ook zonder 022).
       const ms = parseTime(mediaStart.value);
       const ams = parseTime(answerMediaStart.value);
-      if (ms === false || ams === false) return (err.textContent = 'Vul het beginpunt in als minuten:seconden, bijvoorbeeld 1:05.');
+      if (ms === false || ams === false) return (err.textContent = 'Vul het beginpunt in als minuten.seconden, bijvoorbeeld 1.05 (of alleen seconden: 65).');
       if (ms || q?.media_start) row.media_start = ms || null;
       if (ams || ans?.answer_media_start) answerRow.answer_media_start = ams || null;
       // Uitfaden van de filmpjes (alleen meesturen als ingesteld of eerder ingesteld; werkt dan ook zonder 025).
       const ve = parseTime(videoEnd.value);
       const ave = parseTime(answerVideoEnd.value);
-      if (ve === false || ave === false) return (err.textContent = 'Vul het uitfaadmoment in als minuten:seconden, bijvoorbeeld 0:45.');
+      if (ve === false || ave === false) return (err.textContent = 'Vul het uitfaadmoment in als minuten.seconden, bijvoorbeeld 0.45 (of alleen seconden: 45).');
       if (ve || q?.video_end) row.video_end = ve || null;
       if (ave || ans?.answer_video_end) answerRow.answer_video_end = ave || null;
       // Alleen meesturen als ingesteld of eerder ingesteld (werkt dan ook zonder 017_antwoordfoto_onthullen.sql).
@@ -896,7 +897,7 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
       h('label', {}, 'Foto onthullen', revealFx,
         h('span', { class: 'hint' }, 'De foto wordt tijdens de vraag langzaam zichtbaar op de tv (na ongeveer 85% van de tijd helemaal). Op de telefoons staat de foto dan niet.')),
       video.el,
-      h('label', {}, '🔉 Uitfaden bij (minuten:seconden)', videoEnd, h('span', { class: 'hint' }, 'Het filmpje wordt de laatste 3 seconden zachter en donkerder en stopt op dit moment. Leeg = tot het einde.')),
+      h('label', {}, '🔉 Uitfaden bij (minuten:seconden)', videoEnd, h('span', { class: 'hint' }, 'Bijvoorbeeld 0.45 of 0:45 (of alleen seconden: 45). Het filmpje wordt de laatste 3 seconden zachter en donkerder en stopt op dit moment. Leeg = tot het einde.')),
       h('span', { class: 'hint' }, 'Een filmpje start vanzelf met geluid op de tv, op de plek van de foto (op de telefoons staat dan "Kijk naar het grote scherm"). Maximaal 50 MB.')),
 
     // ---- 3. Muziek en geluid bij de vraag
@@ -923,7 +924,7 @@ function renderEdit(q, { scareOnly: newScare = false } = {}) {
       h('label', {}, 'Antwoordfoto onthullen', answerFx,
         h('span', { class: 'hint' }, 'De antwoordfoto wordt in 8 seconden langzaam zichtbaar zodra het antwoord op de tv komt.')),
       answerVideo.el,
-      h('label', {}, '🔉 Antwoordfilmpje uitfaden bij (minuten:seconden)', answerVideoEnd, h('span', { class: 'hint' }, 'Het filmpje wordt de laatste 3 seconden zachter en donkerder en stopt op dit moment. Leeg = tot het einde.')),
+      h('label', {}, '🔉 Antwoordfilmpje uitfaden bij (minuten:seconden)', answerVideoEnd, h('span', { class: 'hint' }, 'Bijvoorbeeld 0.45 of 0:45 (of alleen seconden: 45). Het filmpje wordt de laatste 3 seconden zachter en donkerder en stopt op dit moment. Leeg = tot het einde.')),
       h('div', { class: 'stack-tight b-subblock' },
         answerMusic.el,
         h('span', { class: 'hint' }, 'Dit nummer speelt in de antwoordenronde, bijvoorbeeld het nummer van het antwoord.'),

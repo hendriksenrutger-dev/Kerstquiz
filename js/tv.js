@@ -4,12 +4,12 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer, inScarePhase, serverNow, SCARE_SECONDS,
-} from './common.js?v=79';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=79';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=79';
+} from './common.js?v=80';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=80';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=80';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking, fastestWinners,
-} from './scoring.js?v=79';
+} from './scoring.js?v=80';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -628,7 +628,7 @@ function boomSound() {
   } catch { /* geen geluid */ }
 }
 
-const SANTA_IMG = 'assets/kerstman-flits.jpg?v=79';
+const SANTA_IMG = 'assets/kerstman-flits.jpg?v=80';
 /** Zo lang blijft de kerstman extra in beeld voordat de eerste vraag eronder klaarstaat. */
 const SANTA_HOLD = 1300;
 
