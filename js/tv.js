@@ -4,12 +4,12 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer, inScarePhase, serverNow, SCARE_SECONDS,
-} from './common.js?v=78';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=78';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=78';
+} from './common.js?v=79';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=79';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=79';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking, fastestWinners,
-} from './scoring.js?v=78';
+} from './scoring.js?v=79';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -628,7 +628,7 @@ function boomSound() {
   } catch { /* geen geluid */ }
 }
 
-const SANTA_IMG = 'assets/kerstman-flits.jpg?v=78';
+const SANTA_IMG = 'assets/kerstman-flits.jpg?v=79';
 /** Zo lang blijft de kerstman extra in beeld voordat de eerste vraag eronder klaarstaat. */
 const SANTA_HOLD = 1300;
 
@@ -2044,8 +2044,40 @@ function playVideo(path) {
   const el = v.el;
   el.muted = false;
   try { el.currentTime = 0; } catch { /* nog niet geladen */ }
+  fadeOutAt(el, videoEndFor(path));
   const go = () => el.play()?.catch(() => { el.muted = true; el.play()?.catch(() => {}); });
   if (el.src) go(); else v.ready.then(go);
+}
+
+/** Ingesteld uitfaadmoment (seconden) van een filmpje bij de vraag of bij het antwoord. */
+function videoEndFor(path) {
+  const qs = [...(state.questions || []), ...(preview?.list || [])];
+  const q = qs.find((x) => x.video_path === path);
+  if (q?.video_end) return Number(q.video_end);
+  for (const k of (state.keys?.values?.() || [])) if (k.answer_video_path === path && k.answer_video_end) return Number(k.answer_video_end);
+  return null;
+}
+
+const VIDEO_FADE = 3;  // seconden uitfaden (geluid en beeld)
+/** Filmpje vanaf `end - 3 s` zachter en donkerder laten worden en op `end` stoppen. */
+function fadeOutAt(el, end) {
+  clearInterval(el._fade);
+  try { el.volume = 1; } catch { /* */ }
+  el.style.filter = '';
+  if (!end) return;
+  el._fade = setInterval(() => {
+    const left = end - el.currentTime;
+    if (left > VIDEO_FADE) return;
+    if (left <= 0) {
+      el.pause();
+      el.style.filter = 'brightness(0)';
+      clearInterval(el._fade);
+      return;
+    }
+    const k = left / VIDEO_FADE;
+    try { el.volume = Math.max(0, Math.min(1, k * k)); } catch { /* volume niet regelbaar (iPad): alleen stoppen */ }
+    el.style.filter = `brightness(${k.toFixed(3)})`;
+  }, 50);
 }
 
 function stopVideos() {
