@@ -1165,6 +1165,9 @@ body.pv-with-phone .stage { width: min(calc(100vw - 340px), calc((100dvh - 64px)
 }
 .morph-flash { position: absolute; inset: 0; background: #fff8e6; opacity: 0; animation: morph-flash 2.3s ease forwards; }
 @keyframes morph-veil { 0% { opacity: 0; } 12% { opacity: .92; } 18%, 62% { opacity: 1; } 100% { opacity: 0; } }
+/* zonder kerstman (eerste vraag met filmpje): de kortere waas van voorheen */
+.morph-short .morph-veil { animation: morph-veil-short 2.3s cubic-bezier(.4, 0, .2, 1) forwards; }
+@keyframes morph-veil-short { 0% { opacity: 0; } 18% { opacity: .9; } 45% { opacity: .9; } 100% { opacity: 0; } }
 /* de kerstman: komt uit het witte licht, kijkt je even dreigend aan en lost dan op */
 .morph-santa {
   position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 10%;
