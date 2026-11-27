@@ -623,7 +623,9 @@ function boomSound() {
     rumble.start(hit); rumble.stop(hit + 4.5); lfo.start(hit); lfo.stop(hit + 4.5);
 
     // daarna het geluidskanaal weer dicht (laat Spotify ongestoord), pas na de nagalm
-    setTimeout(() => { try { ctx.suspend(); } catch { /* */ } }, 6200);
+    // na de nagalm het geluidskanaal helemaal sluiten (niet alleen pauzeren): een achtergebleven
+    // kanaal kan op Android later geluid (zoals de schrikgil) via Bluetooth in de weg zitten
+    setTimeout(() => { if (fxCtx === ctx) fxCtx = null; ctx.close().catch(() => {}); }, 6200);
   } catch { /* geen geluid */ }
 }
 
