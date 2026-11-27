@@ -1,9 +1,9 @@
 // Router: #tv, #speler (standaard) en #beheer.
-import { h, mount, parseHash, checkVersion } from './common.js?v=83';
-import { startTv } from './tv.js?v=83';
-import { startSpeler } from './speler.js?v=83';
-import { startBeheer } from './beheer.js?v=83';
-import { startRemote } from './afstand.js?v=83';
+import { h, mount, parseHash, checkVersion } from './common.js?v=84';
+import { startTv } from './tv.js?v=84';
+import { startSpeler } from './speler.js?v=84';
+import { startBeheer } from './beheer.js?v=84';
+import { startRemote } from './afstand.js?v=84';
 
 function start() {
   const { view, params } = parseHash();
