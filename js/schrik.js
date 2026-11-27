@@ -1,7 +1,7 @@
 // Schrikeffect: na een ingesteld aantal seconden verschijnt plotseling een geest met een gil.
 // Werkt op de tv en op de telefoons, op basis van de starttijd van de vraag (serverklok).
 
-import { serverNow } from './common.js?v=83';
+import { serverNow } from './common.js?v=84';
 
 let ctx = null;
 let timer = null;
@@ -71,10 +71,13 @@ export function scheduleScare(game, q, stillValid, imageUrl = null) {
   clearTimeout(timer);
   timer = null;
   timerKey = key;
-  if (!key || !game?.question_started_at) return;
+  if (!key || !game?.question_started_at) { sleepAgain(); return; }
   const at = new Date(game.question_started_at).getTime() + q.scare_after * 1000;
   const delay = at - serverNow();
   if (delay < -1500) return; // al voorbij (bijv. later binnengekomen): niet alsnog schrikken
+  // Geluid alvast wakker maken: een Bluetooth-speaker valt na een paar seconden stilte in slaap en
+  // mist dan de gil. Een onhoorbaar ruisje houdt de verbinding open tot na de gil.
+  keepAwake(Math.max(0, delay) + 3500);
   // Beeld alvast inladen, zodat het meteen verschijnt
   let img = null;
   if (imageUrl) { img = new Image(); img.src = imageUrl; }
@@ -85,6 +88,40 @@ export function cancelScare() {
   clearTimeout(timer);
   timer = null;
   timerKey = '';
+  sleepAgain();
+}
+
+let awake = null;      // { src, until } — het onhoorbare ruisje
+let sleepTimer = null;
+
+/** Geluidskanaal open houden (vers kanaal, volgt de huidige uitgang) tot `ms` vanaf nu. */
+function keepAwake(ms) {
+  try {
+    if (!awake) {
+      freshContext();
+      if (!ctx) return;
+      if (ctx.state === 'suspended') ctx.resume();
+      const len = ctx.sampleRate;  // 1 seconde, herhaald
+      const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * 0.0004;  // ruim onder -60 dB: onhoorbaar
+      const src = ctx.createBufferSource();
+      src.buffer = buf; src.loop = true;
+      src.connect(ctx.destination); src.start();
+      awake = { src };
+    }
+    clearTimeout(sleepTimer);
+    sleepTimer = setTimeout(sleepAgain, ms);
+  } catch { /* geen geluid */ }
+}
+
+/** Ruisje stoppen en het kanaal weer op pauze (zodat Spotify ongestoord kan spelen). */
+function sleepAgain() {
+  clearTimeout(sleepTimer);
+  if (!awake) return;
+  try { awake.src.stop(); } catch { /* */ }
+  awake = null;
+  try { ctx?.suspend(); } catch { /* */ }
 }
 
 const GHOST_SVG = `
@@ -128,12 +165,13 @@ export function showScare(imageUrl = null) {
 
 /** Een gil, opgebouwd met de geluidschip (geen geluidsbestand nodig). */
 function scream() {
-  freshContext();
+  if (!awake) freshContext();  // al wakker gehouden: dat kanaal gebruiken
   if (!ctx) return;
   const go = () => playScream();
   if (ctx.state === 'suspended') ctx.resume().then(go, go); else go();
-  // na de gil het geluidskanaal weer op pauze (zodat Spotify ongestoord kan spelen)
-  setTimeout(() => { try { ctx.suspend(); } catch { /* */ } }, 2600);
+  // na de gil het ruisje stoppen en het geluidskanaal weer op pauze (zodat Spotify ongestoord kan spelen)
+  if (awake) { clearTimeout(sleepTimer); sleepTimer = setTimeout(sleepAgain, 2600); }
+  else setTimeout(() => { try { ctx.suspend(); } catch { /* */ } }, 2600);
 }
 
 function playScream() {
