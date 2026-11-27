@@ -1,7 +1,7 @@
 // Schrikeffect: na een ingesteld aantal seconden verschijnt plotseling een geest met een gil.
 // Werkt op de tv en op de telefoons, op basis van de starttijd van de vraag (serverklok).
 
-import { serverNow } from './common.js?v=82';
+import { serverNow } from './common.js?v=83';
 
 let ctx = null;
 let timer = null;
@@ -31,6 +31,27 @@ function unlock() {
     UNLOCK_EVENTS.forEach((ev) => document.removeEventListener(ev, unlock, { capture: true }));
     listening = false;
   } catch { /* geen geluid mogelijk */ }
+}
+
+/**
+ * Vlak voor de gil een nieuw geluidskanaal maken. Een oud kanaal kan nog aan een vorige uitgang
+ * vastzitten (bijv. de tv, terwijl het geluid inmiddels via Bluetooth naar een speaker gaat) en blijft
+ * dan stil. Na een eerdere tik mag de browser (Chrome) een nieuw kanaal meteen laten klinken; lukt dat
+ * niet (iPad zonder tik), dan blijft het oude, vrijgegeven kanaal in gebruik.
+ */
+function freshContext() {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    const n = new AC();
+    if (n.state === 'running' || !ctx) {
+      const old = ctx;
+      ctx = n;
+      if (old) old.close().catch(() => {});
+    } else {
+      n.close().catch(() => {});
+    }
+  } catch { /* geen nieuw kanaal: het oude gebruiken */ }
 }
 
 /** Aanroepen met de vragenlijst: alleen bij een schrik wordt het geluid (één keer) vrijgegeven. */
@@ -107,6 +128,7 @@ export function showScare(imageUrl = null) {
 
 /** Een gil, opgebouwd met de geluidschip (geen geluidsbestand nodig). */
 function scream() {
+  freshContext();
   if (!ctx) return;
   const go = () => playScream();
   if (ctx.state === 'suspended') ctx.resume().then(go, go); else go();
