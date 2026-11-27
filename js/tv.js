@@ -4,12 +4,12 @@ import {
   fetchQuestions, fetchGame, errorText, liveSync, syncRealtimeAuth, qrSvg, joinUrl, loginForm,
   keepScreenOn, fullscreenButton, spotifyPlayer, hiddenSpotifyPlayer, loopingSpotifyPlayer, APP_VERSION,
   brandTitle, ornament, deckPlayer, inScarePhase, serverNow, SCARE_SECONDS,
-} from './common.js?v=84';
-import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=84';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=84';
+} from './common.js?v=85';
+import { testPlayers, stopTestMode, answerAsTestPlayers } from './proef.js?v=85';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=85';
 import {
   judgeOpen, estimateWinners, choiceWinners, formatNumber, scoreboard, treeRanking, interimTop, finalRanking, fastestWinners,
-} from './scoring.js?v=84';
+} from './scoring.js?v=85';
 
 const TV_GAME_KEY = 'kerstquiz_tv_game';
 const SIGNED_URL_SECONDS = 3 * 60 * 60; // ongeveer 3 uur
@@ -623,14 +623,16 @@ function boomSound() {
     rumble.start(hit); rumble.stop(hit + 4.5); lfo.start(hit); lfo.stop(hit + 4.5);
 
     // daarna het geluidskanaal weer dicht (laat Spotify ongestoord), pas na de nagalm
-    setTimeout(() => { try { ctx.suspend(); } catch { /* */ } }, 6200);
+    // na de nagalm het geluidskanaal helemaal sluiten (niet alleen pauzeren): een achtergebleven
+    // kanaal kan op Android later geluid (zoals de schrikgil) via Bluetooth in de weg zitten
+    setTimeout(() => { if (fxCtx === ctx) fxCtx = null; ctx.close().catch(() => {}); }, 6200);
   } catch { /* geen geluid */ }
 }
 
 /** Filmpje van de eerste vraag dat al tijdens de overgang speelt. */
 let earlyVideo = null;
 
-const SANTA_IMG = 'assets/kerstman-flits.jpg?v=84';
+const SANTA_IMG = 'assets/kerstman-flits.jpg?v=85';
 /** Zo lang blijft de kerstman extra in beeld voordat de eerste vraag eronder klaarstaat. */
 const SANTA_HOLD = 1300;
 
