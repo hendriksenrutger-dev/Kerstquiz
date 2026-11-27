@@ -2,9 +2,9 @@
 import {
   sb, h, mount, toast, load, save, LETTERS, syncClock, secondsLeft,
   fetchQuestions, fetchGame, errorText, liveSync, brandTitle, inScarePhase,
-} from './common.js?v=85';
-import { parseNumber, formatNumber } from './scoring.js?v=85';
-import { scheduleScare, prepareScareAudio } from './schrik.js?v=85';
+} from './common.js?v=86';
+import { parseNumber, formatNumber } from './scoring.js?v=86';
+import { scheduleScare, prepareScareAudio } from './schrik.js?v=86';
 
 const PLAYER_KEY = 'kerstquiz_speler';
 
